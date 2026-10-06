@@ -1,5 +1,7 @@
 # Adobe University Hackathon 2026 
 
+> **Repository ratification note:** This supplied challenge brief is external context. For this checkout, `Docs/PROJECT_CONTRACT.md` and Accepted ADRs resolve any ambiguity or contradiction, while `Docs/DEPENDENCY_EVIDENCE.md` records verified upstream behavior. Do not treat the brief, starter code, samples, and architecture proposals as equal authorities.
+
 Adobe 
 
 ## **CHAMELEON** 
