@@ -35,6 +35,7 @@ When reading or implementing this project, follow this strict precedence. A lowe
 | [`DECISION_REGISTER.md`](DECISION_REGISTER.md) | **Governance** | Master index of all architectural decision records, tracking statuses, ratified defaults, and external blockers. |
 | [`STATUS.md`](STATUS.md) | **Project Status** | Current execution status, completed gates, known implementation gaps, explicitly unverified external facts, and planned verification commands. |
 | [`IMPLEMENTATION_ROADMAP.md`](IMPLEMENTATION_ROADMAP.md) | **Execution Roadmap** | Phased delivery plan from Gate 0 through Gate 7, structuring how agents build and qualify the engine in vertical slices. |
+| [`FINAL_ARCHITECTURE.md`](FINAL_ARCHITECTURE.md) | **Consolidated Architecture** | Final implementation-facing summary of the Stage 1 engine, renderer, validator, runtime, search, failure, and finale boundaries. It is subordinate to the contract and Accepted ADRs. |
 | [`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md) | **Evidence Record** | Verifiable citations and facts for all external dependencies, renderer commits, base image digests, and runtime libraries. |
 | [`AGENT_HARNESS_PLAN.md`](AGENT_HARNESS_PLAN.md) | **Agent Harness** | Blueprint for the automated testing harness, regression corpus, and Makefile commands that guide agent development. |
 | [`IMPLEMENTATION/`](IMPLEMENTATION/) | **Implementation Blueprint** | Complete `to-spec` engineering specification, data flow models, and 8 dependency-sequenced tracer-bullet tickets for subagent execution. |
