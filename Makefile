@@ -7,11 +7,14 @@ VENV_DIR := $(ROOT_DIR)/.venv
 PYTHON := $(VENV_DIR)/bin/python
 PIP := $(VENV_DIR)/bin/pip
 
-.PHONY: help setup test run agent-check inspect synthetic docker-build docker-test clean
+.PHONY: help setup verify install-hooks preflight test run agent-check inspect synthetic docker-build docker-test clean
 
 help:
 	@echo "Project Chameleon Developer & Agent Commands:"
 	@echo "  make setup        - Initialize .venv (Python 3.11) and install dependencies"
+	@echo "  make verify       - Verify repository governance and implementation wiring"
+	@echo "  make install-hooks - Install the versioned repository Git hooks"
+	@echo "  make preflight    - Verify repository wiring and require the nested engine"
 	@echo "  make test         - Run all unit tests via unittest"
 	@echo "  make run          - Execute engine.main on all tasks in chameleon/input/"
 	@echo "  make inspect      - Inspect generated layouts in terminal using ASCII visualizer"
@@ -23,13 +26,24 @@ help:
 
 setup:
 	@if [ ! -d "$(VENV_DIR)" ]; then \
-		echo "Creating virtual environment using /opt/homebrew/bin/python3.11..."; \
-		/opt/homebrew/bin/python3.11 -m venv $(VENV_DIR); \
+		echo "Creating virtual environment using $${PYTHON_BOOTSTRAP:-python3}..."; \
+		$${PYTHON_BOOTSTRAP:-python3} -m venv $(VENV_DIR); \
 	fi
 	@echo "Installing dependencies from chameleon/requirements.txt..."
 	@$(PIP) install --upgrade pip
 	@$(PIP) install -r chameleon/requirements.txt
 	@echo "Environment setup complete."
+
+verify:
+	@$${PYTHON_BOOTSTRAP:-python3} scripts/verify_repository.py
+
+install-hooks:
+	@mkdir -p .git/hooks
+	@ln -sf ../../.githooks/pre-commit .git/hooks/pre-commit
+	@echo "Installed .githooks/pre-commit"
+
+preflight:
+	@$${PYTHON_BOOTSTRAP:-python3} scripts/verify_repository.py --require-engine
 
 test:
 	@echo "Running unit tests..."
@@ -47,7 +61,7 @@ synthetic:
 	@echo "Generating synthetic marketing test cases..."
 	@$(PYTHON) scripts/generate_synthetic_cases.py
 
-agent-check: test run inspect
+agent-check: verify test run inspect
 	@echo "=========================================="
 	@echo "Agent-check PASSED: All gates verified."
 	@echo "=========================================="

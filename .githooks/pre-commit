@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(git rev-parse --show-toplevel)"
+cd "$root"
+
+if git diff --cached --check; then
+  :
+else
+  echo "pre-commit: whitespace errors found in staged changes" >&2
+  exit 1
+fi
+
+if git diff --cached --name-only | grep -E '(^|/)(output/|__pycache__/)|\.py[co]$' >/dev/null; then
+  echo "pre-commit: generated output or Python cache is staged" >&2
+  exit 1
+fi
+
+python3 scripts/verify_repository.py

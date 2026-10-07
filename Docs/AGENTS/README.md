@@ -2,6 +2,10 @@
 
 This directory defines the specialized agent personas that collaborate to design, implement, review, and qualify Project Chameleon.
 
+Repository-wide contract, testing, and review skills are maintained in
+`skills/` at the project root. They are intentionally shared across agent
+frontends so that the five personas below use the same Stage 1 rules.
+
 ---
 
 ## Agent roles & responsibilities
@@ -54,3 +58,13 @@ This directory defines the specialized agent personas that collaborate to design
 4. **PR / Review Agent** reviews the diff against `PROJECT_CONTRACT.md`, inspects terminal layout outputs via `make inspect`, and verifies all acceptance criteria.
 5. **Git Agent** creates an atomic conventional commit for the completed ticket (e.g. `feat(contract): implement semantic validator oracle (ticket 01)`).
 6. **Issue Agent** marks the ticket complete and unlocks downstream dependent tickets.
+
+## Repository controls
+
+- `make verify` checks that the governance files, skills, and implementation tickets
+  are present and reports whether the nested engine checkout is available.
+- `make preflight` performs the same checks but fails when the nested engine is
+  missing, preventing false claims about software verification.
+- `make install-hooks` installs the versioned `.githooks/pre-commit` hook.
+- The pre-commit hook rejects staged generated outputs and Python caches, checks
+  whitespace, and runs the repository verifier.

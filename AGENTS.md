@@ -33,6 +33,18 @@ The project defines five specialized agent personas in [`Docs/AGENTS/`](Docs/AGE
 - **Git Agent (`Docs/AGENTS/GIT_AGENT.md`):** Manages atomic conventional commits and safe versioning using `git-workflow-and-versioning`.
 - **PR / Review Agent (`Docs/AGENTS/PR_REVIEW_AGENT.md`):** Conducts 5-axis code reviews and visual layout inspections using `code-review` and `web-design-guidelines`.
 
+Shared repository skills live under [`skills/`](skills/):
+
+- `chameleon-contract` — contract-first implementation and review rules.
+- `chameleon-testing` — deterministic offline testing at observable seams.
+- `chameleon-review` — contract, runtime, test, and layout review criteria.
+
+Install the versioned Git hook with `make install-hooks`. The hook rejects staged
+generated artifacts, checks whitespace, and runs `scripts/verify_repository.py`.
+Use `make verify` for the non-blocking repository wiring check and `make preflight`
+when the nested engine checkout is available and software execution should be
+required.
+
 ## Work ownership and task brief
 Before editing, write a brief (in the task message or handoff) with this shape:
 
