@@ -1,6 +1,7 @@
 # Adobe University Hackathon 2026 
 
 > **Repository ratification note:** This supplied challenge brief is external context. For this checkout, `Docs/PROJECT_CONTRACT.md` and Accepted ADRs resolve any ambiguity or contradiction, while `Docs/DEPENDENCY_EVIDENCE.md` records verified upstream behavior. Do not treat the brief, starter code, samples, and architecture proposals as equal authorities.
+For this checkout, the ratified project contract, Accepted ADRs, schema, and dependency evidence supersede any open question or starter instruction in this external brief. The initial Stage 1 path is deterministic and model-free; conformance work may touch the validator, runner, renderer adapter, and packaging, not only `engine/resize.py`.
 
 Adobe 
 
@@ -104,7 +105,7 @@ returned design (same elements, new properties):
   cta -> x:240 y:1560 w:600 h:120
 ```
 
-_A response schema will specify exactly what the engine must return; it is being defined alongside the input schema._
+The response wire schema is ratified in `../chameleon/chameleon_design_schema_v0.9.json`, and the public Stage 1 API is `resize(source, target_canvas) -> target_design`. The contract and Accepted ADRs define the exact mutable fields and hard validation rules.
 
 #### 2.4  One task, three levels of difficulty 
 
@@ -145,7 +146,7 @@ There are two stages: an automated first round that everyone enters and that nar
 
 Every team submits its engine. We run each engine against a large set of hidden designs and target sizes it has never seen, across all three difficulty levels, and score every result automatically (see Section 4). The top six or seven teams advance. 
 
-Stage one runs on the team's own machine, offline. Teams may include and use a locally hosted model. To keep the field level, there is a limit on model size and a list of permitted open models; those specifics are being set with the team. Running locally within a shared limit means no team wins simply by calling a bigger outside service. 
+The organizer brief permits a locally hosted model subject to external limits, but this checkout's initial Stage 1 architecture deliberately has no model or OR-Tools dependency. Any later model path requires immutable offline artifacts, held-out benefit, resource evidence, and a separate accepted decision.
 
 #### 3.2  A short session with Adobe engineering 
 
@@ -209,7 +210,7 @@ This section collects the starter kit's repo layout, submission rules, and FAQ i
 
 Public repo: github.com/jhaaj08/chameleon — clone this to get everything below. 
 
-<mark>`chameleon-starter/` ├── Dockerfile ├── README.md ├── RULES.md ├── requirements.txt ├── chameleon_design_schema_v0.9.json ├── engine/ │ ├── main.py         <</mark> <mark>`- orchestrator; you shouldn't need to edit this` │ └── resize.py       <</mark> <mark>`-` the only file</mark> <mark>`you edit` ├── brand_kit/ │ ├── assets/         <</mark> <mark>`-` backgrounds, logo, product art (asset_id targets) │ └── fonts/          <</mark> <mark>`-` Solstice Serif / Solstice Sans ├── input/               <</mark> <mark>`-` drop task JSONs here (3 samples included) └── output/              <</mark> <mark>`- results land here`</mark> 
+The starter layout contains the orchestrator, resize baseline, renderer, schema, assets, fonts, inputs, and outputs. The current implementation blueprint, not this starter sketch, defines module ownership and the files that conformance work may change.
 
 ###### **1. Clone the starter repo** 
 
@@ -231,7 +232,7 @@ Out of the box, the engine uses a naive uniform-stretch baseline — deliberatel
 
 ###### **4. Implement your approach** 
 
-The only file you need to edit is engine/resize.py: 
+The starter instructions use `engine/resize.py` as the baseline entry point. For this repository, conformance work may also change the semantic validator, error taxonomy, task runner, renderer adapter, geometry modules, tests, and packaging as required by the ratified contract.
 
 <mark>def resize(source: dict, target_canvas: dict)</mark> <mark>`-> dict:`</mark> 
 
@@ -239,7 +240,7 @@ Everything else — input loading, the renderer, output writing, Docker packagin
 
 ###### **5. Sanity-check before submitting** 
 
-engine/main.py runs a quick structural self-check after every task (missing fields, off-canvas elements, mismatched ids) — a local sanity net, not the official scorer. A warning doesn't block output from being written; just decide whether it's a real problem. 
+`engine/main.py` contains a development warning-only self-check, not the official semantic validator. It is not contract evidence; the implementation must use the independent validator and accepted failure/publication protocol described in `PROJECT_CONTRACT.md` and the implementation tickets.
 
 ###### **6. Test in Docker — this is how you'll actually be run** 
 

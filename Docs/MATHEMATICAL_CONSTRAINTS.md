@@ -114,31 +114,31 @@ Background elements may cover the target canvas through the renderer's `fit=cove
 
 ## 4. Source-aware overlap
 
-The solver must not force every pair of elements apart. Define:
+The hard collision predicate uses positive-area intersection of the rotated AABBs defined in Section 2. It does not use unrotated source rectangles.
+
+Define:
 
 - $\mathcal{O}_{\text{src}}$: source pairs that overlap intentionally, including grouped labels and backplates, layered art, and decorative translucent shapes;
-- $\mathcal{P}_{\text{new}}$: source pairs that did not overlap and are not exempt background relationships; and
-- $\mathcal{O}_{\text{busy}}$: image regions where text would become unreadable without a source-supported treatment.
+- $\mathcal{P}_{\text{new}}$: active source pairs that did not overlap and are not exempt background relationships; and
+- $\mathcal{O}_{\text{busy}}$: rendered image regions where text would become unreadable without a source-supported treatment.
 
-For each pair in $\mathcal{P}_{\text{new}}$, at least one separation condition must hold:
-
-$$
-x_i^{\text{tgt}} + w_i^{\text{tgt}} \le x_j^{\text{tgt}}
-$$
+For a serialized element, let:
 
 $$
-x_j^{\text{tgt}} + w_j^{\text{tgt}} \le x_i^{\text{tgt}}
+A_i = [x_{\min,i}, x_{\max,i}] \times [y_{\min,i}, y_{\max,i}]
 $$
 
-$$
-y_i^{\text{tgt}} + h_i^{\text{tgt}} \le y_j^{\text{tgt}}
-$$
+where the bounds are the rotated AABB. A pair in $\mathcal{P}_{\text{new}}$ is hard-invalid exactly when:
 
 $$
-y_j^{\text{tgt}} + h_j^{\text{tgt}} \le y_i^{\text{tgt}}
+\max(0,\min(x_{\max,i},x_{\max,j})-\max(x_{\min,i},x_{\min,j}))
+\cdot
+\max(0,\min(y_{\max,i},y_{\max,j})-\max(y_{\min,i},y_{\min,j}))
+> 0.
 $$
 
-The separation check uses rotated bounds. Pairs in $\mathcal{P}_{\text{new}}$ collide when their rotated bounding boxes have positive-area intersection; boundary contact (touching edges or corners) is permitted. Pairs in $\mathcal{O}_{\text{src}}$ must keep their source relationship, including rigid group movement or preserved relative offsets. They are excluded from unintended-overlap scoring only when that relationship remains intact. A newly placed text element must not occupy a busy image region unless the source design provides a readable overlay or equivalent treatment.
+Pairs in $\mathcal{O}_{\text{src}}$ may remain overlapped when their source relationship remains intact. Edge or point contact is allowed. A newly placed text element should not occupy $\mathcal{O}_{\text{busy}}$ without a readable source-supported treatment; this is a readability objective unless the rendered glyph bounds themselves fail a hard rule.
+
 ## 5. Typography and fixed text attributes
 
 Text content, font family, weight, style, color, style runs, line height, letter spacing, and opacity remain unchanged. Only font size and geometry may change.

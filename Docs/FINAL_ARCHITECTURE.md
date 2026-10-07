@@ -25,6 +25,13 @@ The architecture must:
 
 The current phase is **Gate 1: renderer and validator qualification before the solver**. The existing resize implementation is an intentionally nonconforming baseline, not an architectural authority.
 
+### Terminology
+
+- **Gate 1** means renderer and validator qualification before the layout solver.
+- **Level 1/2/3** means the difficulty fixtures and target-shape stress profiles.
+- **Pipeline phases** are internal implementation steps; they are not product stages.
+- **Stage 1** means the autonomous scored engine, while the **finale** means the separate interactive product layer.
+
 ## 2. Authority and boundaries
 
 The decision hierarchy is:

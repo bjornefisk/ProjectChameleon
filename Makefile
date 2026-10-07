@@ -19,7 +19,7 @@ help:
 	@echo "  make run          - Execute engine.main on all tasks in chameleon/input/"
 	@echo "  make inspect      - Inspect generated layouts in terminal using ASCII visualizer"
 	@echo "  make synthetic    - Generate varied marketing aspect-ratio synthetic test cases"
-	@echo "  make agent-check  - Complete verification gate (tests + run + layout inspection)"
+	@echo "  make agent-check  - Run local verification gate (not Stage 1 qualification before Gate 1)"
 	@echo "  make docker-build - Build the official linux/amd64 Docker image"
 	@echo "  make docker-test  - Run the Docker container offline with --network none"
 	@echo "  make clean        - Remove generated outputs, caches, and temporary files"
@@ -63,7 +63,7 @@ synthetic:
 
 agent-check: verify test run inspect
 	@echo "=========================================="
-	@echo "Agent-check PASSED: All gates verified."
+	@echo "Agent-check PASSED: Local checks complete; this is not Stage 1 qualification before Gate 1."
 	@echo "=========================================="
 
 docker-build:

@@ -7,12 +7,13 @@ These instructions govern autonomous work in this repository. They describe how 
 For every implementation task, read these in order before editing:
 
 1. This file.
-2. [`Docs/PROJECT_CONTRACT.md`](Docs/PROJECT_CONTRACT.md) and every **Accepted** ADR in [`Docs/DECISIONS/`](Docs/DECISIONS/): ADR-001 through ADR-005.
+2. [`Docs/PROJECT_CONTRACT.md`](Docs/PROJECT_CONTRACT.md) and every **Accepted** ADR in [`Docs/DECISIONS/`](Docs/DECISIONS/): ADR-001 through ADR-009.
 3. [`chameleon/chameleon_design_schema_v0.9.json`](chameleon/chameleon_design_schema_v0.9.json).
 4. [`Docs/DEPENDENCY_EVIDENCE.md`](Docs/DEPENDENCY_EVIDENCE.md) for pinned/versioned external behavior.
 5. [`Docs/STATUS.md`](Docs/STATUS.md) and [`Docs/IMPLEMENTATION_ROADMAP.md`](Docs/IMPLEMENTATION_ROADMAP.md) for the current phase, gaps, blockers, and evidence plan.
-6. The files and contract fixtures owned by the task.
-7. `chameleon/RULES.md` and the challenge brief only for organizer restrictions, after the higher-priority sources are understood.
+6. [`Docs/FINAL_ARCHITECTURE.md`](Docs/FINAL_ARCHITECTURE.md) for the consolidated implementation boundary; it is subordinate to the contract and Accepted ADRs.
+7. The files and contract fixtures owned by the task.
+8. `chameleon/RULES.md` and the challenge brief only for organizer restrictions, after the higher-priority sources are understood.
 
 The source-of-truth precedence is: `PROJECT_CONTRACT.md` plus Accepted ADRs; ratified schema; pinned project adapter and pinned upstream `cr-renderer`; challenge brief and `chameleon/RULES.md`; fixtures; other proposal/roadmap documents; starter code, comments, and warning-only checks. A lower source never silently overrides a higher one. Resolve a conflict by correcting the lower artifact or recording a superseding ADR, never by guessing or following whichever file was read last.
 

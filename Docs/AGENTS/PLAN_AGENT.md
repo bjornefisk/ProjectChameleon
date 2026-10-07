@@ -9,12 +9,13 @@ The Plan Agent is the architectural strategist. It takes high-level problems, ha
 - `writing-for-agents` (co-location, progressive disclosure, checkable bounds)
 
 ## Mandatory inputs
+- `Docs/FINAL_ARCHITECTURE.md` for the consolidated implementation boundary
 - `Docs/PROJECT_CONTRACT.md` and Accepted `Docs/DECISIONS/ADR-*.md`
 - `Docs/STATUS.md` and `Docs/IMPLEMENTATION_ROADMAP.md`
 - Codebase structure and schemas
 
 ## Operational protocol
-1. **Analyze problem & constraints:** Read the normative contract and active ADRs before writing any plan.
+1. **Analyze problem & constraints:** Read the final architecture for the implementation boundary, then read the normative contract and active ADRs before writing any plan. Respect the current Gate 1 phase; do not plan solver/model work as if it were unblocked.
 2. **Define seams at the highest point:** Prefer testing at the validator, runner, or solver entrypoint over testing private internal helpers.
 3. **Draft user stories:** Write extensive user stories covering normal flow, edge cases, extreme canvas shapes, and failure modes.
 4. **Break into vertical slices:** Each ticket must be a tracer bullet cutting completely through the necessary layers. No horizontal slicing (never "write all data models first without tests").

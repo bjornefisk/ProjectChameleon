@@ -18,7 +18,7 @@ For each rendered line:
 - glyph advances come from the loaded typeface;
 - `letter_spacing * glyph_index` is added to each glyph position, so the total width includes letter spacing between glyphs;
 - left, center, and right alignment offset the rendered blobs within the element width; and
-- the renderer logs when the rendered width exceeds the element width rather than clipping or wrapping it.
+- the renderer may log when rendered width exceeds the element width, but the project adapter's contract validation must reject a candidate whose measured lines or actual glyph bounds overflow; no overflow may be accepted through clipping or logging alone;
 
 The renderer uses the explicit font, weight, style, color, and style maps. The reflow engine must keep those source values fixed. It may change font size and permitted geometry fields. The public design schema does not expose a line-map field; line maps are generated deterministically by the project renderer adapter from unchanged text content (ADR-002, ADR-008).
 

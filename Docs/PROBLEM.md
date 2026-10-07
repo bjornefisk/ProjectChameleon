@@ -41,14 +41,14 @@ The inferred roles guide layout decisions. They do not change the underlying ass
 
 ## Required output behavior
 
-A retargeted document is acceptable only when it keeps the important relationships in the source composition while fitting the target canvas. In practical terms, the output must:
+In practical terms, the output must:
 
 1. keep the same element ids, count, order, and required records;
 2. keep active foreground elements inside the target canvas using rotated axis-aligned bounds after integer quantization (with the narrow exception for contract-defined source-bleed decorative shapes);
 3. preserve raster image aspect ratios, including `fit=fill`, except for permitted background cover cropping;
 4. preserve source-intended overlaps and avoid new collisions between pairs that were separate in the source;
 5. keep text content, font family, weight, style, color, and style runs fixed;
-6. keep text inside its real rendered bounds and readable against the pixels below it; and
+6. keep text inside its real rendered bounds; readability and contrast are soft ranking objectives evaluated against rendered pixels; and
 7. avoid zero-size, hidden, opacity-zero, or replacement elements used to remove content.
 
-These requirements describe the problem. The companion constraints document expresses them as mathematical checks and identifies which failures are disqualifying and which are soft penalties.
+These requirements describe the problem. The companion constraints document expresses them as mathematical checks and identifies which failures are disqualifying and which are soft preferences.

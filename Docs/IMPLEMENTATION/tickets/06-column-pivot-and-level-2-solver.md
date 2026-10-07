@@ -14,6 +14,6 @@ ready-for-agent
 - [ ] Place grouped elements (e.g. `badge_bg` + `badge_label`, `cta_bg` + `cta_label`) using uniform group transforms, ensuring text labels remain centered and aligned within their shape backplates.
 - [ ] Implement source-bleed handling for decorative shapes (e.g. `deco_circle_1`), allowing them to maintain their corner bleed on the target canvas without violating containment rules.
 - [ ] Preserve source-intended overlaps (layered translucent shapes, buttons on backgrounds) while enforcing separation between elements that did not overlap in the source.
-- [ ] Wire the column-pivot generator into `chameleon/engine/resize.py` when aspect-ratio change $\Delta_{\text{AR}} > 0.3$.
+- [ ] Wire the column-pivot generator into `chameleon/engine/resize.py` as a source- and target-aware candidate family for wide targets. Do not make an unqualified fixed $\Delta_{\text{AR}}$ threshold the routing contract; keep other topology candidates available until hard validation and ranking.
 - [ ] Verify that `chameleon_sample_level2_core.json` passes full semantic validation and renders a clean, uncrowded $1600 \times 400$ banner.
 - [ ] Add integration tests in `chameleon/tests/layout/test_level2.py`.

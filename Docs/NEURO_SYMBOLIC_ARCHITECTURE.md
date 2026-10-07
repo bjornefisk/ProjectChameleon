@@ -1,6 +1,7 @@
 # Neuro-symbolic system architecture
 
 > **Authority Notice:** This document is architectural guidance. The binding Stage 1 behavioral contract is ratified in [PROJECT_CONTRACT.md](PROJECT_CONTRACT.md) and Accepted [ADRs](DECISIONS/). In any conflict, the contract and ADRs govern.
+The labels "Phase 1" through "Phase 4" below are internal pipeline phases, not the product-level Stage 1 versus finale boundary.
 
 Project Chameleon uses a deterministic pipeline that separates role inference from coordinate resolution. The parser proposes relationships and layout archetypes from the source document. The solver places the existing elements while enforcing the hard output rules.
 
@@ -12,35 +13,35 @@ The pipeline does not redraw assets, rewrite text, or treat every overlap as an 
 Source document and target canvas dimensions
                       │
                       ▼
-STAGE 1: Role and relationship inference
+PHASE 1: Role and relationship inference
   - Normalize geometry, rotation, z-order, opacity, fit, and coverage
   - Infer background, brand, hero, text, and decorative roles
   - Use group_id for rigid units; containment and proximity are layout hints only
   - Record intentional source overlaps and busy image regions
                       │
                       ▼
-STAGE 2: Layout archetype generation
+PHASE 2: Layout archetype generation
   - Measure aspect-ratio change and source composition structure
   - Generate near-isomorphic, column-pivot, horizontal-ribbon,
     and vertical-re-stack candidates
   - Derive slots from canvas proportions and measured content
                       │
                       ▼
-STAGE 3: Constraint placement and typography
+PHASE 3: Constraint placement and typography
   - Place rigid groups and independent elements on integer geometry
   - Preserve allowed source overlaps and separate new collisions
   - Measure text with the supplied fonts and renderer semantics
   - Generate candidates with different hero and copy emphasis
                       │
                       ▼
-STAGE 4: Quantize, render, and validate
+PHASE 4: Quantize, render, and validate
   - Quantize candidate geometry to deliberate integers once
   - Render candidate through the project renderer
   - Check hard constraints on serialized geometry and actual glyph bounds
   - Rank hard-valid candidates with deterministic fixed-point scoring
 ```
 
-## Stage 1: Role and relationship inference
+## Phase 1: Role and relationship inference
 
 The input supplies geometry, stacking data, visual properties, asset identifiers, and text attributes, but it does not label semantic roles. The engine builds a scene graph:
 
@@ -68,7 +69,7 @@ Grouping follows a strict precedence:
 3. Source overlap alone does not create a group. It records an overlap relationship that the target layout should preserve when it appears intentional.
 The parser also marks image regions that are visually busy. Text may overlap a deliberate container or decorative layer, but it must not be placed over a busy image without a readable treatment already present in the source.
 
-## Stage 2: Layout archetype generation
+## Phase 2: Layout archetype generation
 
 The router measures aspect-ratio change with:
 
@@ -100,14 +101,14 @@ For a tall target, re-stack groups along the vertical axis when a wide source co
 
 The engine may keep several archetypes alive until hard validation and soft scoring select the result. This avoids committing to a layout from aspect ratio alone.
 
-## Stage 3: Constraint placement and typography
+## Phase 3: Constraint placement and typography
 
-A bounded structured candidate search places the rigid units and independent elements across four topology families (CP-SAT is a deferred conditional solver requiring experimental justification under ADR-004/ADR-009). Its constraints must distinguish source-intended overlaps from new collisions. Alignment, even spacing, hierarchy, balance, whitespace, and readability belong in the objective. Kiwi is optional and can refine coordinates after the topology is fixed.
+A bounded structured candidate search places the rigid units and independent elements across four topology families. CP-SAT is a deferred conditional solver requiring held-out evidence, an accepted dependency/runtime ADR, and deterministic status handling. Kiwi is not part of the current dependency baseline; any future cleanup dependency requires the same explicit decision process. Constraints must distinguish source-intended overlaps from new collisions. Alignment, even spacing, hierarchy, balance, whitespace, and readability belong in the objective.
 Typography changes only font size and geometry. Content, font family, weight, style, color, and style runs remain source values. The engine measures the supplied font files and follows the renderer's explicit line representation, line height, letter spacing, and style maps. It searches for the largest size that fits each candidate slot without imposing a universal headline-to-body ratio.
 
 Candidate weights may favor hero scale, copy scale, or balance, but every candidate must satisfy the same hard rules. The ranking step must not rescue an invalid candidate by shrinking an element to zero, hiding it, or dropping it from the output.
 
-## Stage 4: Render-and-validate
+## Phase 4: Render-and-validate
 
 Upon serialization, the candidate is quantized to deliberate integers, rendered through the project renderer, and checked:
 - the output has the same element ids, count, and order as the source;

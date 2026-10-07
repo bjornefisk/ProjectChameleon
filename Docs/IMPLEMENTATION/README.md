@@ -2,7 +2,9 @@
 
 This directory houses the complete engineering specification, module architecture, and tracer-bullet ticket sequence for building Project Chameleon.
 
-It is structured using the industry-standard **`to-spec`**, **`to-tickets`**, and **`writing-for-agents`** methodologies so autonomous AI agents can execute the build end-to-end with zero ambiguity.
+It is structured using the industry-standard **`to-spec`**, **`to-tickets`**, and **`writing-for-agents`** methodologies so autonomous AI agents have explicit implementation boundaries and dependency-sequenced work.
+Use `../FINAL_ARCHITECTURE.md` as the consolidated implementation summary. This directory decomposes that architecture into the executable specification and dependency-sequenced tickets.
+Current frontier is Gate 1: tickets 01–04 establish validator, renderer, runner, and geometry conformance. Do not dispatch tickets 05–08 until the Gate 1 evidence and status update are complete.
 
 ---
 
