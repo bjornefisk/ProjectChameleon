@@ -1,5 +1,7 @@
 # Mathematical constraints
 
+> **Authority Notice:** This document formalizes the geometric and optimization model. The binding Stage 1 behavioral contract is ratified in [PROJECT_CONTRACT.md](PROJECT_CONTRACT.md) and Accepted [ADRs](DECISIONS/). In any conflict, the contract and ADRs govern.
+
 This document separates disqualifying structural failures from soft layout preferences. A hard constraint invalidates a candidate. A soft term ranks candidates that already satisfy the hard constraints.
 
 ## 1. Formal model
@@ -82,6 +84,7 @@ x_{\max,i}^{\text{tgt}} \le W_{\text{tgt}},\quad
 y_{\max,i}^{\text{tgt}} \le H_{\text{tgt}}
 $$
 
+*(Exception: contract-defined source-bleed decoration — an ungrouped translucent shape already clipped by the source canvas must preserve clipping on the same side set and intersect the target).*
 The engine rounds output coordinates and dimensions deliberately, then recomputes these bounds. A candidate that passes before rounding but fails after rounding is invalid.
 
 Zero-size source elements and line shapes must not cause division by zero. They remain in the output and are handled as degenerate geometry. The engine must not create a zero-size or hidden element to shed content.
@@ -135,8 +138,7 @@ $$
 y_j^{\text{tgt}} + h_j^{\text{tgt}} \le y_i^{\text{tgt}}
 $$
 
-The separation check uses rotated bounds. Pairs in $\mathcal{O}_{\text{src}}$ must keep their source relationship, including rigid group movement or preserved relative offsets. They are excluded from unintended-overlap scoring only when that relationship remains intact. A newly placed text element must not occupy a busy image region unless the source design provides a readable overlay or equivalent treatment.
-
+The separation check uses rotated bounds. Pairs in $\mathcal{P}_{\text{new}}$ collide when their rotated bounding boxes have positive-area intersection; boundary contact (touching edges or corners) is permitted. Pairs in $\mathcal{O}_{\text{src}}$ must keep their source relationship, including rigid group movement or preserved relative offsets. They are excluded from unintended-overlap scoring only when that relationship remains intact. A newly placed text element must not occupy a busy image region unless the source design provides a readable overlay or equivalent treatment.
 ## 5. Typography and fixed text attributes
 
 Text content, font family, weight, style, color, style runs, line height, letter spacing, and opacity remain unchanged. Only font size and geometry may change.
@@ -157,13 +159,12 @@ The engine preserves source ratios where the target allows it. It does not impos
 
 ## 6. Reading order and rigid units
 
-Explicit `group_id` values define rigid units. Ungrouped containment and proximity may provide fallback units. Internal offsets and relative scale are preserved within each unit.
-
+Explicit `group_id` values define rigid units. For ungrouped elements, containment and proximity provide layout hints only, not fallback rigid units. Internal offsets and relative scale are preserved within each rigid unit.
 The inferred reading order is a soft relationship, not a license to separate a group. When the target requires a topology change, the candidate should preserve the source sequence and hierarchy where it can do so without causing a hard failure.
 
-## 7. Contrast and legibility
+## 7. Contrast and legibility (soft ranking term)
 
-For each text element, evaluate contrast against the actual rendered background pixels beneath its glyph bounds:
+Contrast is an internal soft ranking objective, not a disqualifying hard gate. For each text element, evaluate contrast against the actual rendered background pixels beneath its glyph bounds, with a target preference of:
 
 $$
 \operatorname{ContrastRatio}
@@ -173,8 +174,7 @@ e_i,\ \mathcal{B}_{\text{rendered}}(e_i)
 \ge 4.5
 $$
 
-The contrast check accounts for the target position, the background crop, opacity, and any source-supported overlay. A numeric score can rank candidates, but it cannot make a failed hard geometry check valid.
-
+The contrast check accounts for the target position, the background crop, opacity, and any source-supported overlay. A lower contrast score reduces candidate ranking, but it does not invalidate an otherwise hard-valid geometry candidate.
 ## 8. Missing assets and pixel integrity
 
 An unavailable asset reference does not authorize a new file, placeholder artwork, hidden element, opacity-zero element, or zero-size geometry. The output keeps the original element id and asset reference. The renderer or caller handles the missing file without changing the design record.

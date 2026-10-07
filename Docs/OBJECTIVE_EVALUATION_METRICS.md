@@ -1,5 +1,7 @@
 # Objective evaluation metrics and aesthetic alignment
 
+> **Authority Notice:** This document defines internal optimization proxies for candidate ranking. The binding Stage 1 behavioral contract is ratified in [PROJECT_CONTRACT.md](PROJECT_CONTRACT.md) and Accepted [ADRs](DECISIONS/). In any conflict, the contract and ADRs govern.
+
 Stage 1 produces two scored artifacts: the output JSON and the rendered PNG. Structural checks apply to the JSON. A separate evaluator judges the rendered composition. The metrics in this document are internal proxies for candidate ranking, not the official rubric.
 
 ## Scoring pipeline
@@ -11,17 +13,21 @@ Source-aware layout candidates
 ┌────────────────────────────────────────────────────────┐
 │              VALIDATION AND SOFT SCORING               │
 │                                                        │
-│  Hard structural gates:                                │
-│    - exact element ids and count                      │
-│    - rotated bounds inside the target canvas           │
-│    - image ratio and fixed-property preservation       │
+│  Hard structural gates (post-serialization):            │
+│    - exact element ids, count, order, types, fixed fields│
+│    - rotated AABB containment (with source bleed rule)   │
+│    - exact foreground image ratio preservation           │
+│    - rigid group integrity (no child drift)              │
+│    - zero new positive-area collisions (source-separated)│
+│    - actual rendered glyph bounds inside text box        │
+│    - missing asset preservation; no generated pixels     │
 │                                                        │
-│  Source-aware quality terms:                           │
-│    - unintended overlap:    Ove -> 0                  │
-│    - alignment:             Ali -> 0                  │
-│    - balance:               Bal -> 1                  │
-│    - busy-image occlusion:  Occ -> 0                  │
-│    - rendered readability:  Rea -> 1                  │
+│  Soft candidate ranking terms (hard-valid only):        │
+│    - rendered readability & contrast:  Rea -> 1         │
+│    - shared alignment:                 Ali -> 0         │
+│    - visual balance:                   Bal -> 1         │
+│    - busy-image occlusion:             Occ -> 0         │
+│    - source overlap preservation                        │
 └──────────────────────────┬─────────────────────────────┘
                            │
                            ▼
@@ -151,9 +157,9 @@ The values in this document are internal comparison terms. They are not claims a
 
 | Metric | Definition | Candidate use | Hard gate |
 | --- | --- | --- | --- |
-| Validity ($\text{Val}$) | Exact ids and count plus rotated containment | Reject invalid candidates | Yes |
-| Overlap ($\text{Ove}$) | Unintended intersection among source-separated pairs | Minimize | Yes for new collisions |
-| Alignment ($\text{Ali}$) | Distance to shared axes without breaking groups | Minimize | No |
-| Balance ($\text{Bal}$) | Visual-mass offset from the canvas center | Maximize softly | No |
-| Occlusion ($\text{Occ}$) | Text over busy imagery without a source treatment | Minimize | Readability gate |
-| Readability ($\text{Rea}$) | Measured size and contrast under rendered glyphs | Maximize | Text must remain usable |
+| Structural validity ($\text{Val}$) | Exact IDs, count, order, types, fixed fields, rotated containment, image ratios, groups, no new collisions, glyph bounds | Reject invalid candidates | Yes (hard gate) |
+| Readability ($\text{Rea}$) | Measured font size above floor and contrast against rendered background | Maximize softly | Soft ranking term |
+| Alignment ($\text{Ali}$) | Distance to shared axes without breaking groups | Minimize softly | Soft ranking term |
+| Balance ($\text{Bal}$) | Visual-mass offset from the canvas center | Maximize softly | Soft ranking term |
+| Occlusion ($\text{Occ}$) | Text over busy imagery without a source treatment | Minimize softly | Soft ranking term |
+| Overlap penalty ($\text{Ove}$) | Unintended positive-area intersection among source-separated pairs | Rejection threshold = 0 | Yes (zero new collisions) |

@@ -24,8 +24,16 @@ Stage 1 work MUST preserve the source identity and contract: every source record
 
 Do not expand scope into the finale/add-on, user pinning, candidate selection, shedding, copy revision, font substitution, reduced previews, image regeneration/redrawing/inpainting/seam-carving/outpainting, or unapproved schema/API/dependency/runtime changes. Do not turn a warning-only baseline check into contract evidence. The known gaps are intentionally visible in `Docs/STATUS.md`, including the uniform-stretch `engine/resize.py` baseline, nonconforming warning-only `engine/main.py` self-check and missing typed infeasibility path, renderer style-run/measurement/max-lines/height/stroke gaps, missing semantic validator, and unqualified Docker/native-amd64/offline path.
 
-## Work ownership and task brief
+## Specialized agent roles
 
+The project defines five specialized agent personas in [`Docs/AGENTS/`](Docs/AGENTS/):
+- **Plan Agent (`Docs/AGENTS/PLAN_AGENT.md`):** Scopes features using `to-spec` and `to-tickets` into vertical slices.
+- **Issue Agent (`Docs/AGENTS/ISSUE_AGENT.md`):** Discovers unblocked frontier tickets and validates completion criteria.
+- **Implementer Agent (`Docs/AGENTS/IMPLEMENTER_AGENT.md`):** Executes single frontier tickets using `tdd` and `codebase-design`.
+- **Git Agent (`Docs/AGENTS/GIT_AGENT.md`):** Manages atomic conventional commits and safe versioning using `git-workflow-and-versioning`.
+- **PR / Review Agent (`Docs/AGENTS/PR_REVIEW_AGENT.md`):** Conducts 5-axis code reviews and visual layout inspections using `code-review` and `web-design-guidelines`.
+
+## Work ownership and task brief
 Before editing, write a brief (in the task message or handoff) with this shape:
 
 ```text
@@ -41,10 +49,16 @@ An agent owns only the files explicitly listed in its brief. Agents MUST NOT edi
 
 Use the named workflows deliberately:
 
+- Use **to-spec** and **to-tickets** to break features into tracer-bullet vertical slices with explicit blocking edges before implementation.
+- Use **writing-for-agents** to keep task briefs, instructions, and context pointers sharp, co-located, and free of ambiguity.
+- Use **tdd** during coding: write a failing test first that asserts the desired invariant at the highest seam, observe it go red, then write the minimal code to turn it green.
+- Use **codebase-design** to ensure modules are deep (powerful capabilities hidden behind narrow, simple interfaces) and to design critical seams twice before settling.
+- Use **diagnosing-bugs** for root-cause investigation: reproduce the failure deterministically before attempting any edit; never apply speculative patches.
+- Use **code-review** before concluding a ticket: check for contract violations, blast radius, edge cases, and test rigor.
+- Use **web-design-guidelines** and **frontend-design** when tuning layout heuristics: optimize visual hierarchy, clean margins, balanced whitespace, and readable typography so renders score high on Adobe's vision evaluator.
 - Use **grill-with-docs** only to investigate a genuinely new ambiguity that the authority does not resolve; it is not permission to reopen an Accepted decision.
 - Use **documentation-and-adrs** when a durable internal decision is accepted: update the appropriate documentation/ADR and then implement against it.
 - Use **source-driven-development** for external or versioned behavior (schema, renderer, dependency, base image, or API): inspect the authoritative source/revision, pin or cite it, and record evidence rather than relying on memory or an unpinned latest version.
-
 ## Verification and handoff
 
 Every handoff MUST state changed files, affected contract/ADR sections, exact verification commands run, observed evidence/results, checks not run, blockers, and any ambiguity that requires a future ADR. “Not run” is valid; claiming success without exercising the command is not. During a delegated implementation wave, do not run build/lint/tests/formatters while siblings are editing; the integration owner runs the shared checks once. Do not call a baseline failure contract evidence.

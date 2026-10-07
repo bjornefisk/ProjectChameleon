@@ -1,5 +1,7 @@
 # Problem formulation
 
+> **Authority Notice:** This document is architectural guidance. The binding Stage 1 behavioral contract is ratified in [PROJECT_CONTRACT.md](PROJECT_CONTRACT.md) and Accepted [ADRs](DECISIONS/). In any conflict, the contract and ADRs govern.
+
 ## The problem
 
 Project Chameleon retargets an existing graphic design from its source canvas to a target canvas with a different spatial envelope. The output must preserve the design's hierarchy, brand identity, visual balance, and typographic legibility.
@@ -33,7 +35,7 @@ The engine infers functional hierarchy and layout relationships from:
 - explicit `group_id` values; and
 - asset characteristics and source overlap.
 
-`group_id` is the source of truth for rigid units. Geometric containment is a fallback for ungrouped elements. Source overlap is evidence of a relationship, not automatic proof that two elements should be forced apart or merged.
+`group_id` is the primary source of truth for rigid units. For ungrouped elements, geometric containment and proximity are layout hints only, not fallback rigid units. Source overlap is evidence of an intended relationship, not automatic proof that two elements should be forced apart or merged into a unit.
 
 The inferred roles guide layout decisions. They do not change the underlying assets, text content, fixed text attributes, or element identity.
 
@@ -42,7 +44,7 @@ The inferred roles guide layout decisions. They do not change the underlying ass
 A retargeted document is acceptable only when it keeps the important relationships in the source composition while fitting the target canvas. In practical terms, the output must:
 
 1. keep the same element ids, count, order, and required records;
-2. keep active foreground elements inside the target canvas using rotated axis-aligned bounds;
+2. keep active foreground elements inside the target canvas using rotated axis-aligned bounds after integer quantization (with the narrow exception for contract-defined source-bleed decorative shapes);
 3. preserve raster image aspect ratios, including `fit=fill`, except for permitted background cover cropping;
 4. preserve source-intended overlaps and avoid new collisions between pairs that were separate in the source;
 5. keep text content, font family, weight, style, color, and style runs fixed;

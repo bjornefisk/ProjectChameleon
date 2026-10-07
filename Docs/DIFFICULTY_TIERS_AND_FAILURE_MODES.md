@@ -1,5 +1,7 @@
 # Empirical challenge difficulty tiers and failure modes
 
+> **Authority Notice:** This document describes empirical stress profiles and test benchmarks. The binding Stage 1 behavioral contract is ratified in [PROJECT_CONTRACT.md](PROJECT_CONTRACT.md) and Accepted [ADRs](DECISIONS/). In any conflict, the contract and ADRs govern.
+
 Project Chameleon evaluates the same retargeting task across three difficulty tiers. Each tier stresses a different part of the pipeline, from nearby aspect-ratio changes to dense layouts with missing assets and very little usable height.
 
 ## Level 1: Warm-up
@@ -44,7 +46,7 @@ Level 3 introduces:
 
 A representative transition is a tall portrait asset of $1080 \times 1350$ to a narrow web leaderboard of $728 \times 90$.
 
-The target may not have enough height for the source stack. A horizontal ribbon can work for a wide target, while a vertical re-stack is needed when the target is tall and the source is wide. Both must derive positions from source order, group extents, content measurement, and the target canvas rather than fixed logo, text, image, or CTA slots.
+The target may not have enough height for the source stack. A horizontal ribbon can work for a wide target, while a vertical re-stack is needed when the target is tall and the source is wide. Both must derive positions from source order, group extents, content measurement, and the target canvas rather than fixed logo, text, image, or CTA slots. To avoid unproduced output files and zero-score penalties, the engine aggressively compresses geometry (reducing font sizes to the readable floor, scaling artwork isotropically, packing into horizontal ribbons) before declaring infeasibility (ADR-006).
 
 The renderer uses explicit text line information instead of automatic width-based wrapping. Long copy therefore requires measured line geometry and font-size search. Missing files must not crash the pipeline or lead to a new asset. The original element record remains in the output.
 

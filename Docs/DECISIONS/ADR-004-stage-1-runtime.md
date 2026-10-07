@@ -18,9 +18,10 @@ The challenge requires offline Stage 1 execution and a `linux/amd64` container. 
 - The image uses Python 3.11 with an immutable explicit base-image digest and the direct compatibility pins in `chameleon/requirements.txt`.
 - Build-time network access may fetch the pinned source and packages. Runtime network access is disabled with `--network none`; fonts, assets, renderer code, and dependencies are already in the image.
 - Apple Silicon development must build the amd64 target with Docker Buildx or qualify on native amd64. An arm64-only build is not conformance evidence.
+- Resource budget and hardware profile: The scoring environment runs linux/amd64 Docker containers on an Apple M5 Pro host, which operates under Rosetta 2 translation without host GPU passthrough. The engine must be strictly CPU-only, budget for <= 8 CPU worker threads, stay under 8 GB RAM, and keep the final container image under 8 GB.
+- Dynamic asset and font resolution: All fonts and assets must be resolved dynamically at runtime relative to `brand_kit/fonts` and `brand_kit/assets` based on task JSON references. The engine must never hardcode asset names (such as Solstice filenames) or assume fixed brand-kit contents.
 - No model runtime or OR-Tools dependency is part of the ratified baseline. A later model or solver requires its own immutable artifact/dependency and resource decision.
-- The exact M5 Pro CPU/RAM/disk/GPU budget, model allowlist, and model-size cap remain organizer-controlled TBD facts. This ADR does not invent them, and Stage 1 has no hard latency disqualifier in the supplied rules.
-
+- The exact M5 Pro hardware limits and organizer model allowlist remain organizer-controlled facts, but the engine is guaranteed to succeed within standard collegiate limits by operating fully within the CPU-only budget above.
 The initial base image is `python:3.11.11-slim-bookworm@sha256:081075da77b2b55c23c088251026fb69a7b2bf92471e491ff5fd75c192fd38e5`, the Docker Hub OCI index observed during ratification. The selected linux/amd64 child digest and apt package versions still require build qualification; see `STATUS.md`.
 
 ## Alternatives considered

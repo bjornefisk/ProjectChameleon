@@ -185,6 +185,8 @@ The accepted internal task statuses are `SUCCESS`, `MALFORMED_INPUT`, `INFEASIBL
 
 A hard-valid candidate found before an optimization cutoff MUST be returned after serialized hard validation. A cutoff without a hard-valid candidate is `INCOMPLETE_SEARCH`, never proven infeasibility. Only an exhausted finite search with no hard-valid candidate is `INFEASIBLE_LAYOUT`.
 
+To prevent avoidable task failure in automated scoring, candidate generation MUST actively maximize feasibility on extreme canvas aspect ratios by applying all contract-permitted geometric levers before declaring infeasibility: reducing font sizes to the readable floor (10px–12px), scaling foreground artwork isotropically down to recognizable minimums, switching to horizontal ribbon or column-pivot topologies, and compressing margins. `INFEASIBLE_LAYOUT` is reserved strictly for mathematically unsolvable layouts or invalid/degenerate dimensions.
+
 Target generation should avoid infeasible pairs, but hidden inputs remain entitled to the same deterministic failure protocol.
 
 ## 9. Stage 1 runtime target
@@ -193,6 +195,9 @@ Target generation should avoid infeasible pairs, but hidden inputs remain entitl
 - Runtime network access is disabled with `docker run --network none`. All dependencies, renderer code, fonts, brand assets, and any future model weights are present before task processing.
 - The initial dependency baseline is pinned in `chameleon/requirements.txt`; the base image is pinned in `chameleon/Dockerfile`. Build-time network access is allowed, but a future release needs a hash-locked wheelhouse for fully reproducible offline builds.
 - Apple Silicon development must use Buildx with `--platform linux/amd64` or native amd64 CI. An arm64-only local pass is not Stage 1 evidence; emulation can be slower.
+- Hardware budget and execution profile: The scoring environment runs linux/amd64 containers on an Apple M5 Pro host under Rosetta 2 emulation without host GPU passthrough. The engine must operate CPU-only, budget for <= 8 CPU threads, stay under 8 GB RAM, and maintain a total Docker image size under 8 GB.
+- Dynamic asset and font resolution: All fonts and artwork must be loaded dynamically from `brand_kit/fonts` and `brand_kit/assets` based on task JSON references. Asset filenames and font families must never be hardcoded.
+- Performance targets: The engine operates with a 0 MB neural weight footprint (100% deterministic symbolic solver), targeting < 2.0s CPU latency per design under x86 emulation, < 500 MB resident solver RAM, and bit-identical reproducibility across runs.
 - There is no hard Stage 1 latency disqualifier in the supplied challenge rules. The exact M5 Pro CPU/RAM/disk/GPU budget and model allowlist remain organizer-controlled TBD facts and are not invented here.
 - OR-Tools CP-SAT is not a current dependency or contract requirement. If selected later, it needs a separate pinned dependency decision and integer-model conformance test.
 - The initial search strategy is deterministic structured search: multi-signal role inference; four topology families (near-isomorphic, column pivot, horizontal ribbon, and vertical re-stack); at most three source-derived slot/emphasis variants per family; renderer-in-loop hard validation; fixed-point ranking; and stable tie-breaks. No model or OR-Tools dependency is used initially. A later solver or model requires held-out gain and a separate accepted ADR; it MUST NOT weaken hard validation.
@@ -201,7 +206,7 @@ Target generation should avoid infeasible pairs, but hidden inputs remain entitl
 
 Stage 1 is autonomous and identity-preserving. It does not expose user pinning, candidate selection, element shedding, copy revision, font substitution, or a reduced preview. Image regeneration, redrawing, replacement, inpainting, seam carving, and outpainting are prohibited in every stage.
 
-The finale may wrap the engine in an Adobe Express add-on and may explore user-approved pinning, candidate selection, copy alternatives, font substitution, or a reduced composition as separate interactions. A finale preview that changes records or copy is never labeled a Stage 1 output. Adobe Express API facts are evidence for future work, not Stage 1 dependencies.
+The finale may wrap the engine in an Adobe Express add-on and may explore user-approved pinning, candidate selection, copy alternatives, font substitution, or a reduced composition as separate interactions. A finale preview that changes records or copy is never labeled a Stage 1 output. For the live showcase at Adobe HQ, the Express add-on (running in an iframe via `@adobe/express-add-on-sdk`) connects to the Stage 1 engine exposed as a lightweight local HTTP service (e.g. FastAPI/Flask on localhost) or WebAssembly module. Adobe Express API facts are evidence for future work, not Stage 1 dependencies.
 
 ## 11. Requirement traceability
 

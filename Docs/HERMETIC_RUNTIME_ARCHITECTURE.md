@@ -1,5 +1,7 @@
 # Hermetic container architecture and offline execution
 
+> **Authority Notice:** This document is architectural guidance. The binding Stage 1 behavioral contract is ratified in [PROJECT_CONTRACT.md](PROJECT_CONTRACT.md) and Accepted [ADRs](DECISIONS/). In any conflict, the contract and ADRs govern.
+
 Stage 1 must run without network access:
 
 ```text
@@ -21,12 +23,11 @@ Brand fonts and supplied assets are inputs to the layout process and are baked i
 
 The renderer may produce the scored PNG from the source elements. That is layout rendering, not permission to regenerate, redraw, inpaint, seam-carve, outpaint, or replace image content.
 
-## Model and solver choices
+## Model, solver, and resource profile
 
-A large multimodal model is not required for role inference or coordinate placement. It adds image, memory, and startup dependencies that are difficult to justify in an offline container. If an optional model is used, its weights and runtime must be baked into the image and its use must remain deterministic for the same input.
+Stage 1 runs CPU-only inside the `linux/amd64` Docker container under Rosetta 2 translation on the host Apple M5 Pro machine, without GPU passthrough. The engine operates with a 0 MB neural weight footprint, eliminating model download, cold start, and memory bloat. The runtime budgets for $\le$ 8 CPU threads, $\le$ 8 GB RAM, and a Docker image under 8 GB.
 
-The core path can use local font measurement, image metadata, a role inference pass, CP-SAT or structured candidate search, and render validation. Kiwi is optional for cleanup after topology is fixed.
-
+The primary solver is a bounded structured candidate search across four topology families. OR-Tools CP-SAT and local models are deferred and require empirical justification and an accepted ADR (ADR-004, ADR-009).
 ## Runtime safeguards
 
 The container path must verify:
@@ -52,4 +53,4 @@ Quality takes priority over an unverified latency target. Candidate generation m
 | Geometry behavior | Can drift outside constraints | Checks identity, ratios, rotated bounds, and overlap |
 | Candidate choice | Often opaque | Explicit archetypes, hard validation, and soft ranking |
 
-The container is complete when a clean build produces an image that runs with no network and returns the same structural contract for mounted inputs.
+The container is complete when a clean build produces an image that runs with `--network none`, executes within the CPU/RAM budget, commits JSON and PNG as an atomic logical pair on success (ADR-006), and returns the same structural contract for mounted inputs.

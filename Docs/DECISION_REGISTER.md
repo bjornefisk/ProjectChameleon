@@ -54,11 +54,11 @@ The failure, numeric/geometry, and typography decisions are accepted blocking de
 
 The accepted, deterministic defaults are:
 
-1. **Failure:** typed internal status distinctions, fail closed, and a task-level JSON/PNG commit boundary (ADR-006).
-2. **Numeric/geometry:** exact rational comparisons, one final half-even quantization, contract AABBs, rigid group transforms, and positive-area overlap (ADR-007).
+1. **Failure & Feasibility:** Typed internal status distinctions, fail closed for genuinely invalid/unsolvable geometry, atomic task-level JSON/PNG commit boundary, and proactive spatial compression (font floors, isotropic art scaling, horizontal ribboning) to maximize feasibility on extreme canvases (ADR-006).
+2. **Numeric & Geometry:** Exact rational comparisons, one final half-even quantization, contract AABBs, rigid group transforms, and positive-area overlap (ADR-007).
 3. **Typography:** Unicode-safe cluster boundaries, renderer-matched span metrics, explicit line/height rejection, and no text rewrite (ADR-008).
-4. **Search:** a bounded four-topology structured search with no model or OR-Tools dependency, followed by renderer-in-loop validation and fixed-point ranking (ADR-009).
-
+4. **Search & Runtime:** Bounded four-topology structured search with 0 MB neural model weights, < 2.0s CPU latency target, < 500 MB solver RAM, strictly CPU-only execution under <= 8 cores and <= 8 GB RAM in Docker on Apple Silicon under Rosetta 2, followed by renderer-in-loop validation and fixed-point ranking (ADR-004, ADR-009).
+5. **Finale Integration:** Lightweight local HTTP service (FastAPI/Flask) or WebAssembly module connecting the Stage 1 engine to the Adobe Express add-on iframe (ADR-005).
 These are accepted internal contract decisions, not claims that implementation, verification, or qualification is complete.
 
 These decisions preserve the schema and existing hard constraints while settling internal behavior for later implementation.

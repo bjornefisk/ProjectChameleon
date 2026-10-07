@@ -18,6 +18,8 @@ Stage 1 consists of the autonomous offline engine, its contract, runtime image, 
 
 The finale is a separate Adobe Express product layer. It MAY offer candidate selection, user pinning, copy alternatives, font substitution, or a reduced composition as explicitly separate user-controlled interactions. Any candidate labeled as a Stage 1 output must still satisfy the Stage 1 contract. Reduced or copy-altered previews are never silently passed off as Stage 1 responses. Image regeneration, redrawing, replacement, inpainting, seam carving, and outpainting are prohibited in both stages.
 
+### Finale integration architecture
+For the live finale showcase at Adobe HQ, the Express add-on frontend runs as an iframe in the Express client via the `@adobe/express-add-on-sdk`. The Stage 1 engine will be exposed as a lightweight local HTTP service (e.g. FastAPI/Flask on `localhost`) or WebAssembly module that accepts the active canvas JSON and returns the resized design document, allowing the add-on to update the user's canvas in real time.
 ## Alternatives considered
 
 ### Require a viewer add-on in Stage 1

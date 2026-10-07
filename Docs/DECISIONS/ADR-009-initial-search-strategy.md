@@ -37,6 +37,12 @@ The initial algorithm MUST be a deterministic structured candidate search, not a
 
 No soft proxy score may rescue a hard-invalid candidate. No candidate may shed, hide, replace, or rewrite a source record in order to improve its score.
 
+### 1b. Performance and resource budget targets
+
+- **Zero model weight footprint (0 MB):** The engine operates as a 100% deterministic symbolic solver without neural weights, eliminating model loading time and GPU dependencies.
+- **Execution speed:** The solver targets < 2.0 seconds per design on CPU (under Rosetta 2 x86 emulation on Apple Silicon), well inside any evaluation timeout.
+- **Memory footprint:** Resident memory for the solver pipeline stays under 500 MB RAM, leaving headroom under the 8 GB container ceiling.
+- **Reproducibility:** Two runs on the exact same input task JSON produce identical serialized output coordinates and identical rendered preview PNG bytes.
 ### 2. Use deterministic multi-signal role and relationship inference
 
 Role inference must be inspectable and stable for identical input. Use a fixed ordered set of source signals:

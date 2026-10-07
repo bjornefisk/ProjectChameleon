@@ -1,5 +1,7 @@
 # Interactive finale architecture and Adobe Express add-on integration
 
+> **Authority Notice:** This document describes Stage 2 finale exploratory architecture only. The binding Stage 1 behavioral contract is ratified in [PROJECT_CONTRACT.md](PROJECT_CONTRACT.md) and Accepted [ADRs](DECISIONS/) (specifically [ADR-005](DECISIONS/ADR-005-separate-stage-1-from-finale.md)). Stage 1 remains an autonomous offline engine; finale controls are never engine inputs.
+
 The Adobe Express add-on is a Stage 2 product layer around the Stage 1 retargeting engine. Stage 1 remains an offline, identity-preserving resize service. It cannot shed elements, rewrite copy, change fixed font attributes, hide records, or generate image content.
 
 The add-on can expose controls that are deliberately outside the automated scoring contract: candidate selection, manual pinning, and exploratory alternatives. Any Stage 1 candidate shown in the add-on still has to satisfy the same JSON and rendered-PNG rules.
@@ -19,7 +21,7 @@ Express canvas document state and target selection
 │    - Preview and user comparison                        │
 │    - Separate exploratory copy or visibility controls  │
 └──────────────────────────┬─────────────────────────────┘
-                           │
+                           │ (Local HTTP service via localhost / Wasm)
                            ▼
 ┌────────────────────────────────────────────────────────┐
 │                 RETARGETING CORE ENGINE                │

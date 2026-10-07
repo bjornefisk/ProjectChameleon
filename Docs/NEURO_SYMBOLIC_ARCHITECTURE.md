@@ -1,5 +1,7 @@
 # Neuro-symbolic system architecture
 
+> **Authority Notice:** This document is architectural guidance. The binding Stage 1 behavioral contract is ratified in [PROJECT_CONTRACT.md](PROJECT_CONTRACT.md) and Accepted [ADRs](DECISIONS/). In any conflict, the contract and ADRs govern.
+
 Project Chameleon uses a deterministic pipeline that separates role inference from coordinate resolution. The parser proposes relationships and layout archetypes from the source document. The solver places the existing elements while enforcing the hard output rules.
 
 The pipeline does not redraw assets, rewrite text, or treat every overlap as an error. It preserves source relationships first, then uses constraints and measured rendering to choose among valid layouts.
@@ -13,7 +15,7 @@ Source document and target canvas dimensions
 STAGE 1: Role and relationship inference
   - Normalize geometry, rotation, z-order, opacity, fit, and coverage
   - Infer background, brand, hero, text, and decorative roles
-  - Use group_id for rigid units and containment only as a fallback
+  - Use group_id for rigid units; containment and proximity are layout hints only
   - Record intentional source overlaps and busy image regions
                       │
                       ▼
@@ -31,11 +33,11 @@ STAGE 3: Constraint placement and typography
   - Generate candidates with different hero and copy emphasis
                       │
                       ▼
-STAGE 4: Render-and-validate
-  - Render each candidate through the project renderer
-  - Check ids, fixed properties, rotated bounds, image ratios,
-    text bounds, overlap policy, and contrast
-  - Round deliberately, re-check, and emit the best valid JSON
+STAGE 4: Quantize, render, and validate
+  - Quantize candidate geometry to deliberate integers once
+  - Render candidate through the project renderer
+  - Check hard constraints on serialized geometry and actual glyph bounds
+  - Rank hard-valid candidates with deterministic fixed-point scoring
 ```
 
 ## Stage 1: Role and relationship inference
@@ -62,9 +64,8 @@ No single z-index or coverage threshold defines the background. The same signals
 Grouping follows a strict precedence:
 
 1. Elements with the same `group_id` form a rigid unit.
-2. For ungrouped elements, geometric containment and layer proximity may identify a fallback unit.
+2. For ungrouped elements, geometric containment and proximity provide layout hints only, not fallback rigid units.
 3. Source overlap alone does not create a group. It records an overlap relationship that the target layout should preserve when it appears intentional.
-
 The parser also marks image regions that are visually busy. Text may overlap a deliberate container or decorative layer, but it must not be placed over a busy image without a readable treatment already present in the source.
 
 ## Stage 2: Layout archetype generation
@@ -101,16 +102,14 @@ The engine may keep several archetypes alive until hard validation and soft scor
 
 ## Stage 3: Constraint placement and typography
 
-For small scenes, CP-SAT or a structured integer search can place the rigid units and independent elements. Its constraints must distinguish source-intended overlaps from new collisions. Alignment, even spacing, hierarchy, balance, whitespace, and readability belong in the objective. Kiwi is optional and can refine coordinates after the topology is fixed.
-
+A bounded structured candidate search places the rigid units and independent elements across four topology families (CP-SAT is a deferred conditional solver requiring experimental justification under ADR-004/ADR-009). Its constraints must distinguish source-intended overlaps from new collisions. Alignment, even spacing, hierarchy, balance, whitespace, and readability belong in the objective. Kiwi is optional and can refine coordinates after the topology is fixed.
 Typography changes only font size and geometry. Content, font family, weight, style, color, and style runs remain source values. The engine measures the supplied font files and follows the renderer's explicit line representation, line height, letter spacing, and style maps. It searches for the largest size that fits each candidate slot without imposing a universal headline-to-body ratio.
 
 Candidate weights may favor hero scale, copy scale, or balance, but every candidate must satisfy the same hard rules. The ranking step must not rescue an invalid candidate by shrinking an element to zero, hiding it, or dropping it from the output.
 
 ## Stage 4: Render-and-validate
 
-Before serialization, the engine renders each valid candidate and checks:
-
+Upon serialization, the candidate is quantized to deliberate integers, rendered through the project renderer, and checked:
 - the output has the same element ids, count, and order as the source;
 - fixed text attributes and fixed visual properties are unchanged;
 - every rotated axis-aligned bound stays inside the target canvas;

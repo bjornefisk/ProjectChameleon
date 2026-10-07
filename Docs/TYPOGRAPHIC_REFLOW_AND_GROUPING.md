@@ -1,5 +1,7 @@
 # Computational typographic reflow and structural grouping
 
+> **Authority Notice:** This document is architectural guidance. The binding Stage 1 behavioral contract is ratified in [PROJECT_CONTRACT.md](PROJECT_CONTRACT.md) and Accepted [ADRs](DECISIONS/). In any conflict, the contract and ADRs govern.
+
 Text is a measured layout element, not a bitmap to stretch. Its rendered bounds depend on the supplied font, font size, line representation, line height, letter spacing, and style runs.
 
 ## Why uniform text scaling fails
@@ -18,7 +20,7 @@ For each rendered line:
 - left, center, and right alignment offset the rendered blobs within the element width; and
 - the renderer logs when the rendered width exceeds the element width rather than clipping or wrapping it.
 
-The renderer uses the explicit font, weight, style, color, and style maps. The reflow engine must keep those source values fixed. It may change font size and permitted geometry fields. If the output contract treats line representation as geometry, any changed line map must remain consistent with the unchanged text and style runs.
+The renderer uses the explicit font, weight, style, color, and style maps. The reflow engine must keep those source values fixed. It may change font size and permitted geometry fields. The public design schema does not expose a line-map field; line maps are generated deterministically by the project renderer adapter from unchanged text content (ADR-002, ADR-008).
 
 The renderer draws images by mapping the complete source rectangle into the destination rectangle. That is fill behavior, not a named contain or cover implementation in the public renderer. A wrapper may add a cover path for backgrounds, but the layout engine must not assume that a foreground image will be corrected by the renderer. Its output geometry must retain the source aspect ratio.
 
@@ -70,10 +72,9 @@ Design primitives often form rigid units. If the children are optimized independ
 
 Grouping precedence is:
 
-1. Use `group_id` as the source of truth. Every element in the same group moves with the same group transform.
-2. For elements without a group id, use geometric containment, proximity, and layer order as a fallback.
-3. Do not infer a group from overlap alone. Preserve a source overlap as a relationship even when the elements remain separate records.
-
+1. Use explicit `group_id` as the primary source of truth. Every element in the same group moves with the same uniform group transform (ADR-007).
+2. For ungrouped elements, geometric containment and proximity are layout hints only, not fallback rigid units.
+3. Do not infer a group from overlap alone. Preserve an intentional source overlap as an allowed relationship even when elements remain separate records.
 The macro-layout solver places each rigid unit. Child geometry is then derived from the source internal offsets and scale. For a centered label inside a shape:
 
 $$

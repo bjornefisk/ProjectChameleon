@@ -1,5 +1,7 @@
 # Computational layout optimization solvers
 
+> **Authority Notice:** This document is architectural guidance. The binding Stage 1 behavioral contract is ratified in [PROJECT_CONTRACT.md](PROJECT_CONTRACT.md) and Accepted [ADRs](DECISIONS/). In any conflict, the contract and ADRs govern.
+
 Retargeting has two separate search problems. The engine must choose a topology and place elements, then rank the valid results by alignment, spacing, hierarchy, balance, whitespace, and readability. Solver choice follows the size and structure of the scene rather than a fixed multi-solver pipeline.
 
 ## Linear constraints: Kiwi and Cassowary
@@ -12,7 +14,7 @@ Kiwi cannot choose among left, right, above, and below relationships for an unkn
 
 Google OR-Tools CP-SAT handles finite integer domains, Boolean choices, and disjunctive spatial constraints. `AddNoOverlap2D` is useful for pairs that were separate in the source, but it must not be applied blindly to source-intended overlaps or to rigid children inside a group.
 
-For designs with 17 elements or fewer, CP-SAT alone is sufficient for the global placement problem when the candidate slots and text measurements are supplied. A structured search over a small set of archetypes and group placements is also viable. The implementation should prefer the simpler path that maintains the hard checks.
+Bounded structured candidate search across four topology families is the ratified primary Stage 1 solver (ADR-009). It operates with zero model weight footprint, runs CPU-only, and executes in < 2.0s. Google OR-Tools CP-SAT is a deferred conditional alternative that may be evaluated later if benchmarks prove a material coverage gain that justifies adding the dependency.
 
 Coordinates are rounded intentionally for the integer model. The validator recomputes rotated bounds after rounding and rejects any candidate that crosses the canvas edge.
 
@@ -43,8 +45,8 @@ An alignment reward must never pull apart a `group_id` unit or create a new coll
 | Solver paradigm | Disjunctive placement | Typography handling | Appropriate Stage 1 role |
 | --- | --- | --- | --- |
 | Kiwi or Cassowary | No native topology search | No renderer text measurement | Optional cleanup after topology is fixed |
-| OR-Tools CP-SAT | Boolean choices and integer non-overlap constraints | Uses measured slot requirements supplied by the layout pass | Primary global solver for small scenes |
-| Structured candidate search | Explicit archetype and slot alternatives | Binary search over measured font sizes | Simple alternative for scenes with 17 elements or fewer |
+| OR-Tools CP-SAT | Boolean choices and integer non-overlap constraints | Uses measured slot requirements supplied by the layout pass | Deferred conditional solver; evaluate if benchmarks justify it |
+| Structured candidate search | Explicit archetype and slot alternatives across 4 topologies | Binary search over measured font sizes | Primary deterministic Stage 1 solver (ADR-009) |
 | MILP or HiGHS | Binary separation variables and continuous coordinates | Piecewise approximations require care | Optional alternative when continuous objectives justify it |
 | Nonlinear energy methods | Soft penalties only | Can score continuous aesthetic terms | Offline ranking or refinement after hard validation |
 
@@ -55,8 +57,7 @@ The recommended order is:
 1. infer roles, groups, source overlaps, and busy image regions;
 2. generate several archetype and emphasis candidates;
 3. measure text and image requirements;
-4. solve each candidate with CP-SAT or structured search;
-5. apply optional Kiwi cleanup without changing topology;
+4. solve each candidate with bounded structured candidate search (CP-SAT is deferred);
 6. render and reject hard failures; and
 7. rank the remaining candidates with alignment and spacing terms included.
 
