@@ -1,0 +1,6 @@
+Pillow==11.1.0
+datasets[vision]==3.2.0
+pydantic==2.10.6
+skia-python==132.0b11
+jsonschema==4.23.0
+cr-renderer @ git+https://github.com/CyberAgentAILab/cr-renderer.git@a17e1fb9a732959dd6c21ae168d5ee09d74bd64f

@@ -1,0 +1,19 @@
+{
+  "source": {
+    "canvas": {"width": 320, "height": 180},
+    "elements": [
+      {
+        "id": "product",
+        "type": "image",
+        "x": 40,
+        "y": 20,
+        "width": 160,
+        "height": 100,
+        "z_index": 0,
+        "asset_id": "solstice_bottle.png",
+        "fit": "fill"
+      }
+    ]
+  },
+  "target_canvas": {"width": 640, "height": 360}
+}

@@ -1,0 +1,29 @@
+{
+  "canvas": {"width": 1080, "height": 1080},
+  "elements": [
+    {
+      "id": "bg",
+      "type": "image",
+      "x": 0,
+      "y": 0,
+      "width": 1080,
+      "height": 1080,
+      "z_index": 0,
+      "asset_id": "solstice_bg_gradient.png",
+      "fit": "cover"
+    },
+    {
+      "id": "corner_glow",
+      "type": "shape",
+      "x": -100,
+      "y": -100,
+      "width": 500,
+      "height": 500,
+      "z_index": 1,
+      "opacity": 0.15,
+      "shape_type": "ellipse",
+      "fill_color": "rgba(255,255,255,1)",
+      "_fixture_note": "intentional source-bleed decoration"
+    }
+  ]
+}
