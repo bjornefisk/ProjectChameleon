@@ -13,13 +13,14 @@ The Git Agent is the version control guardian. It ensures that every change is c
 
 ## Operational protocol
 1. **Pre-commit sanity:** Verify that `git status` contains only files intended for the current ticket. Never commit temporary files, cached `.pyc`, or generated outputs in `chameleon/output/`.
-2. **Conventional commit formatting:** Format commits using standard conventional commit syntax:
+2. **Integration branch:** Merge only reviewer-approved ticket branches into the named integration branch. Rebase or merge the ticket branch onto the current integration tip before integrating; preserve unrelated user changes.
+3. **Conventional commit formatting:** Format commits using standard conventional commit syntax:
    - `feat(<scope>): <description> (ticket <NN>)`
    - `fix(<scope>): <description> (ticket <NN>)`
    - `test(<scope>): <description> (ticket <NN>)`
    - `docs(<scope>): <description>`
-3. **Atomic commits:** Commit each completed ticket as its own distinct commit. Never bundle multiple tickets into one giant commit.
-4. **Clean tree:** Ensure the working directory is clean after committing.
+4. **Atomic commits:** Commit each completed ticket as its own distinct commit. Never bundle multiple tickets into one giant commit.
+5. **Clean tree:** Ensure the working directory is clean after committing, or report the exact intentional changes that remain.
 
 ## Non-negotiables
 - Never run destructive git commands (`git reset --hard`, `git push --force`) without explicit human confirmation.

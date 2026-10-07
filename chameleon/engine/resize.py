@@ -1,9 +1,9 @@
 """
-THIS IS THE FILE YOU IMPLEMENT.
+THIS IS THE PUBLIC `resize()` SEAM.
 
-Everything else in this repo (input loading, output writing, rendering,
-the Dockerfile) is plumbing so you can focus on exactly one function:
-`resize()`. See RULES.md and the design schema for the full contract.
+The starter pipeline includes input loading, output publication, rendering, and
+Docker packaging around the public `resize()` seam. The implementation tickets
+may update those modules where contract conformance requires it.
 """
 
 from typing import Any
@@ -40,9 +40,9 @@ def resize(source: dict[str, Any], target_canvas: dict[str, Any]) -> dict[str, A
         - Preserve text and fixed font attributes; change only `font_size`.
         - Return a hard-valid design or fail closed; do not return best effort.
 
-    The challenge submission may change only this file. The broader contract's
-    renderer, input-parser, and batch-runner requirements are documented as
-    Gate 1 blockers when they cannot be satisfied here.
+    The public seam is `resize()`. Gate 1 also owns the parser, renderer,
+    runner, and permanent-test conformance paths; keep this function focused on
+    returning the contract-defined target design.
     """
 
     # ------------------------------------------------------------------

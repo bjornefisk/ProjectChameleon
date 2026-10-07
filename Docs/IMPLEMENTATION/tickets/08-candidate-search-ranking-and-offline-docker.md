@@ -15,6 +15,6 @@ ready-for-agent
 - [ ] Implement deterministic lexicographic tie-breaking: `(hard_validity, quality_tuple, topology_order, candidate_index, source_order)` with zero random seeds.
 - [ ] Wire the full search and ranking pipeline into `resize()` in `chameleon/engine/resize.py`.
 - [ ] Execute `python -m engine.main` locally across all three public samples and contract fixtures, recording hard-validation results, typed failures, and deterministic artifacts. Do not claim a 100% pass rate until the implementation and fixture evidence establish it.
-- [ ] Build the Docker container using `docker buildx build --platform linux/amd64 -t chameleon-stage1 .`.
+- [ ] Build the Docker container using `docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` so the image is available to the local `docker run` smoke step regardless of the selected Buildx driver.
 - [ ] Run the container with `--network none` mounting input and output volumes: record whether each level produces a valid JSON/PNG pair, any typed failure status, and measured per-design runtime against the <$2.0$ second performance target.
 - [ ] Measure peak memory against the <$500\text{ MB}$ solver target and image size against the <$8\text{ GB}$ container ceiling; record evidence rather than treating targets as completed qualification.

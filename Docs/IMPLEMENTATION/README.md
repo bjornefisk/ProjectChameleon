@@ -5,6 +5,7 @@ This directory houses the complete engineering specification, module architectur
 It is structured using the industry-standard **`to-spec`**, **`to-tickets`**, and **`writing-for-agents`** methodologies so autonomous AI agents have explicit implementation boundaries and dependency-sequenced work.
 Use `../FINAL_ARCHITECTURE.md` as the consolidated implementation summary. This directory decomposes that architecture into the executable specification and dependency-sequenced tickets.
 Current frontier is Gate 1: tickets 01–04 establish validator, renderer, runner, and geometry conformance. Do not dispatch tickets 05–08 until the Gate 1 evidence and status update are complete.
+The challenge brief identifies `engine/resize.py` as the primary public seam, not an exclusive edit boundary; supporting files may change when required for contract conformance or qualification.
 
 ---
 
@@ -32,24 +33,26 @@ Docs/IMPLEMENTATION/
 Agents work the **frontier**: any ticket whose blockers are 100% complete.
 
 ```text
-[01: Contract Validator] ──────────┐
-       │ (blocks)                  │ (blocks)
-       ▼                           ▼
-[03: Atomic Runner]        [04: Exact Geometry]    [02: Renderer Conformance]
-       │                           │                      │
-       └───────────────────┬───────┴──────────────────────┘
-                           │ (all 3 block)
-                           ▼
-               [05: Level 1 Solver]
-                           │ (blocks)
-                           ▼
-               [06: Level 2 Solver]
-                           │ (blocks)
-                           ▼
-               [07: Level 3 Solver]
-                           │ (blocks)
-                           ▼
-               [08: Macro Search & Docker]
+[01: Contract Validator] ─────┐
+       │                     │
+       ▼                     ▼
+[03: Atomic Runner]      [02: Renderer Conformance]
+       │                     │
+       ▼                     │
+[04: Exact Geometry] ────────┘
+       │
+       └─────────────┐
+                     ▼
+           [05: Level 1 Solver]
+                     │ (blocks)
+                     ▼
+           [06: Level 2 Solver]
+                     │ (blocks)
+                     ▼
+           [07: Level 3 Solver]
+                     │ (blocks)
+                     ▼
+           [08: Macro Search & Docker]
 ```
 
 ---
@@ -61,7 +64,7 @@ Agents work the **frontier**: any ticket whose blockers are 100% complete.
 | **01** | `engine/errors.py` & `engine/contract.py` semantic validator oracle | None (can start immediately) |
 | **02** | `wrap.py`, `convert.py`, `shapes.py` Unicode & style-run fixes | None (can start immediately) |
 | **03** | `staging.py` & `main.py` atomic JSON/PNG pair publication & error isolation | **01** |
-| **04** | `geometry/` exact rational math, rotated AABB, and group transforms | **01** |
+| **04** | `geometry/` exact rational math, rotated AABB, and group transforms | **01, 03** |
 | **05** | `resize.py` isotropic scaling & near-isomorphic solver (passes Level 1) | **02, 03, 04** |
 | **06** | `roles.py` & `column_pivot.py` multi-signal inference (passes Level 2) | **05** |
 | **07** | `horizontal_ribbon.py` & spatial compression engine (passes Level 3) | **06** |

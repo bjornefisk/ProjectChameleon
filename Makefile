@@ -68,7 +68,7 @@ agent-check: verify test run inspect
 
 docker-build:
 	@echo "Building linux/amd64 Docker image..."
-	@docker buildx build --platform linux/amd64 -t chameleon-stage1 chameleon/
+	@docker buildx build --platform linux/amd64 --load -t chameleon-stage1 chameleon/
 
 docker-test:
 	@echo "Running offline container test with --network none..."

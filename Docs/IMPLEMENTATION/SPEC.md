@@ -86,7 +86,7 @@ A deterministic, renderer-aware adaptive layout engine that separates macro-topo
    - Implements $[start, end)$ code-point indexing for style runs and converts to upstream inclusive indices.
    - Updates `shapes.py` to rasterize declared rectangle/ellipse strokes inside the bounding box.
 4. **`chameleon/engine/geometry/`:**
-   - `math_util.py`: Exact rational Fraction representation, deliberate `round-half-even` quantizer.
+   - `math_util.py`: Converts parser-owned exact integer/decimal values to `Fraction`, provides deliberate `round-half-even` quantization, and never reconstructs lexical values from binary floats.
    - `bounds.py`: Rotated axis-aligned bounding box formula $a = |w\cos\theta| + |h\sin\theta|$, $b = |w\sin\theta| + |h\cos\theta|$, containment predicate, source-bleed predicate.
    - `ratios.py`: Reduced integer lattice point calculation for foreground images.
    - `groups.py`: Uniform macro-scale and translation vector computation.
@@ -97,6 +97,7 @@ A deterministic, renderer-aware adaptive layout engine that separates macro-topo
    - `search.py`: Structured macro-candidate orchestrator generating at most 12 candidates.
    - `ranking.py`: Fixed-point lexicographic scorer: `(hard_validity, quality_tuple, topology_order, candidate_index, source_order)`.
 6. **`chameleon/engine/staging.py` & `main.py`:**
+   - JSON ingress: `main.py` uses `parse_int=int`, `parse_float=Decimal`, and a rejecting `parse_constant` hook (or an equivalent decoder) before validation and geometry; output serialization emits only contract-approved JSON values.
    - Task isolation: `run_task(task_path, input_dir, output_dir)`.
    - Atomic pair publisher: stages `<task>_output.json.tmp` and `<task>_output.png.tmp`, validates both, commits atomically to final names.
    - Stale artifact cleanup: deletes pre-existing outputs on task failure.

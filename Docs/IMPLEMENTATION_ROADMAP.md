@@ -18,6 +18,7 @@ Decision ratification is complete and documentation-only. Do not claim implement
 
 - Build the pinned `linux/amd64` environment and prove local fonts/assets work with `--network none`.
 - Establish the semantic validator around identity/order/fixed fields, finite integer geometry, rotated AABB, exact foreground image ratio, group/overlap policy, text bounds, and missing-asset preservation.
+- Preserve numeric JSON tokens at ingress before any binary-float conversion; use exact integer/decimal parse hooks, reject non-finite constants, and test decimal and exponent cases through the runner/geometry seam.
 - Close the adapter gaps already recorded in `STATUS.md`: end-exclusive style runs, style-aware/letter-spaced measurement, `max_lines`/height, and renderer goldens.
 - Add synthetic fixtures for empty/no-background/single/degenerate/rotated/long-copy/missing-asset/foreground-`fill` cases.
 - Conformance work may touch the task orchestrator and renderer adapter as well as validator-facing paths; it must preserve the public wire schema and Stage 1 mutability boundary.

@@ -82,7 +82,7 @@ For integration, use the exact smoke sequence recorded in `Docs/STATUS.md`:
 cd chameleon
 python -m engine.main
 python -m unittest discover -s tests -p 'test_*.py' -v
-docker buildx build --platform linux/amd64 -t chameleon-stage1 .
+docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .
 docker run --rm --network none \
   -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" \
   chameleon-stage1

@@ -5,7 +5,7 @@ The Issue Agent manages the execution state of the project. It monitors `Docs/IM
 
 ## Primary skills
 - `to-tickets` (ticket lifecycle, frontier discovery)
-- `triage` (prioritization, edge verification)
+- `chameleon-review` (acceptance evidence and blocker verification)
 
 ## Mandatory inputs
 - `Docs/STATUS.md` and `Docs/FINAL_ARCHITECTURE.md`

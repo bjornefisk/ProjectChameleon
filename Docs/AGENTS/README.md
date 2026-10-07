@@ -18,7 +18,7 @@ frontends so that the five personas below use the same Stage 1 rules.
                            │
                            ▼
                ┌────────────────────────┐
-               │      Issue Agent       │  (triage, frontier management)
+               │      Issue Agent       │  (frontier management, acceptance evidence)
                │ (Frontier & Blockers)  │
                └───────────┬────────────┘
                            │
@@ -43,8 +43,8 @@ frontends so that the five personas below use the same Stage 1 rules.
 | Agent | Specialized role | Primary skills | Core responsibility |
 |---|---|---|---|
 | **Plan Agent** | Architecture & Scoping | `to-spec`, `to-tickets`, `writing-for-agents` | Synthesizes specs, breaks features into tracer-bullet vertical slices, defines test seams |
-| **Issue Agent** | Frontier & Ticket Manager | `to-tickets`, `triage` | Tracks `Docs/IMPLEMENTATION/tickets/`, checks blocking edges, unlocks frontier tickets |
-| **Implementer Agent** | TDD & Implementation | `tdd`, `codebase-design`, `implement-spec` | Writes failing tests first, builds minimal passing code, respects single-file ownership |
+| **Issue Agent** | Frontier & Ticket Manager | `to-tickets`, `chameleon-review` | Tracks `Docs/IMPLEMENTATION/tickets/`, checks blocking edges, unlocks frontier tickets |
+| **Implementer Agent** | TDD & Implementation | `tdd`, `codebase-design`, `implement-spec` | Writes failing tests first, builds minimal passing code, respects assigned-file ownership |
 | **Git Agent** | Versioning & Guardrails | `git-workflow-and-versioning`, `git-guardrails-claude-code` | Manages conventional atomic commits, clean diffs, and branch hygiene |
 | **PR / Review Agent** | QA & Design Review | `code-review`, `web-design-guidelines`, `frontend-design` | 5-axis review checking contract compliance, no regression, and layout visualizer output |
 
@@ -58,6 +58,9 @@ frontends so that the five personas below use the same Stage 1 rules.
 4. **PR / Review Agent** reviews the diff against `PROJECT_CONTRACT.md`, inspects terminal layout outputs via `make inspect`, and verifies all acceptance criteria.
 5. **Git Agent** creates an atomic conventional commit for the completed ticket (e.g. `feat(contract): implement semantic validator oracle (ticket 01)`).
 6. **Issue Agent** marks the ticket complete and unlocks downstream dependent tickets.
+7. **Parallel dispatch:** run agents concurrently only when their ticket-owned files and fixtures are disjoint. A shared path has one active owner; integration work waits for that owner's handoff.
+8. **Handoff evidence:** every Implementer handoff lists changed files, acceptance evidence, exact commands and results, checks not run, and blockers. The reviewer decides approval; the Implementer does not self-approve.
+9. **State updates:** the Issue Agent changes ticket status only after reviewer evidence is complete. The Git Agent integrates only reviewed changes and keeps generated artifacts out of commits.
 
 ## Repository controls
 
