@@ -6,6 +6,28 @@ Build a portable, deterministic coding-agent harness around the Chameleon engine
 
 The validator and renderer are the agent's oracle. The Stage 1 engine must remain deterministic, identity-preserving, and runnable offline.
 
+## Current repository controls
+
+The root repository now provides a small, versioned control layer before the nested
+engine is available:
+
+- `skills/chameleon-contract/SKILL.md` — shared contract rules for implementation
+  and review.
+- `skills/chameleon-testing/SKILL.md` — deterministic test seams and offline
+  evidence rules.
+- `skills/chameleon-review/SKILL.md` — review gates for contract, runtime, tests,
+  and layout inspection.
+- `scripts/verify_repository.py` — checks governance files, ticket wiring, staged
+  generated artifacts, and nested-engine availability.
+- `.githooks/pre-commit` — rejects generated artifacts and whitespace errors, then
+  runs the repository verifier.
+- `make verify` — non-blocking repository wiring check.
+- `make preflight` — strict check that also requires the nested engine checkout.
+- `make install-hooks` — installs the versioned pre-commit hook.
+
+These controls do not replace the engine validator or claim runtime qualification.
+They make missing nested-project state explicit and prevent false evidence claims.
+
 ## Phase 1: Establish the executable baseline
 
 1. Import or clone the official starter structure:
