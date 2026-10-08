@@ -13,7 +13,7 @@ FIXTURES = Path(__file__).parents[1] / "fixtures" / "contract"
 
 
 def load_fixture(name):
-    return json.loads((FIXTURES / name).read_text())
+    return json.loads((FIXTURES / name).read_text(), parse_float=Decimal)
 
 
 def design_with_elements(elements, width=200, height=100):
@@ -167,6 +167,28 @@ class ContractValidatorTests(unittest.TestCase):
         response["canvas"] = {"width": 300, "height": 200}
         response["elements"][0].update({"x": 40, "y": 20, "width": 20, "height": 10})
         validate_response(source, response["canvas"], response)
+
+    def test_binary_float_sources_are_rejected_and_decimal_json_stays_exact(self):
+        raw = (
+            '{"canvas":{"width":100,"height":100},"elements":['
+            '{"id":"img","type":"image","x":1,"y":1,'
+            '"width":0.100000000000000005,"height":1,"asset_id":"a.png"}]}'
+        )
+        lossy_source = json.loads(raw)
+        with self.assertRaises(InfeasibleLayoutError) as raised:
+            validate_source(lossy_source)
+        self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.INVALID_SOURCE)
+
+        source = json.loads(raw, parse_float=Decimal)
+        response = copy.deepcopy(source)
+        response["elements"][0].update({"width": 1, "height": 10})
+        self.assert_reason(
+            source,
+            source["canvas"],
+            response,
+            InfeasibleReasonCode.IMAGE_RATIO_VIOLATION,
+        )
+
     def test_source_validation_rejects_invalid_source_and_duplicate_ids(self):
         source = load_fixture("minimal_design.json")
         invalid = copy.deepcopy(source)
@@ -283,6 +305,37 @@ class ContractValidatorTests(unittest.TestCase):
             InfeasibleReasonCode.CONTAINMENT_VIOLATION,
         )
 
+    def test_exact_aabb_rejects_one_pixel_overflow_above_float_precision(self):
+        source = design_with_elements(
+            [
+                {
+                    "id": "edge",
+                    "type": "shape",
+                    "x": 10,
+                    "y": 10,
+                    "width": 10,
+                    "height": 10,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(0,0,0,1)",
+                }
+            ]
+        )
+        target = {"width": 2**53, "height": 100}
+        response = copy.deepcopy(source)
+        response["canvas"] = target
+        response["elements"][0].update({"x": 2**53 - 1, "width": 2})
+
+        boundary = copy.deepcopy(response)
+        boundary["elements"][0]["x"] = 2**53 - 2
+        validate_response(source, target, boundary)
+
+        self.assert_reason(
+            source,
+            target,
+            response,
+            InfeasibleReasonCode.CONTAINMENT_VIOLATION,
+        )
+
     def test_explicit_text_line_overflow_has_a_typed_reason(self):
         source = design_with_elements(
             [
@@ -340,6 +393,117 @@ class ContractValidatorTests(unittest.TestCase):
         scale_drift = copy.deepcopy(valid)
         scale_drift["elements"][1]["width"] = 42
         self.assert_reason(source, target, scale_drift, InfeasibleReasonCode.GROUP_VIOLATION)
+
+    def test_singleton_group_still_requires_uniform_scale(self):
+        source = design_with_elements(
+            [
+                {
+                    "id": "single",
+                    "type": "shape",
+                    "x": 10,
+                    "y": 10,
+                    "width": 20,
+                    "height": 10,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(0,0,0,1)",
+                    "group_id": "g",
+                }
+            ]
+        )
+        response = copy.deepcopy(source)
+        response["elements"][0].update({"x": 20, "y": 20, "width": 40, "height": 30})
+
+        self.assert_reason(
+            source,
+            source["canvas"],
+            response,
+            InfeasibleReasonCode.GROUP_VIOLATION,
+        )
+
+    def test_zero_size_group_scale_is_inferred_from_centers(self):
+        source = design_with_elements(
+            [
+                {
+                    "id": "first",
+                    "type": "shape",
+                    "x": 10,
+                    "y": 10,
+                    "width": 0,
+                    "height": 0,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(0,0,0,1)",
+                    "group_id": "g",
+                },
+                {
+                    "id": "second",
+                    "type": "shape",
+                    "x": 30,
+                    "y": 10,
+                    "width": 0,
+                    "height": 0,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(255,255,255,1)",
+                    "group_id": "g",
+                },
+                {
+                    "id": "third",
+                    "type": "shape",
+                    "x": 10,
+                    "y": 30,
+                    "width": 0,
+                    "height": 0,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(255,255,255,1)",
+                    "group_id": "g",
+                }
+            ]
+        )
+        target = {"width": 200, "height": 200}
+        response = copy.deepcopy(source)
+        response["canvas"] = target
+        response["elements"][0].update({"x": 20, "y": 20})
+        response["elements"][1].update({"x": 60, "y": 20})
+        response["elements"][2].update({"x": 20, "y": 60})
+        validate_response(source, target, response)
+
+        drift = copy.deepcopy(response)
+        drift["elements"][1]["x"] += 1
+        self.assert_reason(source, target, drift, InfeasibleReasonCode.GROUP_VIOLATION)
+
+    def test_expanded_degenerate_source_cannot_create_collision(self):
+        source = design_with_elements(
+            [
+                {
+                    "id": "degenerate",
+                    "type": "shape",
+                    "x": 10,
+                    "y": 10,
+                    "width": 0,
+                    "height": 20,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(0,0,0,1)",
+                },
+                {
+                    "id": "other",
+                    "type": "shape",
+                    "x": 100,
+                    "y": 10,
+                    "width": 20,
+                    "height": 20,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(255,255,255,1)",
+                },
+            ]
+        )
+        response = copy.deepcopy(source)
+        response["elements"][0].update({"x": 100, "width": 20})
+
+        self.assert_reason(
+            source,
+            source["canvas"],
+            response,
+            InfeasibleReasonCode.SOURCE_SEPARATION_VIOLATION,
+        )
 
     def test_source_separated_elements_cannot_gain_positive_area_collision(self):
         source = separated_source()
