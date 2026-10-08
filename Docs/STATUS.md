@@ -48,7 +48,7 @@ These are contract artifacts, not solver or renderer implementation:
 - `chameleon/chameleon_design_schema_v0.9.json` is no longer provisional, accepts empty designs, and records structural ranges/defaults.
 - Contract fixtures live under `chameleon/tests/fixtures/contract/`.
 - The Level 2 public sample's style range is corrected to valid end-exclusive `[6, 15)` semantics; this is fixture/source-data correction, not solver implementation.
-- Semantic validator implementation and tests are intentionally deferred to the next phase; the fixture set and ADRs define their required cases.
+- Semantic validator and contract tests are implemented at `engine.contract`; renderer text bounds, runner integration, and full Gate 1 qualification remain pending.
 
 ## Known implementation gaps before the solver
 
