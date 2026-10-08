@@ -8,25 +8,28 @@ The validator and renderer are the agent's oracle. The Stage 1 engine must remai
 
 ## Current repository controls
 
-The root repository now provides a small, versioned control layer before the nested
+The root repository provides a small, versioned control layer before the nested
 engine is available:
 
-- `skills/chameleon-contract/SKILL.md` — shared contract rules for implementation
-  and review.
-- `skills/chameleon-testing/SKILL.md` — deterministic test seams and offline
-  evidence rules.
-- `skills/chameleon-review/SKILL.md` — review gates for contract, runtime, tests,
-  and layout inspection.
-- `scripts/verify_repository.py` — checks governance files, ticket wiring, staged
-  generated artifacts, and nested-engine availability.
-- `.githooks/pre-commit` — rejects generated artifacts and whitespace errors, then
-  runs the repository verifier.
+- `.agents/README.md` — shared provider-neutral operating system and navigation.
+- `.agents/OPERATING_CONTRACT.md` — process, ownership, evidence, safety, and completion rules.
+- `.agents/PROJECT_PROFILE.md` — Chameleon authority map, gates, commands, and adoption notes.
+- `.agents/roles/`, `workflows/`, `policies/`, `research/`, `github/`, `checklists/`, and `templates/` — reusable collaboration artifacts.
+- `skills/chameleon-contract/SKILL.md` — shared contract rules for implementation and review.
+- `skills/chameleon-testing/SKILL.md` — deterministic test seams and offline evidence rules.
+- `skills/chameleon-review/SKILL.md` — review gates for contract, runtime, tests, and layout inspection.
+- `scripts/verify_repository.py` — checks governance files, ticket wiring, staged generated artifacts, and nested-engine availability.
+- `.githooks/pre-commit` — rejects generated artifacts and whitespace errors, then runs the repository verifier.
 - `make verify` — non-blocking repository wiring check.
 - `make preflight` — strict check that also requires the nested engine checkout.
 - `make install-hooks` — installs the versioned pre-commit hook.
 
 These controls do not replace the engine validator or claim runtime qualification.
-They make missing nested-project state explicit and prevent false evidence claims.
+They make missing project state explicit and prevent false evidence claims.
+
+The `.agents` layer is process guidance, not a second contract. Project behavior
+still comes from `AGENTS.md`, the contract/ADR/schema hierarchy, pinned sources,
+and project skills.
 
 ## Phase 1: Establish the executable baseline (complete for this checkout; retained as historical context)
 
@@ -36,26 +39,23 @@ The baseline may be run to document known failures, but its output and warning-o
 
 ## Phase 2: Use the repository agent contract
 
-The repository already contains the durable agent contract and shared skills:
+The repository now has one project contract plus one shared process layer:
 
 ```text
 AGENTS.md
+.agents/README.md
+.agents/OPERATING_CONTRACT.md
+.agents/PROJECT_PROFILE.md
 skills/chameleon-contract/SKILL.md
 skills/chameleon-testing/SKILL.md
 skills/chameleon-review/SKILL.md
 ```
 
-These rules define the project invariants, deterministic test seams, review gates, and offline evidence requirements. Do not create a second `.omp/` contract or duplicate the rules in another location.
+`.agents/` standardizes how agents plan, research, implement, verify, review,
+coordinate, and hand off. It does not duplicate the behavioral invariants or
+create a second `.omp/` contract. The project skills remain the canonical
+Chameleon-specific contract, testing, and review checks.
 
-The contract requires agents to:
-
-- preserve IDs, count, order, content, and fixed properties;
-- never hide, remove, zero-size, replace, or regenerate elements;
-- preserve image ratios, rigid groups, and intentional overlaps;
-- reject new collisions and rotated-bound overflow;
-- validate after integer rounding;
-- never weaken tests or validators to make an implementation pass; and
-- use the smallest change that addresses the failing invariant.
 
 ## Phase 3: Build the validation harness
 
@@ -102,17 +102,25 @@ The independent validator must check:
 - missing assets; and
 - pixel integrity.
 
-## Phase 4: Use repository skills
+## Phase 4: Use repository skills and operating workflows
 
-Use the existing high-value skills under `skills/`:
+Use the existing project skills under `skills/` for Chameleon-specific contract,
+testing, and review checks. Use the shared `.agents/workflows/` and
+`.agents/checklists/` documents for the surrounding research, implementation,
+verification, review, GitHub, release, and handoff procedure.
 
 ```text
 skills/chameleon-contract/SKILL.md
 skills/chameleon-testing/SKILL.md
 skills/chameleon-review/SKILL.md
+.agents/workflows/
+.agents/checklists/
+.agents/templates/
 ```
 
-Do not create a duplicate `.omp/skills/` tree. Add a new skill only when a repeated, command-backed workflow justifies it.
+Do not create a duplicate `.omp/skills/` tree or a second behavioral contract.
+Add a new skill only when a repeated, command-backed project workflow justifies
+it; add generic process guidance to `.agents/` instead.
 
 The primary debugging workflow is:
 
@@ -128,7 +136,8 @@ run failing fixture
 → run the appropriate full gate
 ```
 
-Prompt templates are optional. Add them only after the underlying commands and evidence paths work.
+Templates are reusable forms, not evidence. Fill them with observed commands,
+results, and limitations before treating a handoff or review as complete.
 
 ## Phase 5: Build the test corpus
 

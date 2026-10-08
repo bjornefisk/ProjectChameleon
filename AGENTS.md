@@ -25,16 +25,25 @@ Stage 1 work MUST preserve the source identity and contract: every source record
 
 Do not expand scope into the finale/add-on, user pinning, candidate selection, shedding, copy revision, font substitution, reduced previews, image regeneration/redrawing/inpainting/seam-carving/outpainting, or unapproved schema/API/dependency/runtime changes. Do not turn a warning-only baseline check into contract evidence. The known gaps are intentionally visible in `Docs/STATUS.md`, including the uniform-stretch `engine/resize.py` baseline, nonconforming warning-only `engine/main.py` self-check and missing typed infeasibility path, renderer style-run/measurement/max-lines/height/stroke gaps, missing semantic validator, and unqualified Docker/native-amd64/offline path.
 
+## Shared agent operating system
+
+The repository-wide, provider-neutral agent operating system lives in [`.agents/`](.agents/), starting with [`.agents/README.md`](.agents/README.md). It covers intake, research, planning, implementation, testing, review, security, GitHub/PRs, release, evidence, templates, and handoffs. The capability contract in [`.agents/TOOLING.md`](.agents/TOOLING.md) gives the researcher required web search/fetch access while keeping the Stage 1 product runtime offline. It is process guidance only; the contract and Accepted ADRs below remain authoritative for behavior.
+
 ## Specialized agent roles
 
-The project defines five specialized agent personas in [`Docs/AGENTS/`](Docs/AGENTS/):
-- **Plan Agent (`Docs/AGENTS/PLAN_AGENT.md`):** Scopes features using `to-spec` and `to-tickets` into vertical slices.
-- **Issue Agent (`Docs/AGENTS/ISSUE_AGENT.md`):** Discovers unblocked frontier tickets and validates completion criteria.
-- **Implementer Agent (`Docs/AGENTS/IMPLEMENTER_AGENT.md`):** Executes single frontier tickets using `tdd` and `codebase-design`.
-- **Git Agent (`Docs/AGENTS/GIT_AGENT.md`):** Manages atomic conventional commits and safe versioning using `git-workflow-and-versioning`.
-- **PR / Review Agent (`Docs/AGENTS/PR_REVIEW_AGENT.md`):** Conducts 5-axis code reviews and visual layout inspections using `code-review` and `web-design-guidelines`.
+Project role contracts live in [`.agents/roles/`](.agents/roles/):
+- **Lead Orchestrator:** Coordinates bounded role/workflow slices and owns synthesis.
+- **Planner:** Scopes features into dependency-ordered vertical slices.
+- **Researcher:** Produces source-backed evidence and tracks unverified facts; web search is an explicit required capability.
+- **Issue Manager:** Discovers the frontier and validates ticket completion.
+- **Implementer:** Executes one owned ticket using test-first development.
+- **Verifier:** Runs observable checks and records evidence.
+- **Reviewer / Security Reviewer:** Performs contract, runtime, maintainability, visual, and security review.
+- **GitHub Maintainer / Release Manager:** Manages issues, branches, commits, PRs, merge, release, and rollback evidence.
 
-Shared repository skills live under [`skills/`](skills/):
+The former `Docs/AGENTS/` role tree was migrated into `.agents/roles/`; do not create a second role source of truth.
+
+Shared project skills remain under [`skills/`](skills/):
 
 - `chameleon-contract` — contract-first implementation and review rules.
 - `chameleon-testing` — deterministic offline testing at observable seams.

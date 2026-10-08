@@ -40,7 +40,7 @@ Implementation should start with `FINAL_ARCHITECTURE.md`, then consult the relev
 | [`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md) | **Evidence Record** | Verifiable citations and facts for all external dependencies, renderer commits, base image digests, and runtime libraries. |
 | [`AGENT_HARNESS_PLAN.md`](AGENT_HARNESS_PLAN.md) | **Agent Harness** | Blueprint for the automated testing harness, regression corpus, and Makefile commands that guide agent development. |
 | [`IMPLEMENTATION/`](IMPLEMENTATION/) | **Implementation Blueprint** | Complete `to-spec` engineering specification, data flow models, and 8 dependency-sequenced tracer-bullet tickets for subagent execution. |
-| [`AGENTS/`](AGENTS/) | **Multi-Agent Architecture** | Specifications and operational protocols for the 5 specialized agent personas (Plan, Issue, Implementer, Git, and PR/Review). |
+| [`../.agents/`](../.agents/) | **Shared Agent Operating System** | Provider-neutral roles, workflows, policies, research/evidence standards, GitHub/PR guidance, checklists, templates, and handoff rules. |
 
 All accepted ADRs reside in [`DECISIONS/`](DECISIONS/):
 
