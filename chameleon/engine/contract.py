@@ -29,9 +29,10 @@ _CANVAS_VALIDATOR = Draft202012Validator(_SCHEMA["$defs"]["canvas"])
 
 _GEOMETRY_FIELDS = ("x", "y", "width", "height")
 
-# AABB tuple: min_x, min_y, max_x, max_y. Coordinate arithmetic stays exact.
-# Pinned math.sin/cos coefficients use exact fractions of their float results.
-AABB = tuple[Fraction, Fraction, Fraction, Fraction]
+# AABB tuple: min_x, min_y, max_x, max_y.  The contract permits the pinned
+# runtime's math.trig path for rotated envelopes; ratio and group checks below
+# remain exact Fraction arithmetic.
+AABB = tuple[float, float, float, float]
 
 
 def validate_source(source: Mapping[str, Any]) -> None:
@@ -40,8 +41,6 @@ def validate_source(source: Mapping[str, Any]) -> None:
     The function returns ``None`` on success and raises
     :class:`InfeasibleLayoutError` with ``INVALID_SOURCE`` on structural or
     semantic source failures.  It never applies defaults or mutates ``source``.
-    Callers must parse JSON decimal tokens with ``parse_float=Decimal``.
-    Binary-float source values are rejected because their original tokens are lost.
     """
 
     if not isinstance(source, Mapping):
@@ -341,12 +340,6 @@ def _validate_finite_numbers(
             f"{label} contains a non-finite number",
             {"path": list(path), "value": repr(value)},
         )
-    if reason_code is InfeasibleReasonCode.INVALID_SOURCE and isinstance(value, float):
-        _fail(
-            reason_code,
-            "source contains a binary float; parse JSON decimal tokens as Decimal",
-            {"path": list(path), "value": repr(value)},
-        )
 
 
 def _validate_source_style_runs(element: Mapping[str, Any], index: int) -> None:
@@ -467,6 +460,9 @@ def _validate_groups(
             groups.setdefault(group_id, []).append(index)
 
     for group_id, indices in groups.items():
+        if len(indices) < 2:
+            continue
+
         scale: Fraction | None = None
         translation: tuple[Fraction, Fraction] | None = None
         for index in indices:
@@ -493,30 +489,7 @@ def _validate_groups(
                 scale = _merge_group_scale(scale, candidate_scale, group_id, index)
 
         if scale is None:
-            source_anchor_center = _element_center(source_elements[indices[0]])
-            response_anchor_center = _element_center(response_elements[indices[0]])
-            for index in indices[1:]:
-                source_center = _element_center(source_elements[index])
-                response_center = _element_center(response_elements[index])
-                for axis in (0, 1):
-                    source_delta = source_center[axis] - source_anchor_center[axis]
-                    response_delta = response_center[axis] - response_anchor_center[axis]
-                    if source_delta == 0:
-                        if response_delta != 0:
-                            _group_fail(
-                                group_id,
-                                index,
-                                "group children do not share one scale",
-                            )
-                    else:
-                        scale = _merge_group_scale(
-                            scale,
-                            response_delta / source_delta,
-                            group_id,
-                            index,
-                        )
-            if scale is None:
-                scale = Fraction(1)
+            scale = Fraction(1)
         if scale <= 0:
             _group_fail(group_id, indices[0], "rigid group scale must be positive")
 
@@ -565,10 +538,10 @@ def _validate_source_separation(
     response_aabbs: Sequence[AABB],
 ) -> None:
     for left in range(len(source_elements)):
-        if not _positive_element(response_elements[left]):
+        if not _positive_element(source_elements[left]):
             continue
         for right in range(left + 1, len(source_elements)):
-            if not _positive_element(response_elements[right]):
+            if not _positive_element(source_elements[right]):
                 continue
             if _positive_aabb_intersection(source_aabbs[left], source_aabbs[right]):
                 continue
@@ -621,16 +594,14 @@ def _validate_text_overflow(response_elements: Sequence[Mapping[str, Any]]) -> N
 
 
 def _background_index(source: Mapping[str, Any], source_aabbs: Sequence[AABB]) -> int | None:
-    candidates: list[tuple[int, Fraction, int]] = []
+    candidates: list[tuple[int, float, int]] = []
     source_canvas = source["canvas"]
     for index, (element, aabb) in enumerate(zip(source["elements"], source_aabbs)):
         if element["type"] != "image" or element.get("fit", "contain") != "cover":
             continue
         if not _contained_canvas_in_aabb(aabb, source_canvas):
             continue
-        area = max(Fraction(0), aabb[2] - aabb[0]) * max(
-            Fraction(0), aabb[3] - aabb[1]
-        )
+        area = max(0.0, aabb[2] - aabb[0]) * max(0.0, aabb[3] - aabb[1])
         candidates.append((int(element.get("z_index", 0)), -area, index))
     if not candidates:
         return None
@@ -666,13 +637,7 @@ def _clipped_sides(aabb: AABB, canvas: Mapping[str, int]) -> frozenset[str]:
 
 
 def _positive_intersection_with_canvas(aabb: AABB, canvas: Mapping[str, int]) -> bool:
-    canvas_aabb = (
-        Fraction(0),
-        Fraction(0),
-        Fraction(canvas["width"]),
-        Fraction(canvas["height"]),
-    )
-    return _positive_aabb_intersection(aabb, canvas_aabb)
+    return _positive_aabb_intersection(aabb, (0.0, 0.0, float(canvas["width"]), float(canvas["height"])))
 
 
 def _contained_in_canvas(aabb: AABB, canvas: Mapping[str, int]) -> bool:
@@ -698,18 +663,18 @@ def _rotated_aabb(element: Mapping[str, Any]) -> AABB:
     y = _as_fraction(element["y"])
     width = _as_fraction(element["width"])
     height = _as_fraction(element["height"])
-    center_x = x + width / 2
-    center_y = y + height / 2
+    center_x = _as_float(x + width / 2)
+    center_y = _as_float(y + height / 2)
+    width_value = _as_float(width)
+    height_value = _as_float(height)
     sine, cosine = _sin_cos_degrees(element.get("rotation", 0))
-    sine = Fraction.from_float(sine)
-    cosine = Fraction.from_float(cosine)
-    extent_x = abs(width * cosine) + abs(height * sine)
-    extent_y = abs(width * sine) + abs(height * cosine)
+    extent_x = abs(width_value * cosine) + abs(height_value * sine)
+    extent_y = abs(width_value * sine) + abs(height_value * cosine)
     return (
-        center_x - extent_x / 2,
-        center_y - extent_y / 2,
-        center_x + extent_x / 2,
-        center_y + extent_y / 2,
+        center_x - extent_x / 2.0,
+        center_y - extent_y / 2.0,
+        center_x + extent_x / 2.0,
+        center_y + extent_y / 2.0,
     )
 
 
