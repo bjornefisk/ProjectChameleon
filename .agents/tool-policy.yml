@@ -1,0 +1,42 @@
+version: 1
+name: chameleon-agent-capabilities
+default_policy: deny
+notes:
+  - Native runtimes map their tools to these capability names.
+  - This file describes authorization; it does not grant a missing runtime tool.
+  - Project behavior remains governed by AGENTS.md, the contract, and Accepted ADRs.
+capabilities:
+  repo.read: {risk: low}
+  repo.search: {risk: low}
+  repo.lsp: {risk: low}
+  repo.edit: {risk: high, requires: [owned_paths]}
+  exec.safe: {risk: medium, requires: [bounded_command]}
+  web.search: {risk: medium, requires: [citation_record]}
+  web.fetch: {risk: medium, requires: [known_or_search_result_url]}
+  web.browser: {risk: high, requires: [surface_verification_or_dynamic_source]}
+  delegate: {risk: medium, requires: [disjoint_slice]}
+  git.inspect: {risk: low}
+  git.mutate: {risk: high, requires: [human_or_role_approval]}
+  github.mutate: {risk: high, requires: [human_or_role_approval]}
+roles:
+  lead-orchestrator:
+    allow: [repo.read, repo.search, repo.lsp, repo.edit, exec.safe, web.search, web.fetch, delegate, git.inspect]
+  planner:
+    allow: [repo.read, repo.search, repo.lsp, repo.edit, git.inspect]
+  researcher:
+    allow: [repo.read, repo.search, repo.lsp, repo.edit, exec.safe, web.search, web.fetch, web.browser, git.inspect]
+    required: [web.search]
+  issue-manager:
+    allow: [repo.read, repo.search, repo.lsp, repo.edit, exec.safe, git.inspect, github.mutate, delegate]
+  implementer:
+    allow: [repo.read, repo.search, repo.lsp, repo.edit, exec.safe, web.search, web.fetch, git.inspect]
+  verifier:
+    allow: [repo.read, repo.search, repo.lsp, repo.edit, exec.safe, web.browser, git.inspect]
+  reviewer:
+    allow: [repo.read, repo.search, repo.lsp, exec.safe, web.search, web.fetch, web.browser, git.inspect]
+  security-reviewer:
+    allow: [repo.read, repo.search, repo.lsp, repo.edit, exec.safe, web.search, web.fetch, web.browser, git.inspect]
+  github-maintainer:
+    allow: [repo.read, repo.search, git.inspect, git.mutate, github.mutate]
+  release-manager:
+    allow: [repo.read, repo.search, repo.lsp, repo.edit, exec.safe, web.search, web.fetch, git.inspect, git.mutate, github.mutate]

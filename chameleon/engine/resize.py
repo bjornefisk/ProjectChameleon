@@ -1,9 +1,9 @@
 """
-THIS IS THE FILE YOU IMPLEMENT.
+THIS IS THE PUBLIC `resize()` SEAM.
 
-Everything else in this repo (input loading, output writing, rendering,
-the Dockerfile) is plumbing so you can focus on exactly one function:
-`resize()`. See RULES.md and the design schema for the full contract.
+The starter pipeline includes input loading, output publication, rendering, and
+Docker packaging around the public `resize()` seam. The implementation tickets
+may update those modules where contract conformance requires it.
 """
 
 from typing import Any
@@ -24,33 +24,32 @@ def resize(source: dict[str, Any], target_canvas: dict[str, Any]) -> dict[str, A
         A design dict with the SAME shape as `source`:
         {"canvas": target_canvas, "elements": [...]}
 
-        Hard requirements (see RULES.md for the full list):
-        - Every element `id` in `source` must appear exactly once in your
-          output. Do not add, remove, or invent elements.
-        - Do not regenerate or redraw any asset's pixel content — you are
-          repositioning and resizing the elements you were given, nothing
-          more. This is a disqualifying rule, not a style preference.
-        - Non-background image elements should be kept in proportion
-          (matching the source aspect ratio within ~5%) unless they are a
-          full-bleed / `fit: "cover"` element, which is expected to crop.
-        - `font_size` may change to help text fit. `font_family` and
-          `content` should not, for this stage of scoring (see RULES.md,
-          "Adaptive typography and copy").
-        - Nothing should end up outside `target_canvas`'s bounds.
+        Hard requirements (see `Docs/PROJECT_CONTRACT.md` and `RULES.md`):
+        - Return the same element count, unique IDs, array order, and types.
+        - Preserve every immutable field; only target canvas dimensions,
+          element geometry, and text `font_size` may change.
+        - Serialize mutable geometry and text size as finite integers.
+        - Preserve exact positive-area foreground image ratios, including
+          `fit="fill"`; only the contract-classified background is exempt.
+        - Contain rotated foreground bounds, except for the contract's narrow
+          full-canvas background and source-bleed exceptions.
+        - Preserve rigid groups and keep source-separated active elements from
+          developing positive-area collisions.
+        - Preserve missing asset references and original pixels; never hide,
+          remove, zero-size, redraw, regenerate, or replace an element or asset.
+        - Preserve text and fixed font attributes; change only `font_size`.
+        - Return a hard-valid design or fail closed; do not return best effort.
 
-    This is where your actual approach goes: constraint solving, a learned
-    layout model, heuristics, whatever you choose. Latency is not a scoring
-    concern (see RULES.md) — spend your effort on quality, not speed.
+    The public seam is `resize()`. Gate 1 also owns the parser, renderer,
+    runner, and permanent-test conformance paths; keep this function focused on
+    returning the contract-defined target design.
     """
 
     # ------------------------------------------------------------------
-    # Naive baseline so this file runs out of the box. This is a uniform
-    # stretch — literally the thing the brief tells you NOT to do ("a
-    # naive program stretches the picture; a good one moves the
-    # furniture"). It's here so `python -m engine.main` produces valid,
-    # schema-correct output on day one. Replace the body of this function;
-    # do not just tune these three lines.
-    # ------------------------------------------------------------------
+    # Uniform-stretch baseline so the starter pipeline runs out of the box.
+    # It is deliberately nonconforming: it distorts foreground ratios, emits
+    # floating-point geometry, and ignores groups, rotated bounds, and collisions.
+    # Replace the implementation; do not tune these independent scale factors.
     scale_x = target_canvas["width"] / source["canvas"]["width"]
     scale_y = target_canvas["height"] / source["canvas"]["height"]
 

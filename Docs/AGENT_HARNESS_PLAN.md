@@ -8,100 +8,89 @@ The validator and renderer are the agent's oracle. The Stage 1 engine must remai
 
 ## Current repository controls
 
-The root repository now provides a small, versioned control layer before the nested
+The root repository provides a small, versioned control layer before the nested
 engine is available:
 
-- `skills/chameleon-contract/SKILL.md` — shared contract rules for implementation
-  and review.
-- `skills/chameleon-testing/SKILL.md` — deterministic test seams and offline
-  evidence rules.
-- `skills/chameleon-review/SKILL.md` — review gates for contract, runtime, tests,
-  and layout inspection.
-- `scripts/verify_repository.py` — checks governance files, ticket wiring, staged
-  generated artifacts, and nested-engine availability.
-- `.githooks/pre-commit` — rejects generated artifacts and whitespace errors, then
-  runs the repository verifier.
+- `.agents/README.md` — shared provider-neutral operating system and navigation.
+- `.agents/OPERATING_CONTRACT.md` — process, ownership, evidence, safety, and completion rules.
+- `.agents/PROJECT_PROFILE.md` — Chameleon authority map, gates, commands, and adoption notes.
+- `.agents/roles/`, `workflows/`, `policies/`, `research/`, `github/`, `checklists/`, and `templates/` — reusable collaboration artifacts.
+- `skills/chameleon-contract/SKILL.md` — shared contract rules for implementation and review.
+- `skills/chameleon-testing/SKILL.md` — deterministic test seams and offline evidence rules.
+- `skills/chameleon-review/SKILL.md` — review gates for contract, runtime, tests, and layout inspection.
+- `scripts/verify_repository.py` — checks governance files, ticket wiring, staged generated artifacts, and nested-engine availability.
+- `.githooks/pre-commit` — rejects generated artifacts and whitespace errors, then runs the repository verifier.
 - `make verify` — non-blocking repository wiring check.
 - `make preflight` — strict check that also requires the nested engine checkout.
 - `make install-hooks` — installs the versioned pre-commit hook.
 
 These controls do not replace the engine validator or claim runtime qualification.
-They make missing nested-project state explicit and prevent false evidence claims.
+They make missing project state explicit and prevent false evidence claims.
 
-## Phase 1: Establish the executable baseline
+The `.agents` layer is process guidance, not a second contract. Project behavior
+still comes from `AGENTS.md`, the contract/ADR/schema hierarchy, pinned sources,
+and project skills.
 
-1. Import or clone the official starter structure:
-   - `engine/main.py`
-   - `engine/resize.py`
-   - `requirements.txt`
-   - `Dockerfile`
-   - schema, assets, fonts, and sample inputs
-2. Run the naive baseline locally.
-3. Confirm that the renderer produces JSON and PNG outputs.
-4. Record baseline failures for all three sample levels.
-5. Add a basic `pytest` setup and preserve the baseline as a regression reference.
+## Phase 1: Establish the executable baseline (complete for this checkout; retained as historical context)
 
-## Phase 2: Create the agent contract
+The starter scaffold, schema, assets, fonts, sample inputs, Dockerfile, and repository controls are already present in this checkout. The baseline `engine/resize.py` is intentionally uniform stretch and remains a regression reference, not a conforming implementation.
 
-Add:
+The baseline may be run to document known failures, but its output and warning-only self-check are not contract evidence. Gate 1 work starts with the semantic validator, renderer conformance, deterministic fixtures, and typed runner path described by the current implementation tickets.
+
+## Phase 2: Use the repository agent contract
+
+The repository now has one project contract plus one shared process layer:
 
 ```text
 AGENTS.md
-.omp/
-  AGENTS.md
-  rules/
-    chameleon-contract.md
-    python.md
-    testing.md
+.agents/README.md
+.agents/OPERATING_CONTRACT.md
+.agents/PROJECT_PROFILE.md
+skills/chameleon-contract/SKILL.md
+skills/chameleon-testing/SKILL.md
+skills/chameleon-review/SKILL.md
 ```
 
-`AGENTS.md` should contain the durable project rules:
+`.agents/` standardizes how agents plan, research, implement, verify, review,
+coordinate, and hand off. It does not duplicate the behavioral invariants or
+create a second `.omp/` contract. The project skills remain the canonical
+Chameleon-specific contract, testing, and review checks.
 
-- Preserve IDs, count, order, content, and fixed properties.
-- Never hide, remove, zero-size, replace, or regenerate elements.
-- Preserve image ratios and intentional overlaps.
-- Reject new collisions and rotated-bound overflow.
-- Validate after integer rounding.
-- Never weaken tests or validators to make an implementation pass.
-- Use the smallest change that addresses the failing invariant.
-
-The OMP-specific file should describe tool usage and workflows rather than repeat the challenge contract.
 
 ## Phase 3: Build the validation harness
 
-Create one authoritative command:
+Use the repository's existing commands as the local entry points:
 
 ```text
+make verify
+make preflight
+make setup
+make test
+make run
+make inspect
 make agent-check
+make docker-build
+make docker-test
 ```
 
-Recommended pipeline:
+`make verify` checks repository governance. `make preflight` additionally requires the nested engine. `make test` runs the current `unittest` suite. `make agent-check` currently combines verification, tests, baseline execution, and layout inspection; it is not contract evidence until the validator and renderer qualification gates pass. Docker commands provide runtime qualification only after the implementation is conformant.
+
+The future full qualification pipeline is:
 
 ```text
 unit tests
 → schema validation
-→ invariant validation
-→ sample fixtures
+→ semantic invariant validation
+→ contract fixtures
 → adversarial fixtures
-→ render outputs
-→ quality metrics
+→ renderer outputs
+→ hard-validation reports
+→ soft-quality metrics
 → Docker build linux/amd64
 → Docker run --network none
 ```
 
-Add supporting commands:
-
-```text
-make test
-make test-unit
-make test-adversarial
-make validate
-make render
-make eval
-make docker-test
-```
-
-The validator should independently check:
+The independent validator must check:
 
 - identity and ordering;
 - fixed text and visual properties;
@@ -113,18 +102,25 @@ The validator should independently check:
 - missing assets; and
 - pixel integrity.
 
-## Phase 4: Add procedural OMP skills
+## Phase 4: Use repository skills and operating workflows
 
-Create only the high-value skills initially:
+Use the existing project skills under `skills/` for Chameleon-specific contract,
+testing, and review checks. Use the shared `.agents/workflows/` and
+`.agents/checklists/` documents for the surrounding research, implementation,
+verification, review, GitHub, release, and handoff procedure.
 
 ```text
-.omp/skills/
-  run-chameleon/SKILL.md
-  validate-layout/SKILL.md
-  inspect-render/SKILL.md
-  adversarial-test/SKILL.md
-  create-regression/SKILL.md
+skills/chameleon-contract/SKILL.md
+skills/chameleon-testing/SKILL.md
+skills/chameleon-review/SKILL.md
+.agents/workflows/
+.agents/checklists/
+.agents/templates/
 ```
+
+Do not create a duplicate `.omp/skills/` tree or a second behavioral contract.
+Add a new skill only when a repeated, command-backed project workflow justifies
+it; add generic process guidance to `.agents/` instead.
 
 The primary debugging workflow is:
 
@@ -137,18 +133,11 @@ run failing fixture
 → identify pipeline stage
 → make smallest fix
 → rerun focused case
-→ run full agent-check
+→ run the appropriate full gate
 ```
 
-Add prompt templates only after the commands and skills work:
-
-```text
-.omp/prompts/
-  implement.md
-  debug.md
-  review.md
-  research.md
-```
+Templates are reusable forms, not evidence. Fill them with observed commands,
+results, and limitations before treating a handoff or review as complete.
 
 ## Phase 5: Build the test corpus
 
@@ -180,22 +169,25 @@ Every discovered bug should become a permanent regression fixture.
 
 ## Phase 6: Implement the engine incrementally
 
-Follow the documented build order:
+Follow the ratified gate and ticket order:
 
-1. Safe geometry baseline.
-2. Role and relationship inference.
-3. Four routing regimes:
+1. semantic contract errors and validator;
+2. renderer conformance and Unicode-safe wrapping;
+3. atomic runner and fail-closed publication;
+4. exact rational geometry and group transforms;
+5. safe geometry baseline;
+6. role and relationship inference;
+7. four routing regimes:
    - near-isomorphic;
    - column pivot;
    - horizontal ribbon; and
-   - vertical re-stack.
-4. Renderer-matched typography.
-5. Candidate generation.
-6. Hard validation.
-7. Soft ranking.
-8. Offline packaging.
+   - vertical re-stack;
+8. renderer-matched typography;
+9. bounded candidate generation and hard validation;
+10. fixed-point ranking; and
+11. offline packaging and qualification.
 
-Do not begin with model orchestration or MCP integration. The deterministic validator and renderer should be the agent's objective oracle.
+Do not begin model orchestration, CP-SAT, or MCP integration as a substitute for the deterministic validator and renderer. Future solver dependencies require measured benefit, a separate accepted decision, and offline evidence.
 
 ## Phase 7: Add adversarial review loops
 
@@ -211,7 +203,7 @@ Rules:
 - The reviewer checks contract violations.
 - The red-team agent adds inputs that expose generalization failures.
 - The evaluator runs the complete corpus.
-- Every accepted fix must pass `make agent-check`.
+- Every accepted implementation fix must pass the relevant focused checks and, once Gate 1 is complete, `make agent-check`.
 
 ## Phase 8: Add minimal MCP support
 
@@ -226,16 +218,15 @@ Development MCP access must remain separate from the Stage 1 runtime. The submit
 
 ## Recommended first milestone
 
-The first deliverable should be:
+The first implementation milestone is Gate 1 qualification:
 
 ```text
-official starter engine imported
-+ baseline runnable
-+ AGENTS.md
-+ validator
-+ pytest fixtures
-+ Makefile
-+ make agent-check passing against the baseline contract
+semantic validator
++ renderer conformance fixes
++ deterministic contract and renderer fixtures
++ typed failure definitions
++ atomic runner path
++ make verify and focused unittest evidence
 ```
 
-Only after that should agents modify `engine/resize.py`.
+This milestone must not claim solver quality or Stage 1 qualification merely because the starter baseline runs. Only after the validator and renderer oracle are qualified should agents modify `engine/resize.py` for the layout solver.

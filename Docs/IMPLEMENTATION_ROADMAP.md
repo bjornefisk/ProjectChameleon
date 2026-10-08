@@ -18,6 +18,7 @@ Decision ratification is complete and documentation-only. Do not claim implement
 
 - Build the pinned `linux/amd64` environment and prove local fonts/assets work with `--network none`.
 - Establish the semantic validator around identity/order/fixed fields, finite integer geometry, rotated AABB, exact foreground image ratio, group/overlap policy, text bounds, and missing-asset preservation.
+- Preserve numeric JSON tokens at ingress before any binary-float conversion; use exact integer/decimal parse hooks, reject non-finite constants, and test decimal and exponent cases through the runner/geometry seam.
 - Close the adapter gaps already recorded in `STATUS.md`: end-exclusive style runs, style-aware/letter-spaced measurement, `max_lines`/height, and renderer goldens.
 - Add synthetic fixtures for empty/no-background/single/degenerate/rotated/long-copy/missing-asset/foreground-`fill` cases.
 - Conformance work may touch the task orchestrator and renderer adapter as well as validator-facing paths; it must preserve the public wire schema and Stage 1 mutability boundary.
@@ -83,7 +84,7 @@ The reliable path to a strong submission is not a large model or a one-sample de
 
 The design review establishes the intended deterministic Stage 1 engine contract. Implementation must return the source element set unchanged, preserve intentional relationships, and adapt geometry to the target canvas without generating pixels or rewriting content; no such implementation or qualification is claimed here.
 
-The current documentation needs five corrections before implementation:
+The original design review identified five corrections; all are resolved or superseded in the current documents above. The list is retained as historical rationale, not as an outstanding checklist:
 
 - `group_id` is the primary grouping signal. Geometric containment is a fallback for ungrouped elements.
 - Source overlaps are evidence of intent. The solver separates only pairs that did not overlap in the source, while keeping text off busy image regions.
@@ -120,24 +121,26 @@ The following review notes are retained for rationale and are subordinate to the
 
 ### Phase 4: Constraint solving and validation
 
-- Use CP-SAT or a structured slot search for small scenes, with intentional source overlaps represented as allowed relationships. Kiwi is optional for continuous cleanup after topology is fixed.
+- Use the bounded structured search as the Stage 1 primary path, with intentional source overlaps represented as allowed relationships. CP-SAT is deferred; Kiwi is not a current dependency. Either requires measured benefit, explicit deterministic behavior, and an accepted dependency decision before implementation.
 - Include alignment and even-spacing terms in the objective.
 - Render every candidate, reject hard-constraint failures, and select the highest-scoring valid result.
 - Exercise the engine with synthetic designs and catalogue sizes such as Instagram Post, Instagram Story, YouTube Thumbnail, Leaderboard, Poster, and Facebook cover.
 - Build for `linux/amd64` and run the container with `--network none` only after the offline path is complete.
 
-## Review findings by document
+## Historical review findings (resolved or superseded)
 
-| Document | Required correction |
+| Document | Original review finding |
 | --- | --- |
 | [Neuro-symbolic architecture](NEURO_SYMBOLIC_ARCHITECTURE.md) | Replace fixed role thresholds, containment-first grouping, three-regime routing, universal non-overlap, and mandatory Kiwi with source-aware rules. |
 | [Typographic reflow and grouping](TYPOGRAPHIC_REFLOW_AND_GROUPING.md) | Document explicit renderer line maps, measured metrics, source hierarchy preservation, and `group_id` precedence. |
 | [Mathematical constraints](MATHEMATICAL_CONSTRAINTS.md) | Add identity, fixed-property, rotated-bound, rounding, missing-asset, and source-overlap checks. |
 | [Objective metrics](OBJECTIVE_EVALUATION_METRICS.md) | Treat Val, Ove, Ali, Bal, Occ, and Rea as internal proxies, not the judging rubric, and make overlap and contrast source-aware. |
 | [Difficulty tiers](DIFFICULTY_TIERS_AND_FAILURE_MODES.md) | Remove fixed pixel slots and include vertical re-stack and adversarial edge cases. |
-| [Computational layout solvers](COMPUTATIONAL_LAYOUT_SOLVERS.md) | Make CP-SAT sufficient for small scenes, keep Kiwi optional, and score alignment and spacing. |
+| [Computational layout solvers](COMPUTATIONAL_LAYOUT_SOLVERS.md) | Keep bounded structured search primary; keep CP-SAT and Kiwi deferred unless measured evidence and an accepted dependency decision justify them; score alignment and spacing. |
 | [Hermetic runtime](HERMETIC_RUNTIME_ARCHITECTURE.md) | State the `linux/amd64` build target and separate offline requirements from unverified performance targets. |
 | [Interactive finale](ADOBE_EXPRESS_INTERACTIVE_ADDON.md) | Keep shedding and copy revision explicitly outside Stage 1, with no zero-size or hidden-element workaround. |
+
+The following phase matrix names implementation workstreams after Gate 1; these phases are not product stages and do not override current gate blockers.
 
 ## Phase matrix
 

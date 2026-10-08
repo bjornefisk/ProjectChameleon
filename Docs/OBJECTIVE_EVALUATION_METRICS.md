@@ -2,7 +2,7 @@
 
 > **Authority Notice:** This document defines internal optimization proxies for candidate ranking. The binding Stage 1 behavioral contract is ratified in [PROJECT_CONTRACT.md](PROJECT_CONTRACT.md) and Accepted [ADRs](DECISIONS/). In any conflict, the contract and ADRs govern.
 
-Stage 1 produces two scored artifacts: the output JSON and the rendered PNG. Structural checks apply to the JSON. A separate evaluator judges the rendered composition. The metrics in this document are internal proxies for candidate ranking, not the official rubric.
+Stage 1 produces a design JSON and a rendered PNG on success. Structural checks apply to the JSON, and a separate evaluator may judge the rendered composition. The metrics in this document are internal comparison proxies, not the official rubric, not ratified fixed-point scales or weights, and not substitutes for the contract validator.
 
 ## Scoring pipeline
 
@@ -162,4 +162,4 @@ The values in this document are internal comparison terms. They are not claims a
 | Alignment ($\text{Ali}$) | Distance to shared axes without breaking groups | Minimize softly | Soft ranking term |
 | Balance ($\text{Bal}$) | Visual-mass offset from the canvas center | Maximize softly | Soft ranking term |
 | Occlusion ($\text{Occ}$) | Text over busy imagery without a source treatment | Minimize softly | Soft ranking term |
-| Overlap penalty ($\text{Ove}$) | Unintended positive-area intersection among source-separated pairs | Rejection threshold = 0 | Yes (zero new collisions) |
+| Overlap proxy ($\text{Ove}$) | Diagnostic estimate of unintended overlap among source-separated pairs | Optional diagnostic only | The validator's serialized positive-area overlap rule is the hard gate |

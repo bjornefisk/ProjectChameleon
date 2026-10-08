@@ -110,7 +110,7 @@ Even after these decisions are ratified, the following implementation/evidence d
 ADR-006, ADR-007, ADR-008, and ADR-009 are accepted pre-implementation decisions:
 
 - these files are documentation-only contract records; they do not claim implementation or qualification;
-- they preserve and extend `PROJECT_CONTRACT.md` and ADR-001 through ADR-005 without adding wire fields or weakening hard constraints;
+- they preserve and extend `PROJECT_CONTRACT.md` and ADR-001 through ADR-005; together with those prior decisions they form the accepted ADR-001 through ADR-009 package without adding wire fields or weakening hard constraints;
 - no code/schema/fixture/Docker/requirements/engine/renderer/validator/solver/model/runtime behavior changes on the strength of this register; and
 - an implementation that encounters a conflict must stop and request a superseding accepted ADR or contract update rather than silently choosing a different behavior.
 

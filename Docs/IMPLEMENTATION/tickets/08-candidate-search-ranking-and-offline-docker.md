@@ -1,7 +1,7 @@
 # 08: Bounded Macro-Search, Fixed-Point Ranking, and Offline Docker Qualification
 
 **What to build:**  
-The complete macro-candidate search and ranking pipeline coordinating all four layout topologies, paired with full qualification inside the offline `linux/amd64` Docker container. For any task, the engine generates up to 12 valid candidates across the four families, validates each through the actual renderer, ranks survivors with deterministic fixed-point scores, selects the optimal design, and qualifies cleanly in Docker with `--network none`.
+A bounded macro-candidate search coordinating all four layout topologies, paired with offline `linux/amd64` qualification. For any task, the engine generates at most 12 candidates across the four families, validates each through the actual renderer, ranks only hard-valid survivors, selects deterministically, and records qualification evidence rather than assuming every task is feasible.
 
 **Blocked by:**  
 `07: Horizontal Ribbon Topology and Level 3 Extreme Leaderboard Solver`
@@ -14,7 +14,7 @@ ready-for-agent
 - [ ] Create `chameleon/engine/layout/ranking.py` implementing fixed-point quality scoring: score readability ($\text{Rea}$), visual balance ($\text{Bal}$), alignment ($\text{Ali}$), and hierarchy preservation.
 - [ ] Implement deterministic lexicographic tie-breaking: `(hard_validity, quality_tuple, topology_order, candidate_index, source_order)` with zero random seeds.
 - [ ] Wire the full search and ranking pipeline into `resize()` in `chameleon/engine/resize.py`.
-- [ ] Execute `python -m engine.main` locally across all 3 public samples and contract fixtures, confirming 100% pass rate.
-- [ ] Build the Docker container using `docker buildx build --platform linux/amd64 -t chameleon-stage1 .`.
-- [ ] Run the container with `--network none` mounting input and output volumes: verify that all 3 levels produce scorable JSON and PNG pairs without network access in < 2.0s per design.
-- [ ] Confirm that peak memory remains $< 500\text{ MB}$ RAM and the final Docker image is $< 8\text{ GB}$.
+- [ ] Execute `python -m engine.main` locally across all three public samples and contract fixtures, recording hard-validation results, typed failures, and deterministic artifacts. Do not claim a 100% pass rate until the implementation and fixture evidence establish it.
+- [ ] Build the Docker container using `docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` so the image is available to the local `docker run` smoke step regardless of the selected Buildx driver.
+- [ ] Run the container with `--network none` mounting input and output volumes: record whether each level produces a valid JSON/PNG pair, any typed failure status, and measured per-design runtime against the <$2.0$ second performance target.
+- [ ] Measure peak memory against the <$500\text{ MB}$ solver target and image size against the <$8\text{ GB}$ container ceiling; record evidence rather than treating targets as completed qualification.

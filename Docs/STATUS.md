@@ -18,6 +18,7 @@
 - ADR-007 ratifies exact numeric ingress, one round-half-even serialization, rigid group transforms, contract AABBs, and positive-area overlap.
 - ADR-008 ratifies Unicode-safe line generation, code-point `[start,end)` style ranges, effective span metrics, overflow rejection, and in-box rectangle/ellipse strokes.
 - ADR-009 ratifies bounded deterministic four-topology search, renderer-in-loop hard validation, fixed-point ranking, and no initial model/OR-Tools dependency.
+- `Docs/FINAL_ARCHITECTURE.md` consolidates the ratified Stage 1 architecture and finale boundary for implementation; it is subordinate to the contract and Accepted ADRs.
 
 ## Resolved contract decisions
 
@@ -56,7 +57,7 @@ These are intentionally visible; none is silently promoted to contract behavior:
 1. `engine/resize.py` is the documented uniform-stretch baseline and violates image-ratio, group, overlap, rotation, and typography rules.
 2. `engine/main.py` has a warning-only self-check that checks unrotated rectangles and ID sets; it is not the contract validator.
 3. The renderer adapter's style-run end handling, Unicode-safe wrapping, letter-spacing/style-width measurement, explicit line/max-lines/height enforcement, glyph-bound validation, and rectangle/ellipse stroke behavior need conformance work.
-4. The batch runner has no accepted typed-status, cutoff, stale-output, or logical-pair publication path yet.
+4. The batch runner has no accepted typed-status, cutoff, stale-output, or logical-pair publication path yet, and its default JSON decoding does not preserve numeric tokens for exact ingress.
 5. The deterministic role-inference, four-topology candidate search, renderer-in-loop ranking, and held-out evaluation path have not been implemented.
 6. The Docker build has no project-owned hash-locked wheelhouse or apt-version lock; the direct compatibility pins are an initial baseline.
 
@@ -80,7 +81,7 @@ Decision ratification is complete, but Gate 1 qualification remains pending. The
 cd chameleon
 python -m engine.main
 python -m unittest discover -s tests -p 'test_*.py' -v
-docker buildx build --platform linux/amd64 -t chameleon-stage1 .
+docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .
 docker run --rm --network none \
   -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" \
   chameleon-stage1

@@ -26,6 +26,7 @@ When reading or implementing this project, follow this strict precedence. A lowe
 ---
 
 ## Document map & reading order
+Implementation should start with `FINAL_ARCHITECTURE.md`, then consult the relevant contract/ADR and implementation ticket. The deep-dives below are explanatory guidance only; they must not introduce a second architecture.
 
 ### Core contract & project governance (must read first)
 
@@ -35,10 +36,11 @@ When reading or implementing this project, follow this strict precedence. A lowe
 | [`DECISION_REGISTER.md`](DECISION_REGISTER.md) | **Governance** | Master index of all architectural decision records, tracking statuses, ratified defaults, and external blockers. |
 | [`STATUS.md`](STATUS.md) | **Project Status** | Current execution status, completed gates, known implementation gaps, explicitly unverified external facts, and planned verification commands. |
 | [`IMPLEMENTATION_ROADMAP.md`](IMPLEMENTATION_ROADMAP.md) | **Execution Roadmap** | Phased delivery plan from Gate 0 through Gate 7, structuring how agents build and qualify the engine in vertical slices. |
+| [`FINAL_ARCHITECTURE.md`](FINAL_ARCHITECTURE.md) | **Consolidated Architecture** | Final implementation-facing summary of the Stage 1 engine, renderer, validator, runtime, search, failure, and finale boundaries. It is subordinate to the contract and Accepted ADRs. |
 | [`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md) | **Evidence Record** | Verifiable citations and facts for all external dependencies, renderer commits, base image digests, and runtime libraries. |
 | [`AGENT_HARNESS_PLAN.md`](AGENT_HARNESS_PLAN.md) | **Agent Harness** | Blueprint for the automated testing harness, regression corpus, and Makefile commands that guide agent development. |
 | [`IMPLEMENTATION/`](IMPLEMENTATION/) | **Implementation Blueprint** | Complete `to-spec` engineering specification, data flow models, and 8 dependency-sequenced tracer-bullet tickets for subagent execution. |
-| [`AGENTS/`](AGENTS/) | **Multi-Agent Architecture** | Specifications and operational protocols for the 5 specialized agent personas (Plan, Issue, Implementer, Git, and PR/Review). |
+| [`../.agents/`](../.agents/) | **Shared Agent Operating System** | Provider-neutral roles, workflows, policies, research/evidence standards, GitHub/PR guidance, checklists, templates, and handoff rules. |
 
 All accepted ADRs reside in [`DECISIONS/`](DECISIONS/):
 
@@ -58,8 +60,8 @@ All accepted ADRs reside in [`DECISIONS/`](DECISIONS/):
 |---|---|---|
 | [`PROBLEM.md`](PROBLEM.md) | Problem Formulation | Why uniform scaling fails, semantic gap in input data, and mandatory output behaviors. |
 | [`MATHEMATICAL_CONSTRAINTS.md`](MATHEMATICAL_CONSTRAINTS.md) | Mathematical Model | Formal equations for rotated AABB containment, image aspect ratio invariance, source-separated non-overlap, and soft readability/contrast targets. |
-| [`NEURO_SYMBOLIC_ARCHITECTURE.md`](NEURO_SYMBOLIC_ARCHITECTURE.md) | System Pipeline | Four-stage pipeline: (1) role/relationship inference, (2) layout archetype generation, (3) constraint placement/typography, and (4) serialize, render, and validate. |
-| [`COMPUTATIONAL_LAYOUT_SOLVERS.md`](COMPUTATIONAL_LAYOUT_SOLVERS.md) | Solver Paradigms | Evaluates structured search (primary), Kiwi/Cassowary (optional cleanup), CP-SAT (deferred conditional backend), and energy methods. |
+| [`NEURO_SYMBOLIC_ARCHITECTURE.md`](NEURO_SYMBOLIC_ARCHITECTURE.md) | Internal Pipeline Guidance | Internal four-phase pipeline: role/relationship inference, layout archetype generation, constraint placement/typography, and serialize/render/validate. It is not the product Stage 1/finale split. |
+| [`COMPUTATIONAL_LAYOUT_SOLVERS.md`](COMPUTATIONAL_LAYOUT_SOLVERS.md) | Solver Paradigms | Keeps bounded structured search primary; treats Kiwi/Cassowary and CP-SAT as deferred alternatives requiring evidence and an accepted decision. |
 | [`TYPOGRAPHIC_REFLOW_AND_GROUPING.md`](TYPOGRAPHIC_REFLOW_AND_GROUPING.md) | Typography & Groups | Font metric measurement, binary-search font sizing within slots, typographic hierarchy preservation, and rigid unit derivation. |
 | [`OBJECTIVE_EVALUATION_METRICS.md`](OBJECTIVE_EVALUATION_METRICS.md) | Optimization Proxies | Distinguishes hard validation gates from soft ranking terms (alignment, balance, readability, occlusion, overlap penalty). |
 | [`DIFFICULTY_TIERS_AND_FAILURE_MODES.md`](DIFFICULTY_TIERS_AND_FAILURE_MODES.md) | Benchmark Profiles | Level 1 (Warm-up), Level 2 (Core banner with bleed), and Level 3 (Advanced 728x90 leaderboard), detailing adversarial stress modes. |
@@ -77,5 +79,5 @@ All accepted ADRs reside in [`DECISIONS/`](DECISIONS/):
 4. **Rotated containment:** Elements must stay inside the target canvas using rotated axis-aligned bounds (with the sole exception of contract-defined translucent source-bleed shapes).
 5. **Grouping & collisions:** Elements sharing a `group_id` move as a rigid unit via a single uniform scale and translation. Elements that were separate in the source must not collide (zero positive-area overlap).
 6. **Deterministic typography:** Line breaking uses Unicode grapheme cluster safety; style-runs use $[start, end)$ code-point indexing; font size is quantized to integers; overflowing text causes candidate rejection, never silent truncation.
-7. **Proactive spatial compression:** On tight canvases like 728×90, the engine compresses font sizes to the floor (10–12px), scales artwork isotropically, and pivots to horizontal ribbon topologies to ensure scorable, valid layouts rather than failing closed.
-8. **Hermetic CPU execution:** Container runs `linux/amd64` offline with `--network none`, budgets $\le$ 8 CPU threads and $\le$ 8 GB RAM, has a 0 MB neural weight footprint, and executes in < 2.0s per design.
+7. **Proactive spatial compression:** On tight canvases like 728×90, the engine tries the contract-permitted levers—font-size reduction toward the readable preference near 10–12px unless the source is smaller, isotropic artwork scaling, topology pivots, and margin compression—before reporting a typed failure. These are feasibility measures, not a guarantee that every target is solvable.
+8. **Hermetic CPU execution:** The container targets `linux/amd64` offline with `--network none`, budgets $\le$ 8 CPU threads and $\le$ 8 GB RAM, has a 0 MB neural weight footprint, and has a < 2.0s per-design performance target pending qualification; these are not a substitute for the failure protocol or organizer clarification.

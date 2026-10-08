@@ -1,14 +1,14 @@
 """
-Orchestrator — you shouldn't need to edit this file. It:
+Orchestrator — the starter path for batch execution. Conformance work MAY
+change this file as required by the ratified contract. It:
   1. Reads every *.json task file from /app/input (source + target_canvas)
-  2. Calls your resize() from resize.py
-  3. Runs a quick self-check (structural only — NOT the official scoring;
-     see RULES.md for what the judge actually checks)
-  4. Writes <task>_output.json and <task>_output.png to /app/output
+  2. Calls resize(source, target_canvas)
+  3. Runs a development self-check (NOT the official semantic validator)
+  4. Writes task artifacts through the runner publication path
 
-Mirrors the same input/ -> output/ convention as the earlier India-program
-challenges: drop task files in, get one JSON + one PNG out per task, no
-manual steps in between.
+The accepted contract requires typed failure statuses, stale-output cleanup,
+and atomic JSON/PNG publication. The current baseline does not implement all
+of those rules; see Docs/PROJECT_CONTRACT.md and the implementation tickets.
 """
 
 import json

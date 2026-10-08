@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -18,6 +19,30 @@ REQUIRED_ROOT_FILES = (
     "Docs/IMPLEMENTATION/README.md",
     "Docs/IMPLEMENTATION/SPEC.md",
 )
+REQUIRED_AGENT_FILES = (
+    ".agents/README.md",
+    ".agents/OPERATING_CONTRACT.md",
+    ".agents/PROJECT_PROFILE.md",
+    ".agents/PRODUCTION_STANDARD.md",
+    ".agents/TOOLING.md",
+    ".agents/tool-policy.yml",
+    ".agents/roles/README.md",
+    ".agents/roles/lead-orchestrator.md",
+    ".agents/roles/researcher.md",
+    ".agents/workflows/00-intake.md",
+    ".agents/workflows/01-research.md",
+    ".agents/workflows/03-implement.md",
+    ".agents/workflows/05-verify.md",
+    ".agents/workflows/12-incident-response.md",
+    ".agents/research/web-search.md",
+    ".agents/research/prompt-lineage.md",
+    ".agents/policies/README.md",
+    ".agents/checklists/web-research.md",
+    ".agents/templates/task-brief.md",
+    ".agents/templates/agent-run.md",
+    ".agents/templates/handoff.md",
+)
+
 REQUIRED_SKILLS = (
     "skills/chameleon-contract/SKILL.md",
     "skills/chameleon-testing/SKILL.md",
@@ -55,6 +80,47 @@ def check_paths(paths: tuple[str, ...], errors: list[str]) -> None:
             errors.append(f"missing required file: {relative}")
 
 
+
+ROLE_HEADINGS = (
+    "## Mission",
+    "## Authority",
+    "## Required inputs",
+    "## Allowed tools",
+    "## Quality gates",
+    "## Failure and stop behavior",
+    "## Security",
+    "## Evidence and handoff",
+)
+MARKDOWN_LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
+
+
+def check_agent_contract(errors: list[str]) -> None:
+    agent_root = ROOT / ".agents"
+    role_files = sorted(path for path in (agent_root / "roles").glob("*.md") if path.name != "README.md")
+    for path in role_files:
+        text = path.read_text(encoding="utf-8")
+        missing = [heading for heading in ROLE_HEADINGS if heading not in text]
+        if missing:
+            errors.append(
+                f"incomplete role contract {path.relative_to(ROOT)}: {', '.join(missing)}"
+            )
+
+    researcher = agent_root / "roles" / "researcher.md"
+    if researcher.exists() and "web_search: required" not in researcher.read_text(encoding="utf-8"):
+        errors.append("researcher role must require web_search")
+
+    for path in sorted(agent_root.rglob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        for raw_target in MARKDOWN_LINK.findall(text):
+            target = raw_target.strip().split()[0].strip("<>")
+            if target.startswith(("http://", "https://", "mailto:", "#")):
+                continue
+            target = target.split("#", 1)[0]
+            if target and not (path.parent / target).resolve().exists():
+                errors.append(
+                    f"broken .agents link {path.relative_to(ROOT)} -> {target}"
+                )
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -66,7 +132,14 @@ def main() -> int:
 
     errors: list[str] = []
     warnings: list[str] = []
-    check_paths(REQUIRED_ROOT_FILES + REQUIRED_SKILLS + REQUIRED_TICKETS, errors)
+    check_paths(
+        REQUIRED_ROOT_FILES
+        + REQUIRED_AGENT_FILES
+        + REQUIRED_SKILLS
+        + REQUIRED_TICKETS,
+        errors,
+    )
+    check_agent_contract(errors)
 
     engine_path = ROOT / "chameleon"
     if not engine_path.is_dir():
