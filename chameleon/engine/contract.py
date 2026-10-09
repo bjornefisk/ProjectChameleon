@@ -233,6 +233,15 @@ def validate_response(
         zip(source_elements, response_elements, response_aabbs)
     ):
         if index == background_index:
+            # The cover exemption lifts the containment bound, not visibility:
+            # a background with no overlap with the target is a hidden record
+            # (PROJECT_CONTRACT section 8, hard rule 3).
+            if not _positive_intersection_with_canvas(response_aabb, response["canvas"]):
+                _fail(
+                    InfeasibleReasonCode.CONTAINMENT_VIOLATION,
+                    "background must keep positive-area overlap with the target canvas",
+                    {"index": index, "id": response_element["id"], "aabb": response_aabb},
+                )
             continue
 
         expected_bleed = bleed_sides[index]

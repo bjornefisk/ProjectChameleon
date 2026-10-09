@@ -528,6 +528,105 @@ class ContractValidatorTests(unittest.TestCase):
         missing["elements"][0]["asset_id"] = "missing.png"
         self.assert_reason(source, task["target_canvas"], missing, InfeasibleReasonCode.IMMUTABLE_FIELD_CHANGED)
 
+    def test_background_exemption_does_not_allow_a_hidden_background(self):
+        bleed = load_fixture("offcanvas_decoration.json")
+        hidden = copy.deepcopy(bleed)
+        hidden["elements"][0].update({"x": -5000, "y": -5000})
+        self.assert_reason(bleed, bleed["canvas"], hidden, InfeasibleReasonCode.CONTAINMENT_VIOLATION)
+
+    def test_background_boundary_contact_hides_but_one_pixel_overlap_stays_visible(self):
+        bleed = load_fixture("offcanvas_decoration.json")
+        touching = copy.deepcopy(bleed)
+        touching["elements"][0].update({"x": -1080})
+        self.assert_reason(bleed, bleed["canvas"], touching, InfeasibleReasonCode.CONTAINMENT_VIOLATION)
+
+        one_pixel = copy.deepcopy(bleed)
+        one_pixel["elements"][0].update({"x": -1079})
+        validate_response(bleed, one_pixel["canvas"], one_pixel)
+
+    def test_full_canvas_contain_image_is_not_a_background(self):
+        source = design_with_elements(
+            [
+                {
+                    "id": "photo",
+                    "type": "image",
+                    "x": 0,
+                    "y": 0,
+                    "width": 200,
+                    "height": 100,
+                    "asset_id": "solstice_bottle.png",
+                    "fit": "contain",
+                }
+            ]
+        )
+        response = copy.deepcopy(source)
+        response["elements"][0]["x"] = -1
+        self.assert_reason(source, source["canvas"], response, InfeasibleReasonCode.CONTAINMENT_VIOLATION)
+
+    def test_omitted_source_fields_stay_omitted_in_the_response(self):
+        source = separated_source()
+        response = copy.deepcopy(source)
+        response["elements"][0]["rotation"] = 0
+        self.assert_reason(source, source["canvas"], response, InfeasibleReasonCode.IMMUTABLE_FIELD_CHANGED)
+
+    def test_infeasible_target_fixture_rejects_unmodified_geometry(self):
+        task = load_fixture("infeasible_target.json")
+        source = task["source"]
+        candidate = copy.deepcopy(source)
+        candidate["canvas"] = copy.deepcopy(task["target_canvas"])
+        self.assert_reason(source, task["target_canvas"], candidate, InfeasibleReasonCode.CONTAINMENT_VIOLATION)
+
+    def test_sample_envelopes_validate_only_after_extracting_source_and_target(self):
+        samples = sorted((Path(__file__).parents[2] / "input").glob("chameleon_sample_*.json"))
+        self.assertEqual(len(samples), 3)
+        for path in samples:
+            with self.subTest(sample=path.name):
+                envelope = json.loads(path.read_text(encoding="utf-8"), parse_float=Decimal)
+                source = envelope["source"]
+                target = envelope["target_canvas"]
+                validate_source(source)
+
+                with self.assertRaises(InfeasibleLayoutError) as raised:
+                    validate_source(envelope)
+                self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.INVALID_SOURCE)
+
+                candidate = copy.deepcopy(source)
+                candidate["canvas"] = copy.deepcopy(target)
+                try:
+                    validate_response(source, target, candidate)
+                except InfeasibleLayoutError as error:
+                    # Geometry may legitimately fail at the new canvas; the target itself must be accepted.
+                    self.assertNotIn(
+                        error.reason_code,
+                        {InfeasibleReasonCode.INVALID_TARGET, InfeasibleReasonCode.MALFORMED_INPUT},
+                    )
+
+    def test_empty_zero_size_and_text_free_sources_validate_identity(self):
+        empty = design_with_elements([])
+        validate_source(empty)
+        validate_response(empty, empty["canvas"], copy.deepcopy(empty))
+
+        zero_size = design_with_elements(
+            [
+                {
+                    "id": "dot",
+                    "type": "shape",
+                    "x": 10,
+                    "y": 10,
+                    "width": 0,
+                    "height": 0,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(0,0,0,1)",
+                }
+            ]
+        )
+        validate_source(zero_size)
+        validate_response(zero_size, zero_size["canvas"], copy.deepcopy(zero_size))
+
+        text_free = separated_source()
+        validate_source(text_free)
+        validate_response(text_free, text_free["canvas"], copy.deepcopy(text_free))
+
 
 if __name__ == "__main__":
     unittest.main()
