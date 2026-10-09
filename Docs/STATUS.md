@@ -1,9 +1,9 @@
 # Project Chameleon status
 
-**Date:** 2026-10-06
+**Date:** 2026-10-09
 
-**Phase:** Contract and decision ratification complete; Gate 1 qualification pending; implementation not started.
-**Decision status:** Documentation-only ratification; no implementation, conformance, or runtime qualification is claimed.
+**Phase:** Ticket 01 implementation complete; ticket 02 remains not started; Gate 1 qualification remains pending.
+**Decision status:** Ticket 01 semantic validation has local contract evidence. Renderer, runner, solver, and runtime qualification remain outside this PR.
 
 ## Ground truth now recorded
 
@@ -48,7 +48,7 @@ These are contract artifacts, not solver or renderer implementation:
 - `chameleon/chameleon_design_schema_v0.9.json` is no longer provisional, accepts empty designs, and records structural ranges/defaults.
 - Contract fixtures live under `chameleon/tests/fixtures/contract/`.
 - The Level 2 public sample's style range is corrected to valid end-exclusive `[6, 15)` semantics; this is fixture/source-data correction, not solver implementation.
-- Semantic validator and contract tests are implemented at `engine.contract`; renderer text bounds, runner integration, and full Gate 1 qualification remain pending.
+- Ticket 01's semantic validator and contract tests are implemented at `engine.contract`; the renderer adapter, runner, solver, and full Gate 1 qualification remain pending in later tickets.
 
 ## Known implementation gaps before the solver
 
@@ -73,9 +73,16 @@ These are intentionally visible; none is silently promoted to contract behavior:
 
 These are not unresolved internal design choices. They require external facts or the implementation/conformance phase.
 
-## Verification plan
+## Ticket 01 verification record
 
-Decision ratification is complete, but Gate 1 qualification remains pending. The documentation phase has not run the solver, renderer qualification, Docker build, or validator suite and makes no implementation or verification claim. The next implementation phase MUST exercise:
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/contract -p 'test_*.py' -v` — 27 tests passed.
+- `python3 scripts/verify_repository.py` — passed.
+- The suite covers schema/source validation, identity and immutable-field preservation, exact numeric ingress, serialized integer geometry, rotated containment and bleed, image ratios, rigid groups, source-separated collision, text line-box checks, empty/degenerate designs, and typed reason codes.
+- The ticket-01 PR tree contains no ticket-02 renderer/wrapping implementation, tests, fixtures, or Unicode data. Ticket 02 remains pending human review and approval.
+
+## Remaining Gate 1 qualification
+
+The following sequence is required for later Gate 1 qualification and is not ticket-01 evidence:
 
 ```bash
 cd chameleon
@@ -87,4 +94,4 @@ docker run --rm --network none \
   chameleon-stage1
 ```
 
-The baseline run is expected to expose its documented uniform-stretch failures; it is not contract evidence. A Docker build or validator run is not claimed here until it has been exercised and recorded.
+The warning-only baseline self-check, renderer goldens/native-library parity, clean native amd64 run, and solver remain outside this PR.
