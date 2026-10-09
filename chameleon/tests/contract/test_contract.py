@@ -201,6 +201,7 @@ class ContractValidatorTests(unittest.TestCase):
         response["canvas"] = {"width": 640, "height": 360}
         response["elements"][0].update({"x": 1, "y": 1, "width": 10, "height": 10})
         validate_response(source, response["canvas"], response)
+        validate_response(source, source["canvas"], response)
 
     def test_source_validation_rejects_invalid_source_and_duplicate_ids(self):
         source = load_fixture("minimal_design.json")

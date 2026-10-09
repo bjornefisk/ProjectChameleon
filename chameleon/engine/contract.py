@@ -152,11 +152,12 @@ def validate_response(
     _validate_schema(response, _DESIGN_VALIDATOR, InfeasibleReasonCode.MALFORMED_INPUT, "response")
     _validate_finite_numbers(response, InfeasibleReasonCode.MALFORMED_INPUT, "response")
 
-    if not _strict_equal(response["canvas"], target_canvas):
+    expected_canvas = _schema_view(target_canvas)
+    if not _strict_equal(response["canvas"], expected_canvas):
         _fail(
             InfeasibleReasonCode.MALFORMED_INPUT,
             "response canvas must equal target_canvas exactly",
-            {"expected": target_canvas, "actual": response["canvas"]},
+            {"expected": expected_canvas, "actual": response["canvas"]},
         )
 
     source_elements = source["elements"]
@@ -335,11 +336,12 @@ def _validate_target_canvas(target_canvas: Any) -> None:
             {"path": list(error.absolute_path)},
         )
 
+    canonical_canvas = _schema_view(target_canvas)
     if (
-        type(target_canvas["width"]) is not int
-        or type(target_canvas["height"]) is not int
-        or target_canvas["width"] <= 0
-        or target_canvas["height"] <= 0
+        type(canonical_canvas["width"]) is not int
+        or type(canonical_canvas["height"]) is not int
+        or canonical_canvas["width"] <= 0
+        or canonical_canvas["height"] <= 0
     ):
         _fail(
             InfeasibleReasonCode.INVALID_TARGET,
