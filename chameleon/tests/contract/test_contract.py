@@ -189,6 +189,19 @@ class ContractValidatorTests(unittest.TestCase):
             InfeasibleReasonCode.IMAGE_RATIO_VIOLATION,
         )
 
+    def test_integral_decimal_tokens_are_integers_per_json_schema(self):
+        raw = (
+            '{"canvas":{"width":640.0,"height":360.0},"elements":['
+            '{"id":"a","type":"shape","x":1.0,"y":1.0,"width":10.0,"height":10.0,'
+            '"z_index":1.0,"shape_type":"rectangle","fill_color":"rgba(0,0,0,1)"}]}'
+        )
+        source = json.loads(raw, parse_float=Decimal)
+        validate_source(source)
+        response = copy.deepcopy(source)
+        response["canvas"] = {"width": 640, "height": 360}
+        response["elements"][0].update({"x": 1, "y": 1, "width": 10, "height": 10})
+        validate_response(source, response["canvas"], response)
+
     def test_source_validation_rejects_invalid_source_and_duplicate_ids(self):
         source = load_fixture("minimal_design.json")
         invalid = copy.deepcopy(source)

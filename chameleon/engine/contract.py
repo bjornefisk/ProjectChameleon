@@ -277,6 +277,23 @@ def validate_response(
     _validate_text_overflow(response_elements)
 
 
+def _schema_view(value: Any) -> Any:
+    """Return ``value`` with zero-fraction Decimals as ints.
+
+    JSON Schema treats ``1.0`` as an integer. ``jsonschema`` checks Decimal
+    values by type, so integral Decimal tokens must be converted before the
+    integer check. Fractional values are returned unchanged and still fail.
+    """
+
+    if isinstance(value, Decimal) and value.is_finite() and value == value.to_integral_value():
+        return int(value)
+    if isinstance(value, Mapping):
+        return {key: _schema_view(child) for key, child in value.items()}
+    if isinstance(value, list):
+        return [_schema_view(child) for child in value]
+    return value
+
+
 def _validate_schema(
     value: Any,
     validator: Draft202012Validator,
@@ -284,7 +301,7 @@ def _validate_schema(
     label: str,
 ) -> None:
     errors = sorted(
-        validator.iter_errors(value),
+        validator.iter_errors(_schema_view(value)),
         key=lambda error: tuple(str(part) for part in error.path),
     )
     if not errors:
@@ -307,7 +324,7 @@ def _validate_target_canvas(target_canvas: Any) -> None:
         )
 
     errors = sorted(
-        _CANVAS_VALIDATOR.iter_errors(target_canvas),
+        _CANVAS_VALIDATOR.iter_errors(_schema_view(target_canvas)),
         key=lambda error: tuple(str(part) for part in error.path),
     )
     if errors:
