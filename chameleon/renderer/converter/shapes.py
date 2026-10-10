@@ -3,43 +3,63 @@ from PIL import Image, ImageDraw
 from .colorutil import parse_rgba
 
 
-def render_shape(element: dict) -> Image.Image:
-    """Rasterize a `shape` element to an RGBA PIL image.
+def _rgba_pixel(value: str, default: tuple[int, int, int, float]) -> tuple[int, int, int, int]:
+    red, green, blue, alpha = parse_rgba(value, default=default)
+    return red, green, blue, max(0, min(255, round(alpha * 255)))
 
-    Crello's schema has no notion of vector shapes (only text/image
-    elements), so shapes are pre-rendered to a PNG here and handed to
-    cr-renderer as a regular image element. The element's own `opacity` is
-    NOT baked in here - cr-renderer applies that separately as paint alpha
-    when it composites the image, so baking it in too would double it up.
-    """
-    width = max(1, round(element.get("width", 1)))
-    height = max(1, round(element.get("height", 1)))
+
+def render_shape(element: dict) -> Image.Image:
+    """Rasterize a shape without drawing any pixel outside its box."""
+    width = max(1, round(float(element.get("width", 1))))
+    height = max(1, round(float(element.get("height", 1))))
     image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
 
-    r, g, b, _alpha = parse_rgba(element.get("fill_color"), default=(200, 200, 200, 1.0))
-    fill = (r, g, b, 255)
+    fill = _rgba_pixel(
+        element.get("fill_color"),
+        default=(200, 200, 200, 1.0),
+    )
+    stroke = None
+    stroke_width = round(float(element.get("stroke_width", 0) or 0))
+    if element.get("stroke_color") and stroke_width > 0:
+        stroke = _rgba_pixel(
+            element["stroke_color"],
+            default=(0, 0, 0, 1.0),
+        )
 
     shape_type = element.get("shape_type", "rectangle")
+    bounds = [0, 0, width - 1, height - 1]
     if shape_type == "ellipse":
-        draw.ellipse([0, 0, width - 1, height - 1], fill=fill)
+        draw.ellipse(bounds, fill=fill, outline=stroke, width=stroke_width)
     elif shape_type == "line":
-        stroke_r, stroke_g, stroke_b, _sa = parse_rgba(
-            element.get("stroke_color") or element.get("fill_color"), default=(0, 0, 0, 1.0)
+        line_color = _rgba_pixel(
+            element.get("stroke_color") or element.get("fill_color"),
+            default=(0, 0, 0, 1.0),
         )
-        stroke_width = max(1, round(element.get("stroke_width", 1) or 1))
-        draw.line([0, height // 2, width - 1, height // 2], fill=(stroke_r, stroke_g, stroke_b, 255), width=stroke_width)
+        line_width = max(1, round(float(element.get("stroke_width", 1) or 1)))
+        draw.line(
+            [0, height // 2, width - 1, height // 2],
+            fill=line_color,
+            width=line_width,
+        )
     else:
-        radius = max(0, min(element.get("corner_radius", 0), width / 2, height / 2))
+        radius = max(
+            0,
+            min(
+                round(float(element.get("corner_radius", 0) or 0)),
+                width // 2,
+                height // 2,
+            ),
+        )
         if radius > 0:
-            draw.rounded_rectangle([0, 0, width - 1, height - 1], radius=radius, fill=fill)
+            draw.rounded_rectangle(
+                bounds,
+                radius=radius,
+                fill=fill,
+                outline=stroke,
+                width=stroke_width,
+            )
         else:
-            draw.rectangle([0, 0, width - 1, height - 1], fill=fill)
+            draw.rectangle(bounds, fill=fill, outline=stroke, width=stroke_width)
 
     return image
-
-
-def shape_fill_alpha(element: dict) -> float:
-    """Return the alpha channel embedded in `fill_color`, e.g. `rgba(1,2,3,0.5)`."""
-    _r, _g, _b, alpha = parse_rgba(element.get("fill_color"), default=(0, 0, 0, 1.0))
-    return alpha
