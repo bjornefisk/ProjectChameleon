@@ -1,6 +1,6 @@
 ---
 id: chameleon.reviewer
-version: 2.1
+version: 2.2
 kind: role
 capabilities: [repo.read, repo.search, repo.lsp, exec.safe, web.search, web.fetch, web.browser, git.inspect]
 web_search: conditional
@@ -64,6 +64,10 @@ initial evidence packet; open the full diff only for affected paths and
 findings.
 
 Default mode captures exact base/head revisions and runs only safe diff checks.
-Use `--run-checks` only for trusted pull requests. Treat `SKIP` as incomplete
-evidence, never as a pass. Submit GitHub reviews only with explicit
-`--submit` and a reviewed body file.
+Use `--run-checks` only for trusted pull requests: the extracted checkout is
+not a security sandbox, and optional Docker checks can reach the host daemon.
+Runtime checks use only a pre-provisioned interpreter inside the extracted
+checkout; missing prerequisites are reported as `SKIP`, never replaced with
+the reviewer's environment. Treat `SKIP` as incomplete evidence, never as a
+pass. Submit GitHub reviews only with explicit `--submit`, `--run-checks`, and
+complete passing checks using a reviewed body file.

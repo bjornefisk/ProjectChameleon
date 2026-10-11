@@ -1,5 +1,8 @@
+import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
@@ -19,6 +22,18 @@ class ReviewCapsuleTests(unittest.TestCase):
                 f"Docs/DECISIONS/ADR-{suffix:03d}-",
                 "\n".join(review_pr.CONTRACT_SOURCES),
             )
+
+    def test_changed_authority_sources_require_trusted_comparison(self):
+        sources = review_pr.changed_contract_sources([".agents/roles/reviewer.md"])
+
+        self.assertIn("skills/chameleon-review/SKILL.md", sources)
+        self.assertIn("chameleon/RULES.md", sources)
+        self.assertEqual(
+            review_pr.changed_authority_sources(
+                [".agents/roles/reviewer.md"], sources
+            ),
+            [".agents/roles/reviewer.md"],
+        )
 
     def test_write_text_preserves_diff_trailing_whitespace(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -114,6 +129,102 @@ class ReviewCapsuleTests(unittest.TestCase):
         self.assertIn("python3", content)
         self.assertIn("independent reviewer", content)
         self.assertIn("diff.patch", content)
+
+    def test_run_process_caps_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log_path = Path(directory) / "check.log"
+            with patch.object(review_pr, "MAX_LOG_BYTES", 32):
+                result = review_pr.run_process(
+                    [
+                        sys.executable,
+                        "-c",
+                        "import sys; sys.stdout.write('x' * 256)",
+                    ],
+                    ROOT,
+                    log_path,
+                    10,
+                )
+
+            self.assertEqual(result.status, "PASS")
+            content = log_path.read_bytes()
+            self.assertIn(review_pr.LOG_TRUNCATION_MARKER, content)
+            self.assertLessEqual(
+                len(content),
+                32 + len(review_pr.LOG_TRUNCATION_MARKER),
+            )
+
+    def test_checkout_python_does_not_use_caller_environment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            checkout = Path(directory)
+            self.assertIsNone(review_pr.checkout_python(checkout))
+            python_path = checkout / ".venv" / "bin" / "python"
+            python_path.parent.mkdir(parents=True)
+            python_path.write_text("", encoding="utf-8")
+            self.assertEqual(review_pr.checkout_python(checkout), python_path)
+
+    def test_submission_requires_complete_checks(self):
+        checks = [
+            review_pr.CheckResult("contract-sources", "PASS", 0.0, []),
+            review_pr.CheckResult("test", "SKIP", 0.0, [], reason="not run"),
+        ]
+
+        self.assertEqual(
+            review_pr.submission_blocker(checks),
+            "submission blocked; incomplete checks: test",
+        )
+        self.assertEqual(
+            review_pr.next_owner(checks, "request-changes"),
+            "reviewer/maintainer (complete skipped evidence)",
+        )
+        self.assertEqual(
+            review_pr.next_owner(
+                [review_pr.CheckResult("submit-review", "PASS", 0.0, [])],
+                "request-changes",
+            ),
+            "PR author/maintainer",
+        )
+
+    def test_submit_requires_run_checks(self):
+        with patch.object(
+            review_pr.sys,
+            "argv",
+            [
+                "review_pr.py",
+                "--pr",
+                "8",
+                "--submit",
+                "comment",
+                "--body-file",
+                "review.md",
+            ],
+        ):
+            with redirect_stderr(StringIO()):
+                with self.assertRaises(SystemExit):
+                    review_pr.parse_args()
+
+    def test_summary_escapes_untrusted_markdown_fields(self):
+        with tempfile.TemporaryDirectory() as directory:
+            summary = review_pr.make_summary(
+                Path(directory),
+                {"number": 8, "repository": "owner/repo", "url": "https://example.test"},
+                "base",
+                "head",
+                ["bad`|name\nline"],
+                [
+                    review_pr.CheckResult(
+                        "check",
+                        "SKIP",
+                        0.0,
+                        [],
+                        reason="bad|reason\nnext",
+                    )
+                ],
+                list(review_pr.CONTRACT_SOURCES),
+            )
+            content = summary.read_text(encoding="utf-8")
+
+        self.assertIn("bad\\`\\|name\\nline", content)
+        self.assertIn("bad\\|reason\\nnext", content)
 
 
 if __name__ == "__main__":

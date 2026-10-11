@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Build a compact, isolated evidence capsule for one GitHub pull request.
+"""Build a compact evidence capsule for one GitHub pull request.
 
-The script automates repository mechanics only. It never chooses a review
-verdict and never mutates GitHub unless ``--submit`` is supplied explicitly.
-PR-controlled checks require the explicit ``--run-checks`` opt-in.
+The script automates repository mechanics only. The extracted checkout is not
+a security sandbox. It never chooses a review verdict and never mutates GitHub
+unless ``--submit`` is supplied explicitly; submission requires complete
+passing checks.
 """
 
 from __future__ import annotations
@@ -14,10 +15,12 @@ import os
 import platform
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import tarfile
 import tempfile
+import threading
 import time
 import uuid
 from dataclasses import asdict, dataclass
@@ -29,9 +32,13 @@ from typing import Iterable, Mapping, Sequence
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TIMEOUT = 300
 GH_TIMEOUT = 60
+MAX_LOG_BYTES = 4 * 1024 * 1024
+LOG_TRUNCATION_MARKER = b"\n[output truncated]\n"
 CONTRACT_SOURCES = (
     "AGENTS.md",
+    "Docs/README.md",
     "Docs/PROJECT_CONTRACT.md",
+    "Docs/DECISION_REGISTER.md",
     "Docs/DECISIONS/ADR-001-source-of-truth-hierarchy.md",
     "Docs/DECISIONS/ADR-002-stage-1-schema-renderer.md",
     "Docs/DECISIONS/ADR-003-hard-constraints-and-fallback.md",
@@ -43,6 +50,8 @@ CONTRACT_SOURCES = (
     "Docs/DECISIONS/ADR-009-initial-search-strategy.md",
     "Docs/FINAL_ARCHITECTURE.md",
     "chameleon/chameleon_design_schema_v0.9.json",
+    "chameleon/RULES.md",
+    "Docs/CHAMELEONCHALLENGE.md",
     "Docs/DEPENDENCY_EVIDENCE.md",
     "Docs/STATUS.md",
     "Docs/IMPLEMENTATION_ROADMAP.md",
@@ -52,11 +61,16 @@ CONTRACT_SOURCES = (
     ".agents/TOOLING.md",
     ".agents/policies/authority.md",
     ".agents/policies/evidence.md",
+    ".agents/policies/security.md",
     ".agents/roles/reviewer.md",
+    ".agents/roles/security-reviewer.md",
     ".agents/workflows/06-review.md",
     ".agents/workflows/07-github-pr.md",
     ".agents/checklists/review.md",
     ".agents/templates/review.md",
+    "skills/chameleon-contract/SKILL.md",
+    "skills/chameleon-review/SKILL.md",
+    "skills/chameleon-testing/SKILL.md",
 )
 
 
@@ -75,6 +89,31 @@ class CheckResult:
     reason: str | None = None
 
 
+def terminate_process(process: subprocess.Popen) -> None:
+    if process.poll() is not None:
+        return
+    try:
+        if os.name == "posix":
+            os.killpg(process.pid, signal.SIGTERM)
+        else:
+            process.terminate()
+        process.wait(timeout=5)
+        return
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    try:
+        if os.name == "posix":
+            os.killpg(process.pid, signal.SIGKILL)
+        else:
+            process.kill()
+    except OSError:
+        pass
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        pass
+
+
 def run_process(
     command: Sequence[str],
     cwd: Path,
@@ -84,35 +123,78 @@ def run_process(
 ) -> CheckResult:
     started = time.monotonic()
     try:
-        completed = subprocess.run(
+        process = subprocess.Popen(
             list(command),
             cwd=cwd,
             env=dict(env) if env is not None else None,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            text=True,
-            timeout=timeout,
-            check=False,
+            start_new_session=os.name == "posix",
         )
-        output = completed.stdout or ""
-        status = "PASS" if completed.returncode == 0 else "FAIL"
-        returncode = completed.returncode
-        reason = None
-    except subprocess.TimeoutExpired as error:
-        partial_output = error.stdout or ""
-        if isinstance(partial_output, bytes):
-            partial_output = partial_output.decode(errors="replace")
-        output = partial_output + f"\nTimed out after {timeout}s.\n"
+    except OSError as error:
+        log_path.write_text(f"{type(error).__name__}: {error}\n", encoding="utf-8")
+        return CheckResult(
+            name=log_path.stem,
+            status="FAIL",
+            duration_seconds=round(time.monotonic() - started, 3),
+            command=list(command),
+            reason=str(error),
+            log=str(log_path),
+        )
+
+    written = 0
+    output_truncated = False
+    reader_error: OSError | None = None
+
+    with log_path.open("wb") as log:
+        def drain_output() -> None:
+            nonlocal output_truncated, reader_error, written
+            stream = process.stdout
+            if stream is None:
+                return
+            try:
+                while True:
+                    chunk = stream.read(65536)
+                    if not chunk:
+                        return
+                    remaining = MAX_LOG_BYTES - written
+                    if remaining > 0:
+                        log.write(chunk[:remaining])
+                        written += min(len(chunk), remaining)
+                    if len(chunk) > remaining:
+                        output_truncated = True
+            except OSError as error:
+                reader_error = error
+
+        reader = threading.Thread(target=drain_output, daemon=True)
+        reader.start()
+        timed_out = False
+        try:
+            returncode = process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            terminate_process(process)
+            returncode = process.returncode
+        reader.join(timeout=5)
+        if reader.is_alive():
+            output_truncated = True
+            if process.stdout is not None:
+                process.stdout.close()
+            reader.join(timeout=1)
+        if process.stdout is not None:
+            process.stdout.close()
+        if reader_error is not None:
+            log.write(f"\nOutput capture failed: {reader_error}\n".encode())
+        if output_truncated:
+            log.write(LOG_TRUNCATION_MARKER)
+
+    if timed_out:
         status = "FAIL"
         returncode = None
         reason = f"timeout after {timeout}s"
-    except OSError as error:
-        output = f"{type(error).__name__}: {error}\n"
-        status = "FAIL"
-        returncode = None
-        reason = str(error)
-
-    log_path.write_text(output, encoding="utf-8")
+    else:
+        status = "PASS" if returncode == 0 else "FAIL"
+        reason = None
     return CheckResult(
         name=log_path.stem,
         status=status,
@@ -227,10 +309,22 @@ def changed_contract_sources(changed_files: Iterable[str]) -> list[str]:
         )
     return list(dict.fromkeys(sources))
 
+def source_path(source: str) -> str:
+    return source.split(" §", 1)[0]
+
+
+def changed_authority_sources(
+    changed_files: Iterable[str],
+    sources: Iterable[str] = CONTRACT_SOURCES,
+) -> list[str]:
+    changed = set(changed_files)
+    return sorted({source_path(source) for source in sources if source_path(source) in changed})
+
+
 def missing_contract_sources(root: Path, sources: Iterable[str]) -> list[str]:
     missing = []
     for source in sources:
-        path = source.split(" §", 1)[0]
+        path = source_path(source)
         if not (root / path).is_file():
             missing.append(source)
     return missing
@@ -324,7 +418,51 @@ def make_command(target: str, python_path: Path | None) -> list[str]:
         )
     command.append(target)
     return command
+def markdown_cell(value: object) -> str:
+    return (
+        str(value)
+        .replace("\\", "\\\\")
+        .replace("|", "\\|")
+        .replace("\r", "\\r")
+        .replace("\n", "\\n")
+    )
 
+
+def markdown_code(value: object) -> str:
+    escaped = markdown_cell(value).replace("`", "\\`")
+    return f"`{escaped}`"
+
+
+def incomplete_checks(checks: Iterable[CheckResult]) -> list[str]:
+    return [check.name for check in checks if check.status != "PASS"]
+
+
+def next_owner(checks: Iterable[CheckResult], submit_mode: str) -> str:
+    checks = list(checks)
+    submission_succeeded = any(
+        check.name == "submit-review" and check.status == "PASS" for check in checks
+    )
+    if submission_succeeded and submit_mode == "request-changes":
+        return "PR author/maintainer"
+    if any(check.status == "FAIL" for check in checks):
+        return "PR author/maintainer (resolve failed checks)"
+    if any(check.status == "SKIP" for check in checks):
+        return "reviewer/maintainer (complete skipped evidence)"
+    if submission_succeeded:
+        return "PR author/maintainer"
+    return "independent reviewer"
+
+
+def submission_blocker(checks: Iterable[CheckResult]) -> str | None:
+    incomplete = incomplete_checks(checks)
+    if not incomplete:
+        return None
+    return "submission blocked; incomplete checks: " + ", ".join(incomplete)
+
+
+def checkout_python(checkout: Path) -> Path | None:
+    candidate = checkout / ".venv" / "bin" / "python"
+    return candidate if candidate.is_file() else None
 
 def make_summary(
     report_dir: Path,
@@ -347,10 +485,10 @@ def make_summary(
         "# PR review capsule",
         "",
         f"- Overall: **{overall}**",
-        f"- PR: #{metadata['number']} ({metadata.get('url', 'unknown URL')})",
-        f"- Repository: {metadata['repository']}",
-        f"- Base: `{base_sha}`",
-        f"- Head: `{head_sha}`",
+        f"- PR: #{metadata['number']} ({markdown_code(metadata.get('url', 'unknown URL'))})",
+        f"- Repository: {markdown_code(metadata['repository'])}",
+        f"- Base: {markdown_code(base_sha)}",
+        f"- Head: {markdown_code(head_sha)}",
         f"- Generated: {datetime.now(timezone.utc).isoformat()}",
         "",
         "## Provenance",
@@ -370,7 +508,7 @@ def make_summary(
         value = provenance.get(key)
         if value:
             label = key.replace("_", " ").title()
-            lines.append(f"- {label}: `{value}`")
+            lines.append(f"- {label}: {markdown_code(value)}")
     lines.extend(
         [
             "",
@@ -386,9 +524,9 @@ def make_summary(
             "",
         ]
     )
-    lines.extend(f"- `{path}`" for path in changed_files)
+    lines.extend(f"- {markdown_code(path)}" for path in changed_files)
     lines.extend(["", "## Contract pointers", ""])
-    lines.extend(f"- `{source}`" for source in contract_sources)
+    lines.extend(f"- {markdown_code(source)}" for source in contract_sources)
     lines.extend(
         [
             "",
@@ -405,14 +543,15 @@ def make_summary(
                 log_path = log_path.relative_to(report_dir)
             except ValueError:
                 pass
-            log = f"`{log_path}`"
+            log = markdown_code(log_path)
         else:
             log = "—"
         lines.append(
-            f"| `{check.name}` | **{check.status}** | {check.duration_seconds:.3f} | {log} |"
+            f"| {markdown_code(check.name)} | **{markdown_cell(check.status)}** | "
+            f"{check.duration_seconds:.3f} | {log} |"
         )
         if check.reason:
-            lines.append(f"| reason | {check.reason} |  |  |")
+            lines.append(f"| reason | {markdown_cell(check.reason)} |  |  |")
     lines.extend(
         [
             "",
@@ -439,7 +578,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--run-checks",
         action="store_true",
-        help="Execute PR-controlled repository checks in an isolated checkout",
+        help="Execute PR-controlled checks in an extracted checkout; this is not a sandbox",
     )
     parser.add_argument(
         "--submit",
@@ -464,6 +603,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("--timeout must be positive")
     if args.submit != "none" and args.body_file is None:
         parser.error("--body-file is required with --submit")
+    if args.submit != "none" and not args.run_checks:
+        parser.error("--submit requires --run-checks")
     if args.docker and not args.run_checks:
         parser.error("--docker requires --run-checks")
     return args
@@ -678,12 +819,23 @@ def main() -> int:
         create_checkout(head_sha, checkout)
         checkout_created = True
         missing_sources = missing_contract_sources(checkout, contract_sources)
+        changed_sources = changed_authority_sources(changed_files, contract_sources)
+        contract_issues = []
         if missing_sources:
+            contract_issues.append(
+                "missing from PR checkout: " + ", ".join(missing_sources)
+            )
+        if changed_sources:
+            contract_issues.append(
+                "changed in PR; compare with trusted base: "
+                + ", ".join(changed_sources)
+            )
+        if contract_issues:
             checks.append(
                 skipped(
                     "contract-sources",
                     ["canonical-contract-sources"],
-                    "missing from PR checkout: " + ", ".join(missing_sources),
+                    "; ".join(contract_issues),
                 )
             )
         else:
@@ -696,23 +848,6 @@ def main() -> int:
                     returncode=0,
                 )
             )
-        provenance = {
-            "run_id": report_dir.name,
-            "capsule_revision": capsule_revision,
-            "role": ".agents/roles/reviewer.md",
-            "workflow": ".agents/workflows/06-review.md; .agents/workflows/07-github-pr.md",
-            "gate": "Gate 1: renderer and validator qualification before solver",
-            "environment": f"{platform.python_implementation()} {platform.python_version()} on {platform.platform()}",
-            "validation": (
-                "PR code execution requested; inspect check statuses"
-                if args.run_checks
-                else "PR code execution disabled by default"
-            ),
-            "contract_sources": (
-                "complete" if not missing_sources else "incomplete"
-            ),
-            "next_owner": "independent reviewer",
-        }
 
         if not args.run_checks:
             reason = "not requested; PR code execution is disabled by default"
@@ -734,14 +869,21 @@ def main() -> int:
             )
             checks.append(run_check("verify", ["make", "verify"], checkout, report_dir, args.timeout, check_env))
             engine_available = (checkout / "chameleon" / "engine").is_dir()
-            python_path = ROOT / ".venv" / "bin" / "python"
-            if not engine_available or not python_path.is_file():
-                reason = "missing nested engine or host .venv; initialize prerequisites before runtime checks"
+            python_path = checkout_python(checkout)
+            if not engine_available or python_path is None:
+                missing_runtime = []
+                if not engine_available:
+                    missing_runtime.append("nested engine unavailable")
+                if python_path is None:
+                    missing_runtime.append(
+                        "PR checkout has no pre-provisioned .venv; host environments are not used"
+                    )
+                reason = "; ".join(missing_runtime)
                 checks.extend(
                     [
-                        skipped("test", make_command("test", python_path if python_path.is_file() else None), reason),
-                        skipped("run", make_command("run", python_path if python_path.is_file() else None), reason),
-                        skipped("inspect", make_command("inspect", python_path if python_path.is_file() else None), reason),
+                        skipped("test", make_command("test", python_path), reason),
+                        skipped("run", make_command("run", python_path), reason),
+                        skipped("inspect", make_command("inspect", python_path), reason),
                     ]
                 )
             else:
@@ -778,8 +920,44 @@ def main() -> int:
                         checks.append(skipped("docker-test", ["make", "docker-test"], "docker build failed"))
 
         if args.submit != "none":
-            checks.append(submit_review(args.pr, repository, args.submit, body_file, report_dir, args.timeout))
+            blocker = submission_blocker(checks)
+            if blocker:
+                checks.append(
+                    skipped(
+                        "submit-review",
+                        ["gh", "pr", "review", str(args.pr)],
+                        blocker,
+                    )
+                )
+            else:
+                checks.append(
+                    submit_review(
+                        args.pr,
+                        repository,
+                        args.submit,
+                        body_file,
+                        report_dir,
+                        args.timeout,
+                    )
+                )
 
+        provenance = {
+            "run_id": report_dir.name,
+            "capsule_revision": capsule_revision,
+            "role": ".agents/roles/reviewer.md",
+            "workflow": ".agents/workflows/06-review.md; .agents/workflows/07-github-pr.md",
+            "gate": "Gate 1: renderer and validator qualification before solver",
+            "environment": f"{platform.python_implementation()} {platform.python_version()} on {platform.platform()}",
+            "validation": (
+                "PR-controlled checks requested; inspect statuses; execution is not sandboxed"
+                if args.run_checks
+                else "PR code execution disabled by default"
+            ),
+            "contract_sources": (
+                "complete" if not contract_issues else "incomplete"
+            ),
+            "next_owner": next_owner(checks, args.submit),
+        }
         write_text(
             report_dir / "checks.json",
             json.dumps([asdict(check) for check in checks], indent=2),
