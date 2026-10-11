@@ -59,16 +59,16 @@ class RendererConformanceTests(unittest.TestCase):
         self.assertEqual(output["font_italic"][0], [False, True, False, False])
 
     def test_style_run_typeface_width_changes_wrapping(self):
-        plain = self.convert_text(content="WW WW", width=103, height=100)
+        plain = self.convert_text(content="HH HH", width=74, height=100)
         styled = self.convert_text(
-            content="WW WW",
-            width=103,
+            content="HH HH",
+            width=74,
             height=100,
-            style_runs=[{"start": 0, "end": 2, "font_weight": "bold"}],
+            style_runs=[{"start": 0, "end": 5, "font_weight": "bold"}],
         )
 
-        self.assertEqual(plain["text"][0], "WW WW")
-        self.assertEqual(styled["text"][0], "WW\nWW")
+        self.assertEqual(plain["text"][0], "HH HH")
+        self.assertEqual(styled["text"][0], "HH\nHH")
 
     def test_letter_spacing_participates_in_greedy_wrapping(self):
         self.assertEqual(
