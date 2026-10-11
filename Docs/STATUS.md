@@ -3,7 +3,7 @@
 **Date:** 2026-10-09
 
 **Phase:** Ticket 01 and ticket 02 implementations complete; Gate 1 qualification remains pending.
-**Decision status:** Ticket 01 semantic validation and ticket 02 renderer conformance have local contract evidence. Runner, solver, and runtime qualification remain outside this PR.
+**Decision status:** Ticket 01 semantic validation and ticket 02 renderer conformance plus fail-closed runner publication have local evidence. Full semantic runner validation, solver, and runtime qualification remain outside this PR.
 
 ## Ground truth now recorded
 
@@ -48,7 +48,7 @@ These are contract artifacts, not solver or renderer implementation:
 - `chameleon/chameleon_design_schema_v0.9.json` is no longer provisional, accepts empty designs, and records structural ranges/defaults.
 - Contract fixtures live under `chameleon/tests/fixtures/contract/`.
 - The Level 2 public sample's style range is corrected to valid end-exclusive `[6, 15)` semantics; this is fixture/source-data correction, not solver implementation.
-- Ticket 01's semantic validator and contract tests plus ticket 02's renderer adapter/tests are implemented; the atomic runner, solver, and full Gate 1 qualification remain pending in later tickets.
+- Ticket 01's semantic validator and contract tests plus ticket 02's renderer adapter/tests are implemented; ticket 02 also stages task JSON/PNG pairs and cleans failed-task artifacts, while full semantic runner validation, cutoff behavior, solver, and full Gate 1 qualification remain pending.
 
 ## Known implementation gaps before the solver
 
@@ -56,8 +56,8 @@ These are intentionally visible; none is silently promoted to contract behavior:
 
 1. `engine/resize.py` is the documented uniform-stretch baseline and violates image-ratio, group, overlap, rotation, and typography rules.
 2. `engine/main.py` has a warning-only self-check that checks unrotated rectangles and ID sets; it is not the contract validator.
-3. The renderer adapter's actual glyph-bound validation, renderer goldens, and native-amd64 qualification remain; ticket 02 closes style-run end handling, Unicode-safe wrapping, letter-spacing/style-width measurement, explicit line/max-lines/height enforcement, and rectangle/ellipse stroke rasterization.
-4. The batch runner has no accepted typed-status, cutoff, stale-output, or logical-pair publication path yet, and its default JSON decoding does not preserve numeric tokens for exact ingress.
+3. The renderer adapter's renderer goldens and native-amd64 qualification remain; ticket 02 closes style-run end handling, Unicode-safe wrapping, letter-spacing/style-width measurement, mandatory/non-space line-map handling, actual positioned glyph-bound rejection, explicit line/max-lines/height enforcement, and rectangle/ellipse stroke rasterization.
+4. The batch runner now stages JSON/PNG pairs, cleans stale/failed artifacts, continues later tasks, and maps malformed/text-layout failures to typed log codes; accepted cutoff semantics, the complete status protocol, and exact numeric ingress remain pending.
 5. The deterministic role-inference, four-topology candidate search, renderer-in-loop ranking, and held-out evaluation path have not been implemented.
 6. The Docker build has no project-owned hash-locked wheelhouse or apt-version lock; the direct compatibility pins are an initial baseline.
 
@@ -83,11 +83,12 @@ These are not unresolved internal design choices. They require external facts or
 
 ## Ticket 02 verification record
 
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/renderer -p 'test_*.py' -v` — 7 tests passed.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 34 tests passed.
-- `cd chameleon && ../.venv/bin/python -m engine.main` — all three sample tasks rendered through the pinned adapter and wrote JSON/PNG pairs; the existing Level 2 source-bleed warning remained expected from the warning-only baseline self-check.
-- Coverage includes end-exclusive and overlapping style runs, effective bold-face measurement, letter-spacing wrapping, grapheme-safe unbreakable rejection, explicit/empty lines, max-lines and line-box overflow, and in-box rectangle/ellipse strokes.
-- Docker `linux/amd64`, native-amd64, renderer golden, glyph-bound, and full Stage 1 qualification checks remain pending.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/renderer -p 'test_*.py' -v` — 12 tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 40 tests passed.
+- `cd chameleon && ../.venv/bin/python -u -m engine.main` — exit 1 as expected for the current nonconforming baseline: level 1 and level 2 published JSON/PNG pairs (level 2 retained its warning-only off-canvas self-check), while level 3 failed closed with `TEXT_OVERFLOW` and no task artifacts.
+- Coverage includes end-exclusive and overlapping style runs, effective bold-face measurement, letter-spacing wrapping, grapheme-safe unbreakable rejection, Indic and emoji-tag grapheme boundaries, mandatory/non-space line-map breaks, explicit/empty lines, max-lines and line-box overflow, actual positioned glyph bounds, and in-box rectangle/ellipse strokes including subpixel-positive widths.
+- `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — attempted; Docker Desktop resolved the pinned base metadata, then the build timed out after 360s before producing an image. `docker run --rm --network none ...` was not run because no image was produced.
+- Native-amd64, renderer golden, glyph-bound, and full Stage 1 qualification checks remain pending.
 ## Remaining Gate 1 qualification
 
 The following sequence is required for later Gate 1 qualification and is not ticket-01 or ticket-02 evidence:
@@ -102,4 +103,4 @@ docker run --rm --network none \
   chameleon-stage1
 ```
 
-The warning-only baseline self-check, renderer goldens/native-library parity, clean native amd64 run, and solver remain outside this PR.
+The warning-only baseline self-check, complete semantic runner validator/cutoff protocol, exact numeric ingress, renderer goldens/native-library parity, clean native amd64 run, and solver remain outside this PR.

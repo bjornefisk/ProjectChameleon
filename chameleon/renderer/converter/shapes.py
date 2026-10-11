@@ -20,7 +20,8 @@ def render_shape(element: dict) -> Image.Image:
         default=(200, 200, 200, 1.0),
     )
     stroke = None
-    stroke_width = round(float(element.get("stroke_width", 0) or 0))
+    raw_stroke_width = float(element.get("stroke_width", 0) or 0)
+    stroke_width = max(1, round(raw_stroke_width)) if raw_stroke_width > 0 else 0
     if element.get("stroke_color") and stroke_width > 0:
         stroke = _rgba_pixel(
             element["stroke_color"],

@@ -17,6 +17,8 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import skia  # type: ignore
+
 from PIL import Image
 
 from cr_renderer import CrelloV5Renderer
@@ -26,7 +28,12 @@ from .assets import asset_path, load_asset_image
 from .brand_fonts import load_brand_font_manager
 from .features_stub import make_stub_features
 from .shapes import render_shape
-from .wrap import char_widths, enforce_text_limits, visual_line_count, wrap_text
+from .wrap import (
+    TextOverflowError,
+    char_widths,
+    enforce_text_limits,
+    wrap_text_with_line_map,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +189,28 @@ def _style_maps(
     return colors, bold_flags, italic_flags
 
 
+def _style_spans(
+    start: int,
+    end: int,
+    colors: List[str],
+    bold_flags: List[bool],
+    italic_flags: List[bool],
+) -> List[Tuple[int, int, Tuple[str, bool, bool]]]:
+    spans: List[Tuple[int, int, Tuple[str, bool, bool]]] = []
+    span_start = start
+    while span_start < end:
+        state = (colors[span_start], bold_flags[span_start], italic_flags[span_start])
+        span_end = span_start + 1
+        while span_end < end:
+            next_state = (colors[span_end], bold_flags[span_end], italic_flags[span_end])
+            if next_state != state:
+                break
+            span_end += 1
+        spans.append((span_start, span_end, state))
+        span_start = span_end
+    return spans
+
+
 def _measure_text(
     content: str,
     font_manager,
@@ -196,17 +225,9 @@ def _measure_text(
 
     def measure(start: int, end: int) -> float:
         total = 0.0
-        span_start = start
-        while span_start < end:
-            state = (colors[span_start], bold_flags[span_start], italic_flags[span_start])
-            span_end = span_start + 1
-            while span_end < end:
-                next_state = (colors[span_end], bold_flags[span_end], italic_flags[span_end])
-                if next_state != state:
-                    break
-                span_end += 1
-
-            _color, is_bold, is_italic = state
+        for span_start, span_end, (_color, is_bold, is_italic) in _style_spans(
+            start, end, colors, bold_flags, italic_flags
+        ):
             weight = "bold" if is_bold else "regular"
             style = _weight_style_to_font_style(is_bold, is_italic)
             advances = char_widths(
@@ -219,36 +240,115 @@ def _measure_text(
             )
             total += sum(advances)
             total += letter_spacing * max(0, len(advances) - 1)
-            span_start = span_end
         return total
 
     return measure
 
 
-def _line_indices(text: str) -> List[int]:
-    """Encode visual lines for cr-renderer's inclusive internal line map."""
-    if not text:
-        return [0]
+def _line_ranges(
+    line_indices: List[int], line_count: int, content_length: int
+) -> List[Tuple[int, int, int]]:
+    """Return inclusive-upstream line ranges as half-open Python slices."""
+    if not line_indices:
+        return [(0, 0, 0)]
 
-    values: List[int] = []
-    current_line = 0
-    for index, char in enumerate(text):
-        if char != "\n":
-            values.append(current_line)
+    ranges: List[Tuple[int, int, int]] = []
+    range_start = 0
+    current_line = line_indices[0]
+    for index in range(1, len(line_indices)):
+        if line_indices[index] == current_line:
             continue
-        if index == 0 or text[index - 1] == "\n":
-            values.append(current_line)
-            current_line += 1
-        else:
-            current_line += 1
-            values.append(current_line)
+        ranges.append((current_line, range_start, min(index, content_length)))
+        range_start = index
+        current_line = line_indices[index]
+    ranges.append((current_line, range_start, min(len(line_indices), content_length)))
 
-    line_count = visual_line_count(text)
-    represented = set(values)
-    for line_index in range(line_count):
-        if line_index not in represented:
-            values.append(line_index)
-    return values
+    represented = {line for line, _start, _end in ranges}
+    for line in range(line_count):
+        if line not in represented:
+            ranges.append((line, content_length, content_length))
+    return sorted(ranges)
+
+
+def _validate_positioned_glyph_bounds(
+    wrapped: str,
+    line_indices: List[int],
+    line_count: int,
+    element: Dict[str, Any],
+    font_manager,
+    family: str,
+    size: float,
+    line_height: float,
+    letter_spacing: float,
+    colors: List[str],
+    bold_flags: List[bool],
+    italic_flags: List[bool],
+) -> None:
+    """Reject actual Skia glyph envelopes outside the declared text box."""
+    element_width = float(element.get("width", 1.0))
+    element_height = float(element.get("height", 1.0))
+    text_align = element.get("text_align", "left")
+    capitalize = bool(element.get("capitalize", False))
+
+    for line_index, line_start, line_end in _line_ranges(
+        line_indices, line_count, len(wrapped)
+    ):
+        if line_start >= line_end:
+            continue
+
+        blobs: List[Tuple[Any, List[Any], List[float], List[Any], Any, float]] = []
+        total_width = 0.0
+        for span_start, span_end, (_color, is_bold, is_italic) in _style_spans(
+            line_start, line_end, colors, bold_flags, italic_flags
+        ):
+            span_text = wrapped[span_start:span_end].strip("\n")
+            if not span_text:
+                continue
+            if capitalize:
+                span_text = span_text.upper()
+
+            weight = "bold" if is_bold else "regular"
+            style = _weight_style_to_font_style(is_bold, is_italic)
+            typeface = skia.Typeface.MakeFromData(
+                font_manager.lookup(family, weight, style)
+            )
+            font = skia.Font(typeface, int(size))
+            glyphs = font.textToGlyphs(span_text)
+            positions = [
+                x_position + letter_spacing * glyph_index
+                for glyph_index, x_position in enumerate(font.getXPos(glyphs))
+            ]
+            glyph_bounds = list(font.getBounds(glyphs))
+            span_width = sum(font.getWidths(glyphs))
+            span_width += letter_spacing * max(0, len(glyphs) - 1)
+            blobs.append(
+                (font, glyphs, positions, glyph_bounds, font.getMetrics(), span_width)
+            )
+            total_width += span_width
+
+        if text_align == "center":
+            line_offset = (element_width - total_width) / 2.0
+        elif text_align == "right":
+            line_offset = element_width - total_width
+        else:
+            line_offset = 0.0
+
+        span_offset = line_offset
+        for _font, _glyphs, positions, glyph_bounds, metrics, span_width in blobs:
+            baseline = line_index * size * line_height - metrics.fAscent
+            for position, glyph_bound in zip(positions, glyph_bounds):
+                left = span_offset + position + glyph_bound.left()
+                right = span_offset + position + glyph_bound.right()
+                top = baseline + glyph_bound.top()
+                bottom = baseline + glyph_bound.bottom()
+                if left < 0 or top < 0 or right > element_width or bottom > element_height:
+                    raise TextOverflowError(
+                        "positioned glyph bounds exceed text element "
+                        f"(line={line_index}, bounds=({left:g}, {top:g}, "
+                        f"{right:g}, {bottom:g}), box=({element_width:g}, "
+                        f"{element_height:g}))"
+                    )
+            span_offset += span_width
 
 
 def _append_text(out: Dict[str, Any], element: Dict[str, Any], font_manager) -> None:
@@ -269,7 +369,7 @@ def _append_text(out: Dict[str, Any], element: Dict[str, Any], font_manager) -> 
         italic_flags,
     )
 
-    wrapped = wrap_text(
+    wrapped, line_indices, line_count = wrap_text_with_line_map(
         content,
         (),
         float(element.get("width", 1.0)),
@@ -281,6 +381,21 @@ def _append_text(out: Dict[str, Any], element: Dict[str, Any], font_manager) -> 
         line_height,
         element.get("max_lines"),
         float(element.get("height", 1.0)),
+        line_count,
+    )
+    _validate_positioned_glyph_bounds(
+        wrapped,
+        line_indices,
+        line_count,
+        element,
+        font_manager,
+        family,
+        size,
+        line_height,
+        letter_spacing,
+        colors,
+        bold_flags,
+        italic_flags,
     )
 
     out["text"].append(wrapped)
@@ -293,7 +408,7 @@ def _append_text(out: Dict[str, Any], element: Dict[str, Any], font_manager) -> 
     out["font_bold"].append(bold_flags)
     out["font_italic"].append(italic_flags)
     out["text_color"].append(colors)
-    out["text_line"].append(_line_indices(wrapped))
+    out["text_line"].append(line_indices)
 
 
 def _normalize_weight(weight: Optional[str]) -> str:
