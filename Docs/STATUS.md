@@ -57,7 +57,7 @@ These are intentionally visible; none is silently promoted to contract behavior:
 1. `engine/resize.py` is the documented uniform-stretch baseline and violates image-ratio, group, overlap, rotation, and typography rules.
 2. `engine/main.py` has a warning-only self-check that checks unrotated rectangles and ID sets; it is not the contract validator.
 3. The renderer adapter's renderer goldens and native-amd64 qualification remain; ticket 02 closes style-run end handling, Unicode-safe wrapping, letter-spacing/style-width measurement, mandatory/non-space line-map handling, actual positioned glyph-bound rejection, explicit line/max-lines/height enforcement, and rectangle/ellipse stroke rasterization.
-4. The batch runner now stages JSON/PNG pairs, cleans stale/failed artifacts, continues later tasks, and maps malformed/text-layout failures to typed log codes; accepted cutoff semantics, the complete status protocol, and exact numeric ingress remain pending.
+4. `engine/main.py` now stages JSON/PNG pairs, writes a hash-bearing hidden commit marker last, cleans stale/failed artifacts, continues later tasks, and maps malformed/text-layout failures to typed log codes; accepted cutoff semantics, the complete status protocol, and exact numeric ingress remain pending.
 5. The deterministic role-inference, four-topology candidate search, renderer-in-loop ranking, and held-out evaluation path have not been implemented.
 6. The Docker build has no project-owned hash-locked wheelhouse or apt-version lock; the direct compatibility pins are an initial baseline.
 
@@ -83,12 +83,20 @@ These are not unresolved internal design choices. They require external facts or
 
 ## Ticket 02 verification record
 
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/renderer -p 'test_*.py' -v` — 12 tests passed.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 40 tests passed.
-- `cd chameleon && ../.venv/bin/python -u -m engine.main` — exit 1 as expected for the current nonconforming baseline: level 1 and level 2 published JSON/PNG pairs (level 2 retained its warning-only off-canvas self-check), while level 3 failed closed with `TEXT_OVERFLOW` and no task artifacts.
-- Coverage includes end-exclusive and overlapping style runs, effective bold-face measurement, letter-spacing wrapping, grapheme-safe unbreakable rejection, Indic and emoji-tag grapheme boundaries, mandatory/non-space line-map breaks, explicit/empty lines, max-lines and line-box overflow, actual positioned glyph bounds, and in-box rectangle/ellipse strokes including subpixel-positive widths.
-- `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — attempted; Docker Desktop resolved the pinned base metadata, then the build timed out after 360s before producing an image. `docker run --rm --network none ...` was not run because no image was produced.
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests/renderer -p 'test_*.py' -v` — 15 tests passed.
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 47 tests passed.
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -u -m engine.main` — exit 1 as expected for the current nonconforming baseline: level 1 and level 2 published JSON/PNG pairs (level 2 retained its warning-only off-canvas self-check), while level 3 failed closed with `TEXT_OVERFLOW` and no task artifacts.
+- Coverage includes end-exclusive and overlapping style runs, malformed range rejection, effective bold-face measurement, letter-spacing wrapping, grapheme-safe unbreakable rejection, exact Unicode 17.0.0 grapheme and line-break property tables, Indic and emoji-tag grapheme boundaries, non-breaking GL/WJ classes, mandatory/non-space line-map breaks, explicit/empty lines, max-lines and line-box overflow, actual positioned glyph bounds, in-box rectangle/ellipse strokes including subpixel-positive widths, renderer-import failure, and pair-publication cleanup.
+- `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — attempted; Docker daemon was unavailable at `/Users/gabegaines/.docker/run/docker.sock`. `docker run --rm --network none ...` was not run.
 - Native-amd64, renderer golden, glyph-bound, and full Stage 1 qualification checks remain pending.
+
+## PR 7 review-fix verification
+
+The hidden `.<stem>_output.commit` marker is pair-commit authority. It records both final filenames and SHA-256 hashes, and is written only after both artifact renames succeed.
+
+- `make verify` — passed.
+- `git diff --check` — passed.
+
 ## Remaining Gate 1 qualification
 
 The following sequence is required for later Gate 1 qualification and is not ticket-01 or ticket-02 evidence:

@@ -29,6 +29,7 @@ from .brand_fonts import load_brand_font_manager
 from .features_stub import make_stub_features
 from .shapes import render_shape
 from .wrap import (
+    MalformedTextError,
     TextOverflowError,
     char_widths,
     enforce_text_limits,
@@ -171,10 +172,22 @@ def _style_maps(
     italic_flags = [base_italic] * content_length
 
     for run_index, run in enumerate(element.get("style_runs") or []):
-        start = int(run.get("start", 0))
-        end = int(run.get("end", 0))
-        if start < 0 or start > end or end > content_length:
-            raise ValueError(
+        try:
+            start, end = run["start"], run["end"]
+        except (KeyError, TypeError) as error:
+            raise MalformedTextError(
+                f"style_runs[{run_index}] must provide integer start and end"
+            ) from error
+        if (
+            isinstance(start, bool)
+            or isinstance(end, bool)
+            or not isinstance(start, int)
+            or not isinstance(end, int)
+            or start < 0
+            or start > end
+            or end > content_length
+        ):
+            raise MalformedTextError(
                 f"style_runs[{run_index}] must satisfy 0 <= start <= end <= content length"
             )
         for index in range(start, end):

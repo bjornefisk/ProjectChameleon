@@ -75,17 +75,16 @@ Read the warning; decide whether it identifies a real problem or, like the
 Level 2 sample's intentionally corner-bleeding decorative circle, an expected
 fixture case.
 
+The hidden `.<stem>_output.commit` marker is written last with both artifact hashes; only marked pairs are committed results.
+
 ## The renderer
 
 `main.py` calls `renderer/converter/convert.py`'s `render_design_to_png()`
 (the integrated converter, wrapping the pinned `cr-renderer` revision)
-to produce each task's PNG — already wired in, no setup needed. It reads
-fonts/assets from `brand_kit/` and writes a real rendered preview, not a
-placeholder. If you ever see plain labeled boxes instead of real text and
-images in `output/*.png`, that means the import in `main.py` failed (e.g.
-`cr-renderer` didn't install — check `requirements.txt` installed cleanly)
-and it silently fell back to the box-and-label placeholder; don't judge
-your layout quality by that fallback.
+to produce each task's PNG. It reads fonts/assets from `brand_kit/` and
+writes a real rendered preview, not a placeholder. If the adapter import or
+render fails, the runner reports `RUNTIME_IO_FAILURE` and publishes neither
+artifact.
 
 ## Docker (how you'll actually be run)
 

@@ -6,6 +6,7 @@ contract validator. Task JSON and PNG files are staged privately and published
 only after both the resize and render paths succeed.
 """
 
+import hashlib
 import json
 import os
 import sys
@@ -16,8 +17,12 @@ from engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
 from engine.resize import resize
 
 try:
-    from renderer.converter.wrap import TextLayoutError as _TextLayoutError
+    from renderer.converter.wrap import (  # type: ignore
+        MalformedTextError as _MalformedTextError,
+        TextLayoutError as _TextLayoutError,
+    )
 except ImportError:
+    _MalformedTextError = None
     _TextLayoutError = None
 
 # Relative to the current working directory, which is /app both inside the
@@ -77,58 +82,56 @@ def self_check(source: dict, output: dict) -> list[str]:
 
 
 def render_to_png(design: dict, assets_dir: Path, png_path: Path) -> None:
-    """Render with the integrated adapter, using the dev fallback only if it is unavailable."""
-    try:
-        from renderer.converter.convert import render_design_to_png  # type: ignore
-    except ImportError:
-        _fallback_render(design, png_path)
-        return
+    """Render with the pinned local adapter."""
+    from renderer.converter.convert import render_design_to_png  # type: ignore
+
     render_design_to_png(design, assets_dir, str(png_path))
 
 
-def _fallback_render(design: dict, png_path: Path) -> None:
-    """Development-only labeled-box preview."""
-    from PIL import Image, ImageDraw
-
-    w, h = design["canvas"]["width"], design["canvas"]["height"]
-    img = Image.new("RGB", (w, h), "#EDE7DD")
-    draw = ImageDraw.Draw(img)
-    palette = {"text": "#2B6CB0", "image": "#B7791F", "shape": "#2F855A"}
-    for el in sorted(design["elements"], key=lambda e: e.get("z_index", 0)):
-        x0, y0 = el["x"], el["y"]
-        x1, y1 = x0 + el["width"], y0 + el["height"]
-        color = palette.get(el["type"], "#555555")
-        draw.rectangle([x0, y0, x1, y1], outline=color, width=3)
-        draw.text((x0 + 4, y0 + 4), el["id"], fill=color)
-    img.save(png_path, format="PNG")
-
-
-def _task_paths(stem: str) -> tuple[Path, Path, Path, Path]:
+def _task_paths(stem: str) -> tuple[Path, Path, Path, Path, Path]:
     return (
         OUTPUT_DIR / f"{stem}_output.json",
         OUTPUT_DIR / f"{stem}_output.png",
         OUTPUT_DIR / f"{stem}_output.json.tmp",
         OUTPUT_DIR / f"{stem}_output.png.tmp",
+        OUTPUT_DIR / f".{stem}_output.commit",
     )
 
 
 def _cleanup_task_paths(stem: str) -> None:
-    for path in _task_paths(stem):
+    paths = _task_paths(stem)
+    for path in (*paths, paths[-1].with_suffix(".commit.tmp")):
         path.unlink(missing_ok=True)
 
 
 def _publish_pair(output: dict, stem: str) -> None:
-    """Stage both artifacts, then publish them as one task-level result."""
-    json_path, png_path, json_tmp, png_tmp = _task_paths(stem)
+    """Stage artifacts, then publish a pair with an atomic commit marker."""
+    json_path, png_path, json_tmp, png_tmp, commit_path = _task_paths(stem)
     _cleanup_task_paths(stem)
+    commit_tmp = commit_path.with_suffix(".commit.tmp")
     try:
         json_tmp.write_text(
             json.dumps(output, indent=2, allow_nan=False),
             encoding="utf-8",
         )
         render_to_png(output, ASSETS_DIR, png_tmp)
+        if not png_tmp.is_file():
+            raise OSError("renderer did not write staged PNG")
+        commit_tmp.write_text(
+            json.dumps(
+                {
+                    "json": json_path.name,
+                    "png": png_path.name,
+                    "json_sha256": hashlib.sha256(json_tmp.read_bytes()).hexdigest(),
+                    "png_sha256": hashlib.sha256(png_tmp.read_bytes()).hexdigest(),
+                },
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
         os.replace(json_tmp, json_path)
         os.replace(png_tmp, png_path)
+        os.replace(commit_tmp, commit_path)
     except Exception:
         _cleanup_task_paths(stem)
         raise
@@ -137,6 +140,8 @@ def _publish_pair(output: dict, stem: str) -> None:
 def _failure_code(error: Exception) -> InfeasibleReasonCode:
     if isinstance(error, InfeasibleLayoutError):
         return error.reason_code
+    if _MalformedTextError is not None and isinstance(error, _MalformedTextError):
+        return InfeasibleReasonCode.MALFORMED_INPUT
     if _TextLayoutError is not None and isinstance(error, _TextLayoutError):
         return InfeasibleReasonCode.TEXT_OVERFLOW
     if isinstance(error, (_MalformedInputError, json.JSONDecodeError, KeyError, TypeError)):

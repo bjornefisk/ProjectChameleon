@@ -9,6 +9,7 @@ from chameleon.renderer.converter.brand_fonts import load_brand_font_manager
 from chameleon.renderer.converter.convert import convert_chameleon_to_crello
 from chameleon.renderer.converter.shapes import render_shape
 from chameleon.renderer.converter.wrap import (
+    MalformedTextError,
     TextOverflowError,
     UnbreakableTextError,
     _grapheme_clusters,
@@ -58,6 +59,10 @@ class RendererConformanceTests(unittest.TestCase):
         self.assertEqual(output["text_color"][0], [red, blue, red, "rgba(255,255,255,1)"])
         self.assertEqual(output["font_bold"][0], [True, True, True, False])
         self.assertEqual(output["font_italic"][0], [False, True, False, False])
+
+    def test_invalid_style_range_is_typed_input_failure(self):
+        with self.assertRaises(MalformedTextError):
+            self.convert_text(style_runs=[{"start": 4, "end": 5}])
 
     def test_style_run_typeface_width_changes_wrapping(self):
         candidates = (
@@ -183,6 +188,11 @@ class RendererConformanceTests(unittest.TestCase):
         self.assertEqual(line_indices, [0, 1, 1, 1])
         self.assertEqual(line_count, 2)
 
+    def test_non_breaking_line_classes_are_not_wrappable(self):
+        for text in ("A\u2007B", "A\u2060B"):
+            with self.assertRaises(UnbreakableTextError):
+                wrap_text(text, [4.0, 0.0, 4.0], 4.0)
+
     def test_grapheme_properties_cover_indic_and_emoji_tag_sequences(self):
         self.assertEqual(
             [(cluster.start, cluster.end) for cluster in _grapheme_clusters("क्a")],
@@ -205,6 +215,20 @@ class RendererConformanceTests(unittest.TestCase):
                 for cluster in _grapheme_clusters("\u1000\u1039\u1001")
             ],
             [(0, 3)],
+        )
+
+    def test_grapheme_zwj_and_prepend_properties_are_exact(self):
+        self.assertEqual(
+            [(cluster.start, cluster.end) for cluster in _grapheme_clusters("👩\u200d🔬")],
+            [(0, 3)],
+        )
+        self.assertEqual(
+            [(cluster.start, cluster.end) for cluster in _grapheme_clusters("\U000111C2A")],
+            [(0, 2)],
+        )
+        self.assertEqual(
+            [(cluster.start, cluster.end) for cluster in _grapheme_clusters("\U000110BEA")],
+            [(0, 1), (1, 2)],
         )
 
     def test_positioned_italic_glyph_bounds_are_hard_limits(self):

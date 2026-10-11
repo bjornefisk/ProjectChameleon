@@ -1,16 +1,28 @@
 """Unicode-safe text measurement and deterministic greedy wrapping."""
 
 from dataclasses import dataclass
-import unicodedata
 from typing import Callable, List, Optional, Sequence, Set, Tuple
 
 import skia  # type: ignore
 
 from cr_renderer.fonts import FontManager
+from .unicode_data import (
+    EAST_ASIAN_WIDTH_RANGES,
+    EXTENDED_PICTOGRAPHIC_RANGES,
+    GENERAL_CATEGORY_RANGES,
+    GRAPHEME_BREAK_RANGES,
+    INDIC_CONJUNCT_BREAK_RANGES,
+    LINE_BREAK_RANGES,
+    property_for,
+)
 
 
 class TextLayoutError(ValueError):
     """Base class for deterministic renderer text-layout failures."""
+
+
+class MalformedTextError(TextLayoutError):
+    """Raised when text metadata violates the renderer input contract."""
 
 
 class UnbreakableTextError(TextLayoutError):
@@ -25,156 +37,6 @@ class TextOverflowError(TextLayoutError):
 class _Cluster:
     start: int
     end: int
-
-
-_BREAK_AFTER = {
-    "-",
-    "\u058a",
-    "\u05be",
-    "\u1400",
-    "\u1806",
-    "\u2010",
-    "\u2012",
-    "\u2013",
-    "\u2e17",
-    "\u2e1a",
-    "\u2e3a",
-    "\u2e3b",
-    "\u301c",
-    "/",
-    "\u2044",
-}
-_OPENING_PUNCTUATION = {
-    "(",
-    "[",
-    "{",
-    "\u2018",
-    "\u201c",
-    "\u3008",
-    "\u300a",
-    "\u300c",
-    "\u300e",
-}
-_CLOSING_PUNCTUATION = {
-    ")",
-    "]",
-    "}",
-    "\u2019",
-    "\u201d",
-    "\u3009",
-    "\u300b",
-    "\u300d",
-    "\u300f",
-}
-
-# These are the Unicode 17.0 Indic_Conjunct_Break values from
-# DerivedCoreProperties.txt, used by UAX #29 GB9c. Keeping the versioned
-# data local avoids adding a runtime Unicode dependency.
-# Source: https://www.unicode.org/Public/17.0.0/ucd/DerivedCoreProperties.txt
-_INCB_LINKERS = frozenset(
-    {
-        0x094D,
-        0x09CD,
-        0x0ACD,
-        0x0B4D,
-        0x0C4D,
-        0x0D4D,
-        0x1039,
-        0x17D2,
-        0x1A60,
-        0x1B44,
-        0x1BAB,
-        0xA9C0,
-        0xAAF6,
-        0x10A3F,
-        0x11133,
-        0x113D0,
-        0x1193E,
-        0x11A47,
-        0x11A99,
-        0x11F42,
-    }
-)
-_INCB_CONSONANT_RANGES = (
-    (0x0915, 0x0939),
-    (0x0958, 0x095F),
-    (0x0978, 0x097F),
-    (0x0995, 0x09A8),
-    (0x09AA, 0x09B0),
-    (0x09B2, 0x09B2),
-    (0x09B6, 0x09B9),
-    (0x09DC, 0x09DD),
-    (0x09DF, 0x09DF),
-    (0x09F0, 0x09F1),
-    (0x0A95, 0x0AA8),
-    (0x0AAA, 0x0AB0),
-    (0x0AB2, 0x0AB3),
-    (0x0AB5, 0x0AB9),
-    (0x0AF9, 0x0AF9),
-    (0x0B15, 0x0B28),
-    (0x0B2A, 0x0B30),
-    (0x0B32, 0x0B33),
-    (0x0B35, 0x0B39),
-    (0x0B5C, 0x0B5D),
-    (0x0B5F, 0x0B5F),
-    (0x0B71, 0x0B71),
-    (0x0C15, 0x0C28),
-    (0x0C2A, 0x0C39),
-    (0x0C58, 0x0C5A),
-    (0x0D15, 0x0D3A),
-    (0x1000, 0x102A),
-    (0x103F, 0x103F),
-    (0x1050, 0x1055),
-    (0x105A, 0x105D),
-    (0x1061, 0x1061),
-    (0x1065, 0x1066),
-    (0x106E, 0x1070),
-    (0x1075, 0x1081),
-    (0x108E, 0x108E),
-    (0x1780, 0x17B3),
-    (0x1A20, 0x1A54),
-    (0x1B0B, 0x1B0C),
-    (0x1B13, 0x1B33),
-    (0x1B45, 0x1B4C),
-    (0x1B83, 0x1BA0),
-    (0x1BAE, 0x1BAF),
-    (0x1BBB, 0x1BBD),
-    (0xA989, 0xA98B),
-    (0xA98F, 0xA9B2),
-    (0xA9E0, 0xA9E4),
-    (0xA9E7, 0xA9EF),
-    (0xA9FA, 0xA9FE),
-    (0xAA60, 0xAA6F),
-    (0xAA71, 0xAA73),
-    (0xAA7A, 0xAA7A),
-    (0xAA7E, 0xAA7F),
-    (0xAAE0, 0xAAEA),
-    (0xABC0, 0xABDA),
-    (0x10A00, 0x10A00),
-    (0x10A10, 0x10A13),
-    (0x10A15, 0x10A17),
-    (0x10A19, 0x10A35),
-    (0x11103, 0x11126),
-    (0x11144, 0x11144),
-    (0x11147, 0x11147),
-    (0x11380, 0x11389),
-    (0x1138B, 0x1138B),
-    (0x1138E, 0x1138E),
-    (0x11390, 0x113B5),
-    (0x11900, 0x11906),
-    (0x11909, 0x11909),
-    (0x1190C, 0x11913),
-    (0x11915, 0x11916),
-    (0x11918, 0x1192F),
-    (0x11A00, 0x11A00),
-    (0x11A0B, 0x11A32),
-    (0x11A50, 0x11A50),
-    (0x11A5C, 0x11A83),
-    (0x11F04, 0x11F10),
-    (0x11F12, 0x11F33),
-)
-_MANDATORY_BREAKS = frozenset("\n\v\f\x85\u2028\u2029")
-_MANDATORY_BREAK_CHARS = _MANDATORY_BREAKS | {"\r"}
 
 
 def char_widths(
@@ -193,60 +55,48 @@ def char_widths(
     return widths[: len(text)]
 
 
+def _grapheme_break_property(char: str) -> str:
+    return property_for(ord(char), GRAPHEME_BREAK_RANGES, "Other")
+
+
 def _is_control(char: str) -> bool:
-    return char in _MANDATORY_BREAK_CHARS or unicodedata.category(char) == "Cc"
+    return _grapheme_break_property(char) in {"Control", "CR", "LF"}
 
 
 def _is_extend(char: str) -> bool:
-    codepoint = ord(char)
-    return (
-        unicodedata.category(char).startswith("M")
-        or char == "\u200c"
-        or 0xFE00 <= codepoint <= 0xFE0F
-        or 0xE0100 <= codepoint <= 0xE01EF
-        or 0x1F3FB <= codepoint <= 0x1F3FF
-        or 0xE0020 <= codepoint <= 0xE007F
-    )
+    return _grapheme_break_property(char) == "Extend"
 
 
 def _is_spacing_mark(char: str) -> bool:
-    return unicodedata.category(char) == "Mc"
+    return _grapheme_break_property(char) == "SpacingMark"
 
 
 def _is_prepend(char: str) -> bool:
-    codepoint = ord(char)
-    return (
-        0x0600 <= codepoint <= 0x0605
-        or codepoint in {0x06DD, 0x070F, 0x0890, 0x0891, 0x08E2, 0x0D4E}
-        or 0x110BD <= codepoint <= 0x110CD
-    )
+    return _grapheme_break_property(char) == "Prepend"
 
 
 def _is_regional_indicator(char: str) -> bool:
-    return 0x1F1E6 <= ord(char) <= 0x1F1FF
+    return _grapheme_break_property(char) == "Regional_Indicator"
 
 
 def _is_extended_pictographic(char: str) -> bool:
-    codepoint = ord(char)
-    return (
-        0x1F000 <= codepoint <= 0x1FAFF
-        or 0x2600 <= codepoint <= 0x27BF
-        or 0x2300 <= codepoint <= 0x23FF
-        or 0x2B00 <= codepoint <= 0x2BFF
-    )
+    return property_for(ord(char), EXTENDED_PICTOGRAPHIC_RANGES, "No") == "Extended_Pictographic"
+
+
+def _indic_conjunct_break_property(char: str) -> str:
+    return property_for(ord(char), INDIC_CONJUNCT_BREAK_RANGES, "None")
 
 
 def _is_incb_linker(char: str) -> bool:
-    return ord(char) in _INCB_LINKERS
+    return _indic_conjunct_break_property(char) == "Linker"
 
 
 def _is_incb_consonant(char: str) -> bool:
-    codepoint = ord(char)
-    return any(start <= codepoint <= end for start, end in _INCB_CONSONANT_RANGES)
+    return _indic_conjunct_break_property(char) == "Consonant"
 
 
 def _is_incb_extend(char: str) -> bool:
-    return _is_extend(char) and not _is_incb_linker(char)
+    return _indic_conjunct_break_property(char) == "Extend"
 
 
 def _joins_indic_conjunct(text: str, cluster_start: int, boundary: int) -> bool:
@@ -284,6 +134,8 @@ def _should_join(text: str, cluster_start: int, boundary: int) -> bool:
     previous = text[boundary - 1]
     current = text[boundary]
 
+    if previous == "\r" and current == "\n":
+        return True
     if _is_control(previous) or _is_control(current):
         return False
 
@@ -296,13 +148,16 @@ def _should_join(text: str, cluster_start: int, boundary: int) -> bool:
     if previous_hangul in {"LVT", "T"} and current_hangul == "T":
         return True
 
-    if _is_extend(current) or _is_spacing_mark(current) or _is_incb_linker(current):
+    if _is_extend(current) or _is_spacing_mark(current) or current == "\u200d":
         return True
     if _is_prepend(previous):
         return True
 
     if previous == "\u200d" and _is_extended_pictographic(current):
-        return any(_is_extended_pictographic(char) for char in text[cluster_start : boundary - 1])
+        index = boundary - 2
+        while index >= cluster_start and _is_extend(text[index]):
+            index -= 1
+        return index >= cluster_start and _is_extended_pictographic(text[index])
 
     if _joins_indic_conjunct(text, cluster_start, boundary):
         return True
@@ -329,14 +184,49 @@ def _grapheme_clusters(text: str) -> List[_Cluster]:
     return clusters
 
 
+def _line_break_property(char: str) -> str:
+    return property_for(ord(char), LINE_BREAK_RANGES, "XX")
+
+
+def _general_category(char: str) -> str:
+    return property_for(ord(char), GENERAL_CATEGORY_RANGES, "Cn")
+
+
+def _east_asian_width(char: str) -> str:
+    return property_for(ord(char), EAST_ASIAN_WIDTH_RANGES, "N")
+
+
+def _resolved_line_break_class(char: str) -> str:
+    value = _line_break_property(char)
+    if value in {"AI", "SG", "XX"}:
+        return "AL"
+    if value == "SA":
+        return "CM" if _general_category(char) in {"Mn", "Mc"} else "AL"
+    if value == "CJ":
+        return "NS"
+    return value
+
+
+def _cluster_line_break_class(value: str) -> str:
+    for index, char in enumerate(value):
+        line_class = _resolved_line_break_class(char)
+        if index and line_class in {"CM", "ZWJ"}:
+            previous_class = _resolved_line_break_class(value[index - 1])
+            if previous_class not in {"BK", "CR", "LF", "NL", "SP", "ZW"}:
+                continue
+        if line_class not in {"CM", "ZWJ"}:
+            return line_class
+    return "AL"
+
+
 def _mandatory_break_ranges(text: str) -> List[Tuple[int, int]]:
     ranges: List[Tuple[int, int]] = []
     index = 0
     while index < len(text):
-        char = text[index]
-        if char == "\r":
-            end = index + 2 if index + 1 < len(text) and text[index + 1] == "\n" else index + 1
-        elif char in _MANDATORY_BREAKS:
+        line_class = _line_break_property(text[index])
+        if line_class == "CR":
+            end = index + 2 if index + 1 < len(text) and _line_break_property(text[index + 1]) == "LF" else index + 1
+        elif line_class in {"BK", "LF", "NL"}:
             end = index + 1
         else:
             index += 1
@@ -347,53 +237,163 @@ def _mandatory_break_ranges(text: str) -> List[Tuple[int, int]]:
 
 
 def _is_break_space(value: str) -> bool:
-    return bool(value) and all(
-        char.isspace() and char not in "\r\n\u00a0\u202f" for char in value
-    )
+    return bool(value) and all(_line_break_property(char) == "SP" for char in value)
 
 
-def _is_ideographic(char: str) -> bool:
-    codepoint = ord(char)
-    return (
-        0x2E80 <= codepoint <= 0x9FFF
-        or 0xF900 <= codepoint <= 0xFAFF
-        or 0x20000 <= codepoint <= 0x323AF
-    )
+def _cluster_has_property(value: str, line_class: str) -> bool:
+    return any(_line_break_property(char) == line_class for char in value)
 
 
-def _line_break_allowed(previous: str, current: str) -> bool:
-    if not previous or not current:
+def _is_east_asian(value: str) -> bool:
+    return any(_east_asian_width(char) in {"F", "W", "H"} for char in value)
+
+
+def _previous_non_space(classes: Sequence[str], index: int) -> Optional[int]:
+    index -= 1
+    while index >= 0 and classes[index] == "SP":
+        index -= 1
+    return index if index >= 0 else None
+
+
+def _next_non_space(classes: Sequence[str], index: int) -> Optional[int]:
+    index += 1
+    while index < len(classes) and classes[index] == "SP":
+        index += 1
+    return index if index < len(classes) else None
+
+
+def _line_break_allowed(
+    classes: Sequence[str], cluster_texts: Sequence[str], boundary: int
+) -> bool:
+    previous_class = classes[boundary - 1]
+    current_class = classes[boundary]
+    previous = cluster_texts[boundary - 1]
+    current = cluster_texts[boundary]
+
+    if current_class in {"BK", "CR", "LF", "NL", "SP", "ZW"}:
         return False
-    previous_char = previous[-1]
-    current_char = current[0]
+    if previous_class in {"BK", "CR", "LF", "NL"}:
+        return False
+    if previous_class == "WJ" or current_class == "WJ":
+        return False
+    if _cluster_has_property(previous, "ZWJ") or _cluster_has_property(current, "ZWJ"):
+        return False
+    if previous_class == "GL":
+        return False
+    if current_class == "GL" and previous_class not in {"SP", "BA", "HY", "HH"}:
+        return False
+
+    previous_non_space = _previous_non_space(classes, boundary)
+    next_non_space = _next_non_space(classes, boundary - 1)
+
+    if current_class in {"CL", "CP", "EX", "SY"}:
+        return False
+    if previous_class == "OP":
+        return False
+    if previous_class == "SP" and previous_non_space is not None:
+        if classes[previous_non_space] == "OP":
+            return False
+    if current_class == "IS":
+        if previous_class == "SP" and next_non_space is not None and classes[next_non_space] == "NU":
+            return True
+        return False
+    if current_class == "NS" and previous_non_space is not None:
+        if classes[previous_non_space] in {"CL", "CP"}:
+            return False
+    if current_class == "B2" and previous_non_space is not None:
+        if classes[previous_non_space] == "B2":
+            return False
+    if previous_class == "QU" or current_class == "QU":
+        return False
+    if previous_class == "CB" or current_class == "CB":
+        return True
+    if previous_class == "SP":
+        return True
+
+    before_previous = (
+        classes[previous_non_space - 1]
+        if previous_non_space is not None and previous_non_space > 0
+        else None
+    )
     if (
-        unicodedata.category(current_char) in {"Pe", "Pf"}
-        or current_char in _CLOSING_PUNCTUATION
-        or current_char in "!?;:,\u3001\u3002"
+        previous_class in {"HY", "HH"}
+        and current_class in {"AL", "HL"}
+        and before_previous in {None, "BK", "CR", "LF", "NL", "SP", "ZW", "CB", "GL"}
+    ):
+        return False
+    if current_class in {"BA", "HH", "HY", "NS"} or previous_class == "BB":
+        return False
+    if previous_class == "SY" and current_class == "HL":
+        return False
+    if previous_class == "HL" and current_class in {"HY", "HH"}:
+        following = next_non_space
+        if following is None or classes[following] != "HL":
+            return False
+    if current_class == "IN":
+        return False
+
+    if (
+        previous_class in {"AL", "HL"} and current_class == "NU"
+        or previous_class == "NU" and current_class in {"AL", "HL"}
     ):
         return False
     if (
-        unicodedata.category(previous_char) in {"Ps", "Pi"}
-        or previous_char in _OPENING_PUNCTUATION
+        previous_class in {"PR", "PO"} and current_class in {"AL", "HL", "NU", "OP"}
+        or previous_class in {"AL", "HL"} and current_class in {"PR", "PO"}
+        or previous_class == "NU" and current_class in {"PR", "PO", "CL", "CP"}
+        or previous_class in {"PR", "PO"} and current_class == "NU"
+        or previous_class in {"HY", "IS", "SY"} and current_class == "NU"
+        or previous_class == "NU" and current_class == "NU"
     ):
         return False
-    if _is_break_space(previous):
-        return True
-    if previous_char in _BREAK_AFTER:
-        return True
-    if _is_ideographic(previous_char) or _is_ideographic(current_char):
-        return True
-    if previous_char == "\u200b":
-        return True
-    return False
+    if (
+        previous_class in {"PR", "PO"} and current_class in {"ID", "EB", "EM"}
+        or previous_class in {"ID", "EB", "EM"} and current_class == "PO"
+    ):
+        return False
+
+    if (
+        previous_class == "JL" and current_class in {"JL", "JV", "H2", "H3"}
+        or previous_class in {"JV", "H2"} and current_class in {"JV", "JT"}
+        or previous_class in {"JT", "H3"} and current_class == "JT"
+    ):
+        return False
+    if (
+        previous_class in {"JL", "JV", "JT", "H2", "H3"} and current_class == "PO"
+        or previous_class == "PR" and current_class in {"JL", "JV", "JT", "H2", "H3"}
+    ):
+        return False
+    if previous_class in {"AL", "HL"} and current_class in {"AL", "HL"}:
+        return False
+    if previous_class == "IS" and current_class in {"AL", "HL"}:
+        return False
+
+    if current_class == "OP" and previous_class in {"AL", "HL", "NU"}:
+        if not _is_east_asian(current):
+            return False
+    if previous_class == "CP" and current_class in {"AL", "HL", "NU"}:
+        if not _is_east_asian(previous):
+            return False
+    if previous_class == "RI" and current_class == "RI":
+        regional_count = 0
+        index = boundary - 1
+        while index >= 0 and classes[index] == "RI":
+            regional_count += 1
+            index -= 1
+        return regional_count % 2 == 0
+    if current_class == "EM" and (
+        previous_class == "EB" or _is_extended_pictographic(previous[0])
+    ):
+        return False
+    return True
 
 
 def _break_boundaries(text: str, clusters: Sequence[_Cluster]) -> Set[int]:
     boundaries: Set[int] = set()
-    for left, right in zip(clusters, clusters[1:]):
-        previous = text[left.start : left.end]
-        current = text[right.start : right.end]
-        if _line_break_allowed(previous, current):
+    cluster_texts = [text[cluster.start : cluster.end] for cluster in clusters]
+    classes = [_cluster_line_break_class(value) for value in cluster_texts]
+    for index, left in enumerate(clusters[:-1]):
+        if _line_break_allowed(classes, cluster_texts, index + 1):
             boundaries.add(left.end)
     return boundaries
 
@@ -401,7 +401,10 @@ def _break_boundaries(text: str, clusters: Sequence[_Cluster]) -> Set[int]:
 def _default_measure(
     widths: Sequence[float], text: str, start: int, end: int, letter_spacing: float
 ) -> float:
-    glyph_count = sum(char not in _MANDATORY_BREAK_CHARS for char in text[start:end])
+    glyph_count = sum(
+        _line_break_property(char) not in {"BK", "CR", "LF", "NL"}
+        for char in text[start:end]
+    )
     return sum(widths[start:end]) + letter_spacing * max(0, glyph_count - 1)
 
 
