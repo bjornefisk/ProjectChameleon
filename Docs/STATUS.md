@@ -3,7 +3,7 @@
 **Date:** 2026-10-09
 
 **Phase:** Ticket 01 and ticket 02 implementations complete; Gate 1 qualification remains pending.
-**Decision status:** Ticket 01 semantic validation and ticket 02 renderer conformance plus fail-closed runner publication have local evidence. Full semantic runner validation, solver, and runtime qualification remain outside this PR.
+**Decision status:** Ticket 01 semantic validation, ticket 02 renderer conformance, and serialized runner artifact validation have local evidence. Cutoff semantics, solver, and runtime qualification remain outside this PR.
 
 ## Ground truth now recorded
 
@@ -48,7 +48,7 @@ These are contract artifacts, not solver or renderer implementation:
 - `chameleon/chameleon_design_schema_v0.9.json` is no longer provisional, accepts empty designs, and records structural ranges/defaults.
 - Contract fixtures live under `chameleon/tests/fixtures/contract/`.
 - The Level 2 public sample's style range is corrected to valid end-exclusive `[6, 15)` semantics; this is fixture/source-data correction, not solver implementation.
-- Ticket 01's semantic validator and contract tests plus ticket 02's renderer adapter/tests are implemented; ticket 02 also stages task JSON/PNG pairs and cleans failed-task artifacts, while full semantic runner validation, cutoff behavior, solver, and full Gate 1 qualification remain pending.
+- Ticket 01's semantic validator and contract tests plus ticket 02's renderer adapter/tests are implemented; the runner now validates serialized JSON and decodable PNG pairs, removes failed-task artifacts, and continues independent tasks, while cutoff semantics, solver, and full Gate 1 qualification remain pending.
 
 ## Known implementation gaps before the solver
 
@@ -57,7 +57,7 @@ These are intentionally visible; none is silently promoted to contract behavior:
 1. `engine/resize.py` is the documented uniform-stretch baseline and violates image-ratio, group, overlap, rotation, and typography rules.
 2. `engine/main.py` has a warning-only self-check that checks unrotated rectangles and ID sets; it is not the contract validator.
 3. The renderer adapter's renderer goldens and native-amd64 qualification remain; ticket 02 closes style-run end handling, Unicode-safe wrapping, letter-spacing/style-width measurement, mandatory/non-space line-map handling, actual positioned glyph-bound rejection, explicit line/max-lines/height enforcement, and rectangle/ellipse stroke rasterization.
-4. `engine/main.py` now stages JSON/PNG pairs, writes a hash-bearing hidden commit marker last, cleans stale/failed artifacts, continues later tasks, and maps malformed/text-layout failures to typed log codes; accepted cutoff semantics, the complete status protocol, and exact numeric ingress remain pending.
+4. `engine/main.py` parses finite JSON decimals exactly, validates serialized response identity/geometry/text rules and decodable PNGs before publication, writes a hash-bearing hidden commit marker last, cleans stale/failed artifacts, continues later tasks, and maps malformed/text-layout failures to typed log codes; accepted cutoff semantics and the complete status protocol remain pending.
 5. The deterministic role-inference, four-topology candidate search, renderer-in-loop ranking, and held-out evaluation path have not been implemented.
 6. The Docker build has no project-owned hash-locked wheelhouse or apt-version lock; the direct compatibility pins are an initial baseline.
 
@@ -83,16 +83,15 @@ These are not unresolved internal design choices. They require external facts or
 
 ## Ticket 02 verification record
 
-- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests/renderer -p 'test_*.py' -v` — 15 tests passed.
-- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 47 tests passed.
-- `cd chameleon && /tmp/chameleon-venv312/bin/python -u -m engine.main` — exit 1 as expected for the current nonconforming baseline: level 1 and level 2 published JSON/PNG pairs (level 2 retained its warning-only off-canvas self-check), while level 3 failed closed with `TEXT_OVERFLOW` and no task artifacts.
-- Coverage includes end-exclusive and overlapping style runs, malformed range rejection, effective bold-face measurement, letter-spacing wrapping, grapheme-safe unbreakable rejection, exact Unicode 17.0.0 grapheme and line-break property tables, Indic and emoji-tag grapheme boundaries, non-breaking GL/WJ classes, mandatory/non-space line-map breaks, explicit/empty lines, max-lines and line-box overflow, actual positioned glyph bounds, in-box rectangle/ellipse strokes including subpixel-positive widths, renderer-import failure, and pair-publication cleanup.
-- `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — attempted; Docker daemon was unavailable at `/Users/gabegaines/.docker/run/docker.sock`. `docker run --rm --network none ...` was not run.
-- Native-amd64, renderer golden, glyph-bound, and full Stage 1 qualification checks remain pending.
+- `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m unittest discover -s tests/renderer -p 'test_*.py' -v` — renderer tests passed.
+- `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 10 runner tests passed, including exact decimal/exponent preservation, non-finite-number rejection, invalid-design, invalid-PNG, interruption, and cleanup-isolation cases.
+- `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 53 tests passed.
+- `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -u -m engine.main` — exit 1 as required for the nonconforming baseline; all three sample tasks logged `MALFORMED_INPUT: serialized response x must be a finite integer`, and no task artifacts were produced beyond `output/.gitkeep`.
+- Docker `linux/amd64`, native-amd64, renderer-golden, and native-library parity checks remain pending.
 
 ## PR 7 review-fix verification
 
-The hidden `.<stem>_output.commit` marker is pair-commit authority. It records both final filenames and SHA-256 hashes, and is written only after both artifact renames succeed.
+The hidden `.<stem>_output.commit` marker is pair-commit authority. It records both final filenames and SHA-256 hashes, and is written only after both final artifact renames succeed; unmarked artifacts are not committed results.
 
 - `make verify` — passed.
 - `git diff --check` — passed.
@@ -111,4 +110,4 @@ docker run --rm --network none \
   chameleon-stage1
 ```
 
-The warning-only baseline self-check, complete semantic runner validator/cutoff protocol, exact numeric ingress, renderer goldens/native-library parity, clean native amd64 run, and solver remain outside this PR.
+The warning-only baseline self-check remains non-authoritative; accepted cutoff/status protocol, renderer goldens/native-library parity, clean native amd64 run, and solver remain outside this PR.

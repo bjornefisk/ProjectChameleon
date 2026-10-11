@@ -11,8 +11,12 @@ import json
 import os
 import sys
 import time
+from decimal import Decimal
 from pathlib import Path
 
+from PIL import Image
+
+from engine.contract import validate_response, validate_source
 from engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
 from engine.resize import resize
 
@@ -40,11 +44,81 @@ REQUIRED_BY_TYPE = {
 
 
 class _MalformedInputError(ValueError):
-    """Raised when JSON contains a non-standard non-finite number token."""
+    """Raised when JSON contains a non-standard or non-finite number."""
 
 
 def _reject_json_constant(value: str) -> None:
     raise _MalformedInputError(f"non-finite JSON constant {value!r} is not allowed")
+
+
+def _load_task(task_path: Path) -> dict:
+    """Decode a task without converting decimal JSON tokens to binary floats."""
+    return json.loads(
+        task_path.read_text(encoding="utf-8"),
+        parse_int=int,
+        parse_float=Decimal,
+        parse_constant=_reject_json_constant,
+    )
+
+
+def _serialize_json(value: object) -> str:
+    """Serialize JSON while preserving Decimal tokens without binary floats."""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, Decimal):
+        if not value.is_finite():
+            raise _MalformedInputError("non-finite Decimal cannot be serialized")
+        return str(value)
+    if isinstance(value, float):
+        try:
+            return json.dumps(value, allow_nan=False)
+        except ValueError as error:
+            raise _MalformedInputError("non-finite float cannot be serialized") from error
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    if isinstance(value, dict):
+        fields = [
+            f"{_serialize_json(str(key))}:{_serialize_json(child)}"
+            for key, child in value.items()
+        ]
+        return "{" + ",".join(fields) + "}"
+    if isinstance(value, (list, tuple)):
+        return "[" + ",".join(_serialize_json(child) for child in value) + "]"
+    raise TypeError(f"value of type {type(value).__name__} is not JSON serializable")
+
+
+def _serialized_output(
+    source: dict, target_canvas: dict, output: dict
+) -> tuple[str, dict]:
+    """Return JSON text and validate the exact values that will be rendered."""
+    serialized = _serialize_json(output)
+    wire_output = json.loads(
+        serialized,
+        parse_int=int,
+        parse_float=Decimal,
+        parse_constant=_reject_json_constant,
+    )
+    validate_response(source, target_canvas, wire_output)
+    return serialized, wire_output
+
+
+def _validate_staged_png(png_path: Path) -> None:
+    """Require a decodable PNG before it becomes a committed artifact."""
+    if not png_path.is_file():
+        raise OSError("renderer did not write staged PNG")
+    try:
+        with Image.open(png_path) as image:
+            if image.format != "PNG":
+                raise OSError(f"renderer wrote {image.format or 'unknown'} instead of PNG")
+            image.verify()
+        with Image.open(png_path) as image:
+            image.load()
+    except Exception as error:
+        raise OSError(f"staged PNG is not a valid decodable PNG: {error}") from error
 
 
 def self_check(source: dict, output: dict) -> list[str]:
@@ -104,19 +178,20 @@ def _cleanup_task_paths(stem: str) -> None:
         path.unlink(missing_ok=True)
 
 
-def _publish_pair(output: dict, stem: str) -> None:
-    """Stage artifacts, then publish a pair with an atomic commit marker."""
+def _publish_pair(
+    source: dict, target_canvas: dict, output: dict, stem: str
+) -> None:
+    """Stage and validate a logical JSON/PNG pair before committing it."""
     json_path, png_path, json_tmp, png_tmp, commit_path = _task_paths(stem)
-    _cleanup_task_paths(stem)
     commit_tmp = commit_path.with_suffix(".commit.tmp")
     try:
-        json_tmp.write_text(
-            json.dumps(output, indent=2, allow_nan=False),
-            encoding="utf-8",
+        _cleanup_task_paths(stem)
+        serialized, serialized_output = _serialized_output(
+            source, target_canvas, output
         )
-        render_to_png(output, ASSETS_DIR, png_tmp)
-        if not png_tmp.is_file():
-            raise OSError("renderer did not write staged PNG")
+        json_tmp.write_text(serialized, encoding="utf-8")
+        render_to_png(serialized_output, ASSETS_DIR, png_tmp)
+        _validate_staged_png(png_tmp)
         commit_tmp.write_text(
             json.dumps(
                 {
@@ -132,8 +207,11 @@ def _publish_pair(output: dict, stem: str) -> None:
         os.replace(json_tmp, json_path)
         os.replace(png_tmp, png_path)
         os.replace(commit_tmp, commit_path)
-    except Exception:
-        _cleanup_task_paths(stem)
+    except BaseException:
+        try:
+            _cleanup_task_paths(stem)
+        except Exception:
+            pass
         raise
 
 
@@ -159,27 +237,36 @@ def main() -> int:
     exit_code = 0
     for task_path in task_files:
         stem = task_path.stem
-        _cleanup_task_paths(stem)
         try:
-            task = json.loads(
-                task_path.read_text(encoding="utf-8"),
-                parse_constant=_reject_json_constant,
-            )
+            _cleanup_task_paths(stem)
+            task = _load_task(task_path)
             source, target_canvas = task["source"], task["target_canvas"]
+            validate_source(source)
 
             t0 = time.monotonic()
             output = resize(source, target_canvas)
             elapsed = time.monotonic() - t0
             problems = self_check(source, output)
-            _publish_pair(output, stem)
+            _publish_pair(source, target_canvas, output, stem)
         except Exception as error:
             exit_code = 1
-            _cleanup_task_paths(stem)
-            code = _failure_code(error)
-            print(
-                f"[{task_path.name}] {code.value}: {error}",
-                file=sys.stderr,
-            )
+            cleanup_error = None
+            try:
+                _cleanup_task_paths(stem)
+            except Exception as cleanup_exception:
+                cleanup_error = cleanup_exception
+            if cleanup_error is not None:
+                print(
+                    f"[{task_path.name}] {InfeasibleReasonCode.RUNTIME_IO_FAILURE.value}: "
+                    f"{error}; cleanup failed: {cleanup_error}",
+                    file=sys.stderr,
+                )
+            else:
+                code = _failure_code(error)
+                print(
+                    f"[{task_path.name}] {code.value}: {error}",
+                    file=sys.stderr,
+                )
             continue
 
         status = "OK" if not problems else f"{len(problems)} self-check warning(s)"

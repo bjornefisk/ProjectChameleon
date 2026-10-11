@@ -4,8 +4,11 @@ import json
 import sys
 import tempfile
 import unittest
+from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
+
+from PIL import Image
 
 PROJECT_ROOT = Path(__file__).parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -13,10 +16,20 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from chameleon.renderer.converter.wrap import MalformedTextError
 
 from engine import main
-from engine.errors import InfeasibleReasonCode
+from engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
 
 
 class RunnerPublicationTests(unittest.TestCase):
+    @staticmethod
+    def _empty_request():
+        source = {"canvas": {"width": 1, "height": 1}, "elements": []}
+        target = {"width": 1, "height": 1}
+        return source, target
+
+    @staticmethod
+    def _write_png(path):
+        Image.new("RGBA", (1, 1), (0, 0, 0, 0)).save(path, format="PNG")
+
     def test_malformed_text_maps_to_malformed_input(self):
         with patch.object(main, "_MalformedTextError", MalformedTextError):
             self.assertEqual(
@@ -24,16 +37,28 @@ class RunnerPublicationTests(unittest.TestCase):
                 InfeasibleReasonCode.MALFORMED_INPUT,
             )
 
+    def test_task_decoder_preserves_exponents_and_rejects_nonfinite_numbers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            task_path = Path(directory) / "task.json"
+            task_path.write_text('{"value":1.25e+3}', encoding="utf-8")
+            task = main._load_task(task_path)
+            self.assertEqual(task["value"], Decimal("1.25e+3"))
+
+            task_path.write_text('{"value":NaN}', encoding="utf-8")
+            with self.assertRaises(main._MalformedInputError):
+                main._load_task(task_path)
+
     def test_publish_pair_commits_marker_with_both_hashes(self):
-        output = {"canvas": {"width": 1, "height": 1}, "elements": []}
+        source, target = self._empty_request()
+        output = {"canvas": target, "elements": []}
         with tempfile.TemporaryDirectory() as directory:
             output_dir = Path(directory)
             with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
                 main,
                 "render_to_png",
-                side_effect=lambda _design, _assets, path: Path(path).write_bytes(b"png"),
+                side_effect=lambda _design, _assets, path: self._write_png(path),
             ):
-                main._publish_pair(output, "task")
+                main._publish_pair(source, target, output, "task")
 
             json_path = output_dir / "task_output.json"
             png_path = output_dir / "task_output.png"
@@ -49,26 +74,160 @@ class RunnerPublicationTests(unittest.TestCase):
                 commit["png_sha256"], hashlib.sha256(png_path.read_bytes()).hexdigest()
             )
 
+    def test_decimal_immutable_tokens_survive_pair_serialization(self):
+        opacity = Decimal("0.1234567890123456789")
+        source = {
+            "canvas": {"width": 1, "height": 1},
+            "elements": [
+                {
+                    "id": "shape",
+                    "type": "shape",
+                    "x": 0,
+                    "y": 0,
+                    "width": 1,
+                    "height": 1,
+                    "opacity": opacity,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(0,0,0,1)",
+                }
+            ],
+        }
+        target = {"width": 1, "height": 1}
+        output = {"canvas": target, "elements": [dict(source["elements"][0])]}
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
+                main,
+                "render_to_png",
+                side_effect=lambda _design, _assets, path: self._write_png(path),
+            ):
+                main._publish_pair(source, target, output, "task")
+
+            wire = json.loads(
+                (output_dir / "task_output.json").read_text(encoding="utf-8"),
+                parse_float=Decimal,
+            )
+            self.assertEqual(wire["elements"][0]["opacity"], opacity)
+
+    def test_invalid_design_is_not_committed_or_rendered(self):
+        source, target = self._empty_request()
+        output = {
+            "canvas": target,
+            "elements": [
+                {
+                    "id": "unexpected",
+                    "type": "shape",
+                    "x": 0,
+                    "y": 0,
+                    "width": 1,
+                    "height": 1,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(0,0,0,1)",
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
+                main, "render_to_png"
+            ) as render:
+                with self.assertRaises(InfeasibleLayoutError):
+                    main._publish_pair(source, target, output, "task")
+                render.assert_not_called()
+            self.assertEqual(list(output_dir.iterdir()), [])
+
+    def test_invalid_png_is_not_committed(self):
+        source, target = self._empty_request()
+        output = {"canvas": target, "elements": []}
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
+                main,
+                "render_to_png",
+                side_effect=lambda _design, _assets, path: Path(path).write_bytes(
+                    b"not-a-png"
+                ),
+            ):
+                with self.assertRaises(OSError):
+                    main._publish_pair(source, target, output, "task")
+            self.assertEqual(list(output_dir.iterdir()), [])
+
     def test_failed_commit_removes_uncommitted_pair(self):
-        output = {"canvas": {"width": 1, "height": 1}, "elements": []}
+        source, target = self._empty_request()
+        output = {"canvas": target, "elements": []}
         with tempfile.TemporaryDirectory() as directory:
             output_dir = Path(directory)
             real_replace = main.os.replace
 
-            def fail_commit_marker(source, destination):
+            def fail_commit_marker(source_path, destination):
                 if Path(destination).name == ".task_output.commit":
                     raise OSError("commit marker failure")
-                return real_replace(source, destination)
+                return real_replace(source_path, destination)
 
             with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
                 main,
                 "render_to_png",
-                side_effect=lambda _design, _assets, path: Path(path).write_bytes(b"png"),
+                side_effect=lambda _design, _assets, path: self._write_png(path),
             ), patch.object(main.os, "replace", side_effect=fail_commit_marker):
                 with self.assertRaises(OSError):
-                    main._publish_pair(output, "task")
+                    main._publish_pair(source, target, output, "task")
 
             self.assertEqual(list(output_dir.iterdir()), [])
+
+    def test_interrupt_after_first_rename_removes_uncommitted_pair(self):
+        source, target = self._empty_request()
+        output = {"canvas": target, "elements": []}
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            real_replace = main.os.replace
+
+            def interrupt_after_json(source_path, destination):
+                real_replace(source_path, destination)
+                if Path(destination).name == "task_output.json":
+                    raise KeyboardInterrupt("simulated interruption")
+
+            with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
+                main,
+                "render_to_png",
+                side_effect=lambda _design, _assets, path: self._write_png(path),
+            ), patch.object(main.os, "replace", side_effect=interrupt_after_json):
+                with self.assertRaises(KeyboardInterrupt):
+                    main._publish_pair(source, target, output, "task")
+
+            self.assertEqual(list(output_dir.iterdir()), [])
+
+    def test_cleanup_failure_does_not_stop_later_tasks(self):
+        task = {
+            "source": {"canvas": {"width": 1, "height": 1}, "elements": []},
+            "target_canvas": {"width": 1, "height": 1},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            input_dir = root / "input"
+            output_dir = root / "output"
+            input_dir.mkdir()
+            output_dir.mkdir()
+            (input_dir / "first.json").write_text(json.dumps(task), encoding="utf-8")
+            (input_dir / "second.json").write_text(json.dumps(task), encoding="utf-8")
+            (output_dir / "first_output.json").mkdir()
+
+            with patch.object(main, "INPUT_DIR", input_dir), patch.object(
+                main, "OUTPUT_DIR", output_dir
+            ), patch.object(
+                main,
+                "resize",
+                return_value={"canvas": {"width": 1, "height": 1}, "elements": []},
+            ), patch.object(
+                main,
+                "render_to_png",
+                side_effect=lambda _design, _assets, path: self._write_png(path),
+            ):
+                result = main.main()
+
+            self.assertEqual(result, 1)
+            self.assertTrue((output_dir / "second_output.json").is_file())
+            self.assertTrue((output_dir / "second_output.png").is_file())
+            self.assertTrue((output_dir / ".second_output.commit").is_file())
 
     def test_missing_renderer_fails_instead_of_writing_placeholder(self):
         with tempfile.TemporaryDirectory() as directory:
