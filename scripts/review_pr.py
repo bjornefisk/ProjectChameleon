@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import platform
 import shlex
 import shutil
 import subprocess
@@ -18,6 +19,7 @@ import sys
 import tarfile
 import tempfile
 import time
+import uuid
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,17 +30,33 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TIMEOUT = 300
 GH_TIMEOUT = 60
 CONTRACT_SOURCES = (
+    "AGENTS.md",
     "Docs/PROJECT_CONTRACT.md",
     "Docs/DECISIONS/ADR-001-source-of-truth-hierarchy.md",
     "Docs/DECISIONS/ADR-002-stage-1-schema-renderer.md",
     "Docs/DECISIONS/ADR-003-hard-constraints-and-fallback.md",
     "Docs/DECISIONS/ADR-004-stage-1-runtime.md",
     "Docs/DECISIONS/ADR-005-separate-stage-1-from-finale.md",
+    "Docs/DECISIONS/ADR-006-failure-protocol-and-search-status.md",
+    "Docs/DECISIONS/ADR-007-numeric-and-geometry-semantics.md",
+    "Docs/DECISIONS/ADR-008-typography-and-renderer-edge-semantics.md",
+    "Docs/DECISIONS/ADR-009-initial-search-strategy.md",
+    "Docs/FINAL_ARCHITECTURE.md",
     "chameleon/chameleon_design_schema_v0.9.json",
     "Docs/DEPENDENCY_EVIDENCE.md",
     "Docs/STATUS.md",
     "Docs/IMPLEMENTATION_ROADMAP.md",
-    "Docs/AGENTS/PR_REVIEW_AGENT.md",
+    ".agents/README.md",
+    ".agents/OPERATING_CONTRACT.md",
+    ".agents/PROJECT_PROFILE.md",
+    ".agents/TOOLING.md",
+    ".agents/policies/authority.md",
+    ".agents/policies/evidence.md",
+    ".agents/roles/reviewer.md",
+    ".agents/workflows/06-review.md",
+    ".agents/workflows/07-github-pr.md",
+    ".agents/checklists/review.md",
+    ".agents/templates/review.md",
 )
 
 
@@ -145,6 +163,8 @@ def run_gh_json(
         )
     except subprocess.TimeoutExpired as error:
         raise ReviewError(f"timed out after {timeout}s: {shlex.join(command)}") from error
+    except OSError as error:
+        raise ReviewError(f"cannot run {shlex.join(command)}: {error}") from error
     if completed.returncode != 0:
         raise ReviewError(completed.stderr.strip() or shlex.join(command))
     try:
@@ -156,18 +176,21 @@ def run_gh_json(
     return value
 
 
-def git_output(*args: str, cwd: Path = ROOT) -> str:
-    completed = subprocess.run(
-        ["git", *args],
-        cwd=cwd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        check=False,
-    )
+def git_output(*args: str, cwd: Path = ROOT, strip: bool = True) -> str:
+    try:
+        completed = subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+    except OSError as error:
+        raise ReviewError(f"cannot run git {shlex.join(args)}: {error}") from error
     if completed.returncode != 0:
         raise ReviewError(completed.stderr.strip() or shlex.join(["git", *args]))
-    return completed.stdout.strip()
+    return completed.stdout.strip() if strip else completed.stdout
 
 
 def ensure_file(path: Path) -> None:
@@ -204,9 +227,19 @@ def changed_contract_sources(changed_files: Iterable[str]) -> list[str]:
         )
     return list(dict.fromkeys(sources))
 
+def missing_contract_sources(root: Path, sources: Iterable[str]) -> list[str]:
+    missing = []
+    for source in sources:
+        path = source.split(" §", 1)[0]
+        if not (root / path).is_file():
+            missing.append(source)
+    return missing
+
 
 def write_text(path: Path, content: str) -> None:
-    path.write_text(content.rstrip() + "\n", encoding="utf-8")
+    if not content.endswith("\n"):
+        content += "\n"
+    path.write_text(content, encoding="utf-8")
 
 
 def create_checkout(head_sha: str, checkout: Path) -> None:
@@ -301,6 +334,7 @@ def make_summary(
     changed_files: list[str],
     checks: list[CheckResult],
     contract_sources: list[str],
+    provenance: Mapping[str, str] | None = None,
 ) -> Path:
     if any(check.status == "FAIL" for check in checks):
         overall = "FAIL"
@@ -308,6 +342,7 @@ def make_summary(
         overall = "INCOMPLETE"
     else:
         overall = "PASS"
+    provenance = dict(provenance or {})
     lines = [
         "# PR review capsule",
         "",
@@ -318,9 +353,39 @@ def make_summary(
         f"- Head: `{head_sha}`",
         f"- Generated: {datetime.now(timezone.utc).isoformat()}",
         "",
-        "## Changed files",
+        "## Provenance",
         "",
     ]
+    for key in (
+        "run_id",
+        "capsule_revision",
+        "role",
+        "workflow",
+        "gate",
+        "environment",
+        "validation",
+        "contract_sources",
+        "next_owner",
+    ):
+        value = provenance.get(key)
+        if value:
+            label = key.replace("_", " ").title()
+            lines.append(f"- {label}: `{value}`")
+    lines.extend(
+        [
+            "",
+            "## Evidence files",
+            "",
+            "- `diff.patch` — raw diff; inspect affected paths only.",
+            "- `diff-stat.txt` — compact change-size summary.",
+            "- `changed-files.txt` — review scope.",
+            "- `commits.txt` — commit subjects.",
+            "- `checks.json` and `*.log` — machine-readable statuses and bounded output.",
+            "",
+            "## Changed files",
+            "",
+        ]
+    )
     lines.extend(f"- `{path}`" for path in changed_files)
     lines.extend(["", "## Contract pointers", ""])
     lines.extend(f"- `{source}`" for source in contract_sources)
@@ -334,7 +399,15 @@ def make_summary(
         ]
     )
     for check in checks:
-        log = f"`{check.log}`" if check.log else "—"
+        if check.log:
+            log_path = Path(check.log)
+            try:
+                log_path = log_path.relative_to(report_dir)
+            except ValueError:
+                pass
+            log = f"`{log_path}`"
+        else:
+            log = "—"
         lines.append(
             f"| `{check.name}` | **{check.status}** | {check.duration_seconds:.3f} | {log} |"
         )
@@ -345,8 +418,8 @@ def make_summary(
             "",
             "## Manual review boundary",
             "",
-            "Interpret the contract, inspect the diff, judge severity, and write review comments manually.",
-            "This capsule does not approve, reject, or infer correctness.",
+            "Interpret contract, inspect diff, judge severity, and write review comments manually.",
+            "Capsule does not approve, reject, or infer correctness.",
         ]
     )
     summary_path = report_dir / "summary.md"
@@ -423,47 +496,76 @@ def resolve_repository(repo: str | None) -> str:
         )
     except subprocess.TimeoutExpired as error:
         raise ReviewError(f"timed out after {GH_TIMEOUT}s: {shlex.join(command)}") from error
+    except OSError as error:
+        raise ReviewError(f"cannot run {shlex.join(command)}: {error}") from error
     if completed.returncode != 0 or not completed.stdout.strip():
         raise ReviewError(completed.stderr.strip() or "cannot resolve GitHub repository")
     return completed.stdout.strip()
 
 
-def fetch_pr_refs(pr: int, base_ref: str, repository: str) -> None:
+def fetch_pr_refs(
+    pr: int,
+    base_ref_name: str,
+    repository: str,
+    namespace: str | None = None,
+) -> tuple[str, str]:
     remote_url = f"https://github.com/{repository}.git"
+    namespace = namespace or f"pr-{pr}-{uuid.uuid4().hex}"
+    head_ref = f"refs/review-capsule/{namespace}/head"
+    base_ref = f"refs/review-capsule/{namespace}/base"
     commands = (
         [
             "git",
             "fetch",
             "--no-tags",
             remote_url,
-            f"+refs/pull/{pr}/head:refs/remotes/origin/pr/{pr}",
+            f"+refs/pull/{pr}/head:{head_ref}",
         ],
         [
             "git",
             "fetch",
             "--no-tags",
             remote_url,
-            f"+refs/heads/{base_ref}:refs/remotes/origin/{base_ref}",
+            f"+refs/heads/{base_ref_name}:{base_ref}",
         ],
     )
     environment = os.environ.copy()
     environment["GIT_TERMINAL_PROMPT"] = "0"
-    for command in commands:
+    try:
+        for command in commands:
+            try:
+                completed = subprocess.run(
+                    command,
+                    cwd=ROOT,
+                    env=environment,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=GH_TIMEOUT,
+                    check=False,
+                )
+            except subprocess.TimeoutExpired as error:
+                raise ReviewError(
+                    f"timed out after {GH_TIMEOUT}s: {shlex.join(command)}"
+                ) from error
+            except OSError as error:
+                raise ReviewError(
+                    f"cannot run {shlex.join(command)}: {error}"
+                ) from error
+            if completed.returncode != 0:
+                raise ReviewError(completed.stderr.strip() or shlex.join(command))
+    except ReviewError:
+        delete_review_refs((head_ref, base_ref))
+        raise
+    return head_ref, base_ref
+
+
+def delete_review_refs(refs: Iterable[str]) -> None:
+    for ref in refs:
         try:
-            completed = subprocess.run(
-                command,
-                cwd=ROOT,
-                env=environment,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                timeout=GH_TIMEOUT,
-                check=False,
-            )
-        except subprocess.TimeoutExpired as error:
-            raise ReviewError(f"timed out after {GH_TIMEOUT}s: {shlex.join(command)}") from error
-        if completed.returncode != 0:
-            raise ReviewError(completed.stderr.strip() or shlex.join(command))
+            git_output("update-ref", "-d", ref)
+        except ReviewError:
+            continue
 
 
 def submit_review(
@@ -489,27 +591,15 @@ def submit_review(
     expected = "CHANGES_REQUESTED" if mode == "request-changes" else None
     result = run_check("submit-review", command, ROOT, report_dir, timeout)
     if result.status != "PASS":
-        if result.returncode is not None or expected is None:
+        if result.reason and "timeout" in result.reason.lower():
             result.reason = (
-                f"{result.reason or 'submission failed'}; inspect GitHub before retrying"
+                f"{result.reason}; submission outcome indeterminate; "
+                "inspect GitHub before retrying"
             )
-            return result
-        try:
-            verification = run_gh_json(
-                ["gh", "pr", "view", str(pr), "--repo", repo, "--json", "reviewDecision"],
-                timeout=timeout,
-            )
-        except ReviewError as error:
-            result.reason = f"review outcome unknown; verification failed: {error}; do not retry"
-            return result
-        actual = verification.get("reviewDecision")
-        if actual == expected:
-            result.status = "PASS"
-            result.reason = "submission timed out; requested state verified; do not retry"
         else:
             result.reason = (
-                f"review outcome unknown; expected reviewDecision={expected}, got {actual!r}; "
-                "do not retry"
+                f"{result.reason or 'submission failed'}; "
+                "submission not confirmed; inspect GitHub before retrying"
             )
         return result
 
@@ -542,6 +632,7 @@ def main() -> int:
     checks: list[CheckResult] = []
     checkout = report_dir / "checkout"
     checkout_created = False
+    review_refs: tuple[str, ...] = ()
     metadata: dict
 
     try:
@@ -562,14 +653,18 @@ def main() -> int:
         metadata["repository"] = repository
         base_sha = str(metadata["baseRefOid"])
         head_sha = str(metadata["headRefOid"])
-        fetch_pr_refs(args.pr, str(metadata["baseRefName"]), repository)
-        if git_output("rev-parse", f"refs/remotes/origin/pr/{args.pr}") != head_sha:
+        head_ref, base_ref = fetch_pr_refs(args.pr, str(metadata["baseRefName"]), repository)
+        review_refs = (head_ref, base_ref)
+        if git_output("rev-parse", head_ref) != head_sha:
             raise ReviewError("fetched PR head does not match GitHub head SHA")
-        if git_output("rev-parse", f"{base_sha}^{{commit}}") != base_sha:
-            raise ReviewError("GitHub base SHA is unavailable locally")
+        if git_output("rev-parse", base_ref) != base_sha:
+            raise ReviewError("fetched PR base does not match GitHub base SHA")
 
         diff_range = f"{base_sha}...{head_sha}"
-        write_text(report_dir / "diff.patch", git_output("diff", "--no-ext-diff", diff_range))
+        write_text(
+            report_dir / "diff.patch",
+            git_output("diff", "--no-ext-diff", diff_range, strip=False),
+        )
         write_text(report_dir / "diff-stat.txt", git_output("diff", "--stat", diff_range))
         write_text(report_dir / "changed-files.txt", git_output("diff", "--name-only", diff_range))
         write_text(report_dir / "commits.txt", git_output("log", "--oneline", f"{base_sha}..{head_sha}"))
@@ -579,8 +674,45 @@ def main() -> int:
             if line
         ]
         contract_sources = changed_contract_sources(changed_files)
+        capsule_revision = git_output("rev-parse", "HEAD")
         create_checkout(head_sha, checkout)
         checkout_created = True
+        missing_sources = missing_contract_sources(checkout, contract_sources)
+        if missing_sources:
+            checks.append(
+                skipped(
+                    "contract-sources",
+                    ["canonical-contract-sources"],
+                    "missing from PR checkout: " + ", ".join(missing_sources),
+                )
+            )
+        else:
+            checks.append(
+                CheckResult(
+                    "contract-sources",
+                    "PASS",
+                    0.0,
+                    ["canonical-contract-sources"],
+                    returncode=0,
+                )
+            )
+        provenance = {
+            "run_id": report_dir.name,
+            "capsule_revision": capsule_revision,
+            "role": ".agents/roles/reviewer.md",
+            "workflow": ".agents/workflows/06-review.md; .agents/workflows/07-github-pr.md",
+            "gate": "Gate 1: renderer and validator qualification before solver",
+            "environment": f"{platform.python_implementation()} {platform.python_version()} on {platform.platform()}",
+            "validation": (
+                "PR code execution requested; inspect check statuses"
+                if args.run_checks
+                else "PR code execution disabled by default"
+            ),
+            "contract_sources": (
+                "complete" if not missing_sources else "incomplete"
+            ),
+            "next_owner": "independent reviewer",
+        }
 
         if not args.run_checks:
             reason = "not requested; PR code execution is disabled by default"
@@ -648,6 +780,10 @@ def main() -> int:
         if args.submit != "none":
             checks.append(submit_review(args.pr, repository, args.submit, body_file, report_dir, args.timeout))
 
+        write_text(
+            report_dir / "checks.json",
+            json.dumps([asdict(check) for check in checks], indent=2),
+        )
         summary_path = make_summary(
             report_dir,
             metadata,
@@ -656,8 +792,8 @@ def main() -> int:
             changed_files,
             checks,
             contract_sources,
+            provenance,
         )
-        write_text(report_dir / "checks.json", json.dumps([asdict(check) for check in checks], indent=2))
         print(f"report: {summary_path}")
         for check in checks:
             print(f"{check.status:4} {check.name}")
@@ -666,12 +802,13 @@ def main() -> int:
         if any(check.status == "SKIP" for check in checks):
             return 2
         return 0
-    except (ReviewError, subprocess.CalledProcessError) as error:
+    except (ReviewError, OSError, subprocess.CalledProcessError) as error:
         write_text(report_dir / "error.txt", str(error))
         print(f"error: {error}", file=sys.stderr)
         print(f"report: {report_dir}", file=sys.stderr)
         return 2
     finally:
+        delete_review_refs(review_refs)
         if checkout_created:
             shutil.rmtree(checkout, ignore_errors=True)
 
