@@ -12,6 +12,7 @@ from chameleon.renderer.converter.wrap import (
     TextOverflowError,
     UnbreakableTextError,
     _grapheme_clusters,
+    char_widths,
     wrap_text,
     wrap_text_with_line_map,
 )
@@ -59,15 +60,39 @@ class RendererConformanceTests(unittest.TestCase):
         self.assertEqual(output["font_italic"][0], [False, True, False, False])
 
     def test_style_run_typeface_width_changes_wrapping(self):
-        plain = self.convert_text(content="HH HH", width=74, height=100)
+        content = "HH HH"
+        regular_width = sum(
+            char_widths(
+                self.font_manager,
+                "Solstice Sans",
+                "regular",
+                "regular",
+                24,
+                content,
+            )
+        )
+        bold_width = sum(
+            char_widths(
+                self.font_manager,
+                "Solstice Sans",
+                "bold",
+                "bold",
+                24,
+                content,
+            )
+        )
+        self.assertGreater(bold_width, regular_width)
+        width = (regular_width + bold_width) / 2
+
+        plain = self.convert_text(content=content, width=width, height=100)
         styled = self.convert_text(
-            content="HH HH",
-            width=74,
+            content=content,
+            width=width,
             height=100,
-            style_runs=[{"start": 0, "end": 5, "font_weight": "bold"}],
+            style_runs=[{"start": 0, "end": len(content), "font_weight": "bold"}],
         )
 
-        self.assertEqual(plain["text"][0], "HH HH")
+        self.assertEqual(plain["text"][0], content)
         self.assertEqual(styled["text"][0], "HH\nHH")
 
     def test_letter_spacing_participates_in_greedy_wrapping(self):
