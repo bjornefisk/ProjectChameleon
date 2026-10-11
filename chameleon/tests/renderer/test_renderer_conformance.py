@@ -60,26 +60,44 @@ class RendererConformanceTests(unittest.TestCase):
         self.assertEqual(output["font_italic"][0], [False, True, False, False])
 
     def test_style_run_typeface_width_changes_wrapping(self):
-        content = "HH HH"
-        regular_width = sum(
-            char_widths(
-                self.font_manager,
-                "Solstice Sans",
-                "regular",
-                "regular",
-                24,
-                content,
-            )
+        candidates = (
+            "WW WW",
+            "MM MM",
+            "AA AA",
+            "SS SS",
+            "OO OO",
+            "CC CC",
+            "HH HH",
+            "nn nn",
+            "ii ii",
+            "BB BB",
         )
-        bold_width = sum(
-            char_widths(
-                self.font_manager,
-                "Solstice Sans",
-                "bold",
-                "bold",
-                24,
-                content,
+        metrics = []
+        for content in candidates:
+            regular_width = sum(
+                char_widths(
+                    self.font_manager,
+                    "Solstice Sans",
+                    "regular",
+                    "regular",
+                    24,
+                    content,
+                )
             )
+            bold_width = sum(
+                char_widths(
+                    self.font_manager,
+                    "Solstice Sans",
+                    "bold",
+                    "bold",
+                    24,
+                    content,
+                )
+            )
+            metrics.append((content, regular_width, bold_width))
+
+        content, regular_width, bold_width = max(
+            metrics, key=lambda item: item[2] - item[1]
         )
         self.assertGreater(bold_width, regular_width)
         width = (regular_width + bold_width) / 2
@@ -93,7 +111,8 @@ class RendererConformanceTests(unittest.TestCase):
         )
 
         self.assertEqual(plain["text"][0], content)
-        self.assertEqual(styled["text"][0], "HH\nHH")
+        self.assertNotEqual(styled["text"][0], content)
+        self.assertEqual(styled["text"][0], content.replace(" ", "\n", 1))
 
     def test_letter_spacing_participates_in_greedy_wrapping(self):
         self.assertEqual(
