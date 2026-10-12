@@ -1,3 +1,4 @@
+import os
 import sys
 import tempfile
 import unittest
@@ -153,14 +154,48 @@ class ReviewCapsuleTests(unittest.TestCase):
                 32 + len(review_pr.LOG_TRUNCATION_MARKER),
             )
 
-    def test_checkout_python_does_not_use_caller_environment(self):
+    def test_resolve_runner_python_requires_executable_path(self):
         with tempfile.TemporaryDirectory() as directory:
-            checkout = Path(directory)
-            self.assertIsNone(review_pr.checkout_python(checkout))
-            python_path = checkout / ".venv" / "bin" / "python"
-            python_path.parent.mkdir(parents=True)
-            python_path.write_text("", encoding="utf-8")
-            self.assertEqual(review_pr.checkout_python(checkout), python_path)
+            runner = Path(directory) / "bin" / "python"
+            runner.parent.mkdir()
+            runner.write_text("", encoding="utf-8")
+            runner.chmod(0o755)
+
+            self.assertEqual(
+                review_pr.resolve_runner_python(runner),
+                runner.absolute(),
+            )
+            self.assertIsNone(
+                review_pr.resolve_runner_python(runner.parent / "missing")
+            )
+
+    def test_resolve_runner_python_preserves_venv_launcher(self):
+        with tempfile.TemporaryDirectory() as directory:
+            launcher = Path(directory) / "bin" / "python"
+            launcher.parent.mkdir()
+            launcher.symlink_to(sys.executable)
+
+            self.assertEqual(
+                review_pr.resolve_runner_python(launcher),
+                launcher.absolute(),
+            )
+
+
+    def test_make_command_pins_runner_interpreter(self):
+        python_path = Path("/trusted/.venv/bin/python")
+        command = review_pr.make_command("verify", python_path)
+
+        self.assertIn(f"PYTHON_BOOTSTRAP={python_path}", command)
+        self.assertIn(f"PYTHON={python_path}", command)
+
+    def test_isolated_environment_does_not_expose_reviewer_python(self):
+        with tempfile.TemporaryDirectory() as directory:
+            environment = review_pr.isolated_environment(Path(directory))
+
+        self.assertNotIn(
+            str(Path(sys.executable).parent),
+            environment["PATH"].split(os.pathsep),
+        )
 
     def test_submission_requires_complete_checks(self):
         checks = [
@@ -183,6 +218,24 @@ class ReviewCapsuleTests(unittest.TestCase):
             ),
             "PR author/maintainer",
         )
+
+    def test_parse_args_accepts_runner_interpreter(self):
+        runner = Path("/trusted/.venv/bin/python")
+        with patch.object(
+            review_pr.sys,
+            "argv",
+            [
+                "review_pr.py",
+                "--pr",
+                "8",
+                "--run-checks",
+                "--python-path",
+                str(runner),
+            ],
+        ):
+            args = review_pr.parse_args()
+
+        self.assertEqual(args.python_path, runner)
 
     def test_submit_requires_run_checks(self):
         with patch.object(

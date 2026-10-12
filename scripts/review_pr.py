@@ -375,6 +375,14 @@ def create_checkout(head_sha: str, checkout: Path) -> None:
         raise
 
 
+def resolve_runner_python(configured: Path | None) -> Path | None:
+    candidate = configured if configured is not None else ROOT / ".venv" / "bin" / "python"
+    candidate = candidate.expanduser().absolute()
+    if candidate.is_file() and os.access(candidate, os.X_OK):
+        return candidate
+    return None
+
+
 def isolated_environment(report_dir: Path) -> dict[str, str]:
     sandbox_home = report_dir / "sandbox-home"
     sandbox_tmp = report_dir / "sandbox-tmp"
@@ -382,7 +390,7 @@ def isolated_environment(report_dir: Path) -> dict[str, str]:
     sandbox_home.mkdir(parents=True, exist_ok=True)
     sandbox_tmp.mkdir(parents=True, exist_ok=True)
     sandbox_config.mkdir(parents=True, exist_ok=True)
-    path_parts = {"/usr/bin", "/bin", "/usr/sbin", "/sbin", str(Path(sys.executable).parent)}
+    path_parts = {"/usr/bin", "/bin", "/usr/sbin", "/sbin"}
     for command in ("git", "make", "docker"):
         resolved = shutil.which(command)
         if resolved:
@@ -414,6 +422,7 @@ def make_command(target: str, python_path: Path | None) -> list[str]:
                 f"VENV_DIR={venv}",
                 f"PYTHON={python_path}",
                 f"PIP={venv / 'bin' / 'pip'}",
+                f"PYTHON_BOOTSTRAP={python_path}",
             ]
         )
     command.append(target)
@@ -459,10 +468,6 @@ def submission_blocker(checks: Iterable[CheckResult]) -> str | None:
         return None
     return "submission blocked; incomplete checks: " + ", ".join(incomplete)
 
-
-def checkout_python(checkout: Path) -> Path | None:
-    candidate = checkout / ".venv" / "bin" / "python"
-    return candidate if candidate.is_file() else None
 
 def make_summary(
     report_dir: Path,
@@ -579,6 +584,11 @@ def parse_args() -> argparse.Namespace:
         "--run-checks",
         action="store_true",
         help="Execute PR-controlled checks in an extracted checkout; this is not a sandbox",
+    )
+    parser.add_argument(
+        "--python-path",
+        type=Path,
+        help="Trusted pre-provisioned runner interpreter; defaults to ROOT/.venv/bin/python",
     )
     parser.add_argument(
         "--submit",
@@ -867,33 +877,80 @@ def main() -> int:
             checks.append(
                 run_check("diff-check", ["git", "diff", "--check", diff_range], ROOT, report_dir, args.timeout)
             )
-            checks.append(run_check("verify", ["make", "verify"], checkout, report_dir, args.timeout, check_env))
             engine_available = (checkout / "chameleon" / "engine").is_dir()
-            python_path = checkout_python(checkout)
-            if not engine_available or python_path is None:
-                missing_runtime = []
-                if not engine_available:
-                    missing_runtime.append("nested engine unavailable")
-                if python_path is None:
-                    missing_runtime.append(
-                        "PR checkout has no pre-provisioned .venv; host environments are not used"
-                    )
-                reason = "; ".join(missing_runtime)
+            python_path = resolve_runner_python(args.python_path)
+            if python_path is None:
+                reason = (
+                    "no trusted runner interpreter; pass --python-path or provision "
+                    f"{ROOT / '.venv' / 'bin' / 'python'}"
+                )
                 checks.extend(
                     [
-                        skipped("test", make_command("test", python_path), reason),
-                        skipped("run", make_command("run", python_path), reason),
-                        skipped("inspect", make_command("inspect", python_path), reason),
+                        skipped("verify", make_command("verify", None), reason),
+                        skipped("test", make_command("test", None), reason),
+                        skipped("run", make_command("run", None), reason),
+                        skipped("inspect", make_command("inspect", None), reason),
                     ]
                 )
             else:
-                checks.append(run_check("test", make_command("test", python_path), checkout, report_dir, args.timeout, check_env))
-                run_result = run_check("run", make_command("run", python_path), checkout, report_dir, args.timeout, check_env)
-                checks.append(run_result)
-                if run_result.status == "PASS":
-                    checks.append(run_check("inspect", make_command("inspect", python_path), checkout, report_dir, args.timeout, check_env))
+                checks.append(
+                    run_check(
+                        "verify",
+                        make_command("verify", python_path),
+                        checkout,
+                        report_dir,
+                        args.timeout,
+                        check_env,
+                    )
+                )
+                if not engine_available:
+                    reason = "nested engine unavailable"
+                    checks.extend(
+                        [
+                            skipped("test", make_command("test", python_path), reason),
+                            skipped("run", make_command("run", python_path), reason),
+                            skipped("inspect", make_command("inspect", python_path), reason),
+                        ]
+                    )
                 else:
-                    checks.append(skipped("inspect", make_command("inspect", python_path), "sample render failed"))
+                    checks.append(
+                        run_check(
+                            "test",
+                            make_command("test", python_path),
+                            checkout,
+                            report_dir,
+                            args.timeout,
+                            check_env,
+                        )
+                    )
+                    run_result = run_check(
+                        "run",
+                        make_command("run", python_path),
+                        checkout,
+                        report_dir,
+                        args.timeout,
+                        check_env,
+                    )
+                    checks.append(run_result)
+                    if run_result.status == "PASS":
+                        checks.append(
+                            run_check(
+                                "inspect",
+                                make_command("inspect", python_path),
+                                checkout,
+                                report_dir,
+                                args.timeout,
+                                check_env,
+                            )
+                        )
+                    else:
+                        checks.append(
+                            skipped(
+                                "inspect",
+                                make_command("inspect", python_path),
+                                "sample render failed",
+                            )
+                        )
 
             if args.docker:
                 if shutil.which("docker") is None:

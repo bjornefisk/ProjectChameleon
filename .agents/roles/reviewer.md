@@ -66,8 +66,11 @@ findings.
 Default mode captures exact base/head revisions and runs only safe diff checks.
 Use `--run-checks` only for trusted pull requests: the extracted checkout is
 not a security sandbox, and optional Docker checks can reach the host daemon.
-Runtime checks use only a pre-provisioned interpreter inside the extracted
-checkout; missing prerequisites are reported as `SKIP`, never replaced with
-the reviewer's environment. Treat `SKIP` as incomplete evidence, never as a
-pass. Submit GitHub reviews only with explicit `--submit`, `--run-checks`, and
+Runtime checks use only an explicitly selected, pre-provisioned runner
+interpreter. Pass `--python-path`; it defaults to `ROOT/.venv/bin/python`.
+Commands pin that interpreter into Make variables, so `PATH` cannot select a
+different reviewer Python. Missing prerequisites are reported as `SKIP`, never
+replaced with an unconfigured shell environment. Treat `SKIP` as incomplete
+evidence, never as a pass.
+Submit GitHub reviews only with explicit `--submit`, `--run-checks`, and
 complete passing checks using a reviewed body file.
