@@ -25,7 +25,7 @@ from cr_renderer import CrelloV5Renderer
 from cr_renderer.fonts import FONT_WEIGHTS
 
 from .assets import asset_path, load_asset_image
-from .brand_fonts import load_brand_font_manager
+from .brand_fonts import load_brand_font_manager, lookup_exact_font
 from .features_stub import make_stub_features
 from .shapes import render_shape
 from .wrap import (
@@ -52,7 +52,7 @@ def convert_chameleon_to_crello(
 
     `font_manager` is a `cr_renderer.fonts.FontManager` instance, reused
     from the renderer so text-wrap width measurements use the exact same
-    font lookups/fallbacks that will later render the glyphs.
+    font face lookups that will later render the glyphs.
     """
     design = doc["source"] if "source" in doc else doc
     canvas = design["canvas"]
@@ -111,7 +111,7 @@ def convert_chameleon_to_crello(
             out["type"].append("ImageElement")
             _append_blank_text(out)
             asset_id = element.get("asset_id")
-            if asset_id and asset_path(assets_dir, asset_id) is None:
+            if asset_path(assets_dir, asset_id) is None:
                 warnings.append(
                     f"Missing asset '{asset_id}' for element '{eid}' - rendered a placeholder."
                 )
@@ -258,6 +258,29 @@ def _measure_text(
     return measure
 
 
+def _validate_font_faces(
+    font_manager,
+    family: str,
+    element: Dict[str, Any],
+    bold_flags: List[bool],
+    italic_flags: List[bool],
+) -> None:
+    """Preflight every effective face before upstream rendering can fall back."""
+    states = set(zip(bold_flags, italic_flags))
+    if not states:
+        base_weight = _normalize_weight(element.get("font_weight"))
+        states.add(
+            (
+                base_weight in _BOLD_WEIGHTS,
+                _is_italic(element.get("font_style") or element.get("italic")),
+            )
+        )
+    for is_bold, is_italic in states:
+        weight = "bold" if is_bold else "regular"
+        style = _weight_style_to_font_style(is_bold, is_italic)
+        lookup_exact_font(font_manager, family, weight, style)
+
+
 def _line_ranges(
     line_indices: List[int], line_count: int, content_length: int
 ) -> List[Tuple[int, int, int]]:
@@ -323,7 +346,7 @@ def _validate_positioned_glyph_bounds(
             weight = "bold" if is_bold else "regular"
             style = _weight_style_to_font_style(is_bold, is_italic)
             typeface = skia.Typeface.MakeFromData(
-                font_manager.lookup(family, weight, style)
+                lookup_exact_font(font_manager, family, weight, style)
             )
             font = skia.Font(typeface, int(size))
             glyphs = font.textToGlyphs(span_text)
@@ -371,6 +394,7 @@ def _append_text(out: Dict[str, Any], element: Dict[str, Any], font_manager) -> 
     line_height = float(element.get("line_height", _DEFAULT_LINE_HEIGHT))
     letter_spacing = float(element.get("letter_spacing", 0.0))
     colors, bold_flags, italic_flags = _style_maps(element, len(content))
+    _validate_font_faces(font_manager, family, element, bold_flags, italic_flags)
     measure = _measure_text(
         content,
         font_manager,

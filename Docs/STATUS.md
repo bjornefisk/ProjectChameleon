@@ -48,7 +48,7 @@ These are contract artifacts, not solver or renderer implementation:
 - `chameleon/chameleon_design_schema_v0.9.json` is no longer provisional, accepts empty designs, and records structural ranges/defaults.
 - Contract fixtures live under `chameleon/tests/fixtures/contract/`.
 - The Level 2 public sample's style range is corrected to valid end-exclusive `[6, 15)` semantics; this is fixture/source-data correction, not solver implementation.
-- Ticket 01's semantic validator and contract tests plus ticket 02's renderer adapter/tests are implemented; the runner now validates serialized JSON and decodable PNG pairs, removes failed-task artifacts, and continues independent tasks, while cutoff semantics, solver, and full Gate 1 qualification remain pending.
+- Ticket 01's semantic validator and contract tests plus ticket 02's renderer adapter/tests are implemented; the runner now validates serialized JSON and decodable PNG pairs, preserves renderer warnings, enforces exact local font faces, constrains asset paths, removes failed-task artifacts, and continues independent tasks, while cutoff semantics, solver, and full Gate 1 qualification remain pending.
 
 ## Known implementation gaps before the solver
 
@@ -57,7 +57,7 @@ These are intentionally visible; none is silently promoted to contract behavior:
 1. `engine/resize.py` is the documented uniform-stretch baseline and violates image-ratio, group, overlap, rotation, and typography rules.
 2. `engine/main.py` has a warning-only self-check that checks unrotated rectangles and ID sets; it is not the contract validator.
 3. The renderer adapter's renderer goldens and native-amd64 qualification remain; ticket 02 closes style-run end handling, Unicode-safe wrapping, letter-spacing/style-width measurement, mandatory/non-space line-map handling, actual positioned glyph-bound rejection, explicit line/max-lines/height enforcement, and rectangle/ellipse stroke rasterization.
-4. `engine/main.py` parses finite JSON decimals exactly, validates serialized response identity/geometry/text rules and decodable PNGs before publication, writes a hash-bearing hidden commit marker last, cleans stale/failed artifacts, continues later tasks, and maps malformed/text-layout failures to typed log codes; accepted cutoff semantics and the complete status protocol remain pending.
+4. `engine/main.py` parses finite JSON decimals exactly, validates serialized response identity/geometry/text rules and decodable PNGs before publication, writes a hash-bearing hidden commit marker last, cleans stale/failed artifacts, emits renderer warnings, continues later tasks, and maps malformed/text-layout failures to typed log codes; accepted cutoff semantics and the complete status protocol remain pending.
 5. The deterministic role-inference, four-topology candidate search, renderer-in-loop ranking, and held-out evaluation path have not been implemented.
 6. The Docker build has no project-owned hash-locked wheelhouse or apt-version lock; the direct compatibility pins are an initial baseline.
 
@@ -75,7 +75,7 @@ These are not unresolved internal design choices. They require external facts or
 
 ## Ticket 01 verification record
 
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/contract -p 'test_*.py' -v` — 27 tests passed.
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests/contract -p 'test_*.py' -v` — 28 tests passed.
 - `python3 scripts/verify_repository.py` — passed.
 - The suite covers schema/source validation, identity and immutable-field preservation, exact numeric ingress, serialized integer geometry, rotated containment and bleed, image ratios, rigid groups, source-separated collision, text line-box checks, empty/degenerate designs, and typed reason codes.
 - The ticket-01 PR tree contains no ticket-02 renderer/wrapping implementation, tests, fixtures, or Unicode data; this was true before ticket 02 and is retained as the ticket-01 boundary record.
@@ -83,18 +83,20 @@ These are not unresolved internal design choices. They require external facts or
 
 ## Ticket 02 verification record
 
-- `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m unittest discover -s tests/renderer -p 'test_*.py' -v` — renderer tests passed.
-- `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 10 runner tests passed, including exact decimal/exponent preservation, non-finite-number rejection, invalid-design, invalid-PNG, interruption, and cleanup-isolation cases.
-- `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 53 tests passed.
-- `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -u -m engine.main` — exit 1 as required for the nonconforming baseline; all three sample tasks logged `MALFORMED_INPUT: serialized response x must be a finite integer`, and no task artifacts were produced beyond `output/.gitkeep`.
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests/renderer -p 'test_*.py' -v` — 21 tests passed, including exact-font and asset-containment regressions.
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 16 tests passed, including warning propagation and commit-marker filtering.
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 65 tests passed.
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -m engine.main` — exit 1 as required for the nonconforming baseline; all three sample tasks logged `MALFORMED_INPUT: serialized response x must be a finite integer`, and no task artifacts were produced beyond `output/.gitkeep`.
 - Docker `linux/amd64`, native-amd64, renderer-golden, and native-library parity checks remain pending.
 
 ## PR 7 review-fix verification
 
-The hidden `.<stem>_output.commit` marker is pair-commit authority. It records both final filenames and SHA-256 hashes, and is written only after both final artifact renames succeed; unmarked artifacts are not committed results.
+The hidden `.<stem>_output.commit` marker is pair-commit authority. It records both final filenames and SHA-256 hashes, and is written only after both final artifact renames succeed; the layout inspector now ignores unmarked or hash-mismatched artifacts.
 
 - `make verify` — passed.
 - `git diff --check` — passed.
+- `python3 -m py_compile chameleon/engine/main.py chameleon/renderer/converter/assets.py chameleon/renderer/converter/brand_fonts.py chameleon/renderer/converter/wrap.py chameleon/renderer/converter/convert.py scripts/inspect_layout.py chameleon/tests/runner/test_main.py chameleon/tests/runner/test_inspect_layout.py chameleon/tests/renderer/test_assets.py chameleon/tests/renderer/test_renderer_conformance.py` — passed.
+- `make test` — blocked by missing `jsonschema`, `cr_renderer`, and `PIL` in the project `.venv`; the fallback Python 3.12 environment passed all 65 tests above.
 
 ## Remaining Gate 1 qualification
 

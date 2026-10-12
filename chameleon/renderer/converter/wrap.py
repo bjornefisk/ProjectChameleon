@@ -6,6 +6,7 @@ from typing import Callable, List, Optional, Sequence, Set, Tuple
 import skia  # type: ignore
 
 from cr_renderer.fonts import FontManager
+from .brand_fonts import lookup_exact_font
 from .unicode_data import (
     EAST_ASIAN_WIDTH_RANGES,
     EXTENDED_PICTOGRAPHIC_RANGES,
@@ -45,7 +46,7 @@ def char_widths(
     """Return glyph advances using the pinned renderer's Skia path."""
     if not text:
         return []
-    ttf_bytes = font_manager.lookup(family, weight, style)
+    ttf_bytes = lookup_exact_font(font_manager, family, weight, style)
     typeface = skia.Typeface.MakeFromData(ttf_bytes)
     font = skia.Font(typeface, int(size))
     glyphs = font.textToGlyphs(text)

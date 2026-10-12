@@ -5,7 +5,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from chameleon.renderer.converter.brand_fonts import load_brand_font_manager
+from chameleon.renderer.converter.brand_fonts import MissingFontError, load_brand_font_manager
 from chameleon.renderer.converter.convert import convert_chameleon_to_crello
 from chameleon.renderer.converter.shapes import render_shape
 from chameleon.renderer.converter.wrap import (
@@ -63,6 +63,46 @@ class RendererConformanceTests(unittest.TestCase):
     def test_invalid_style_range_is_typed_input_failure(self):
         with self.assertRaises(MalformedTextError):
             self.convert_text(style_runs=[{"start": 4, "end": 5}])
+
+
+    def test_missing_font_family_fails_instead_of_falling_back(self):
+        with self.assertRaises(MissingFontError):
+            self.convert_text(font_family="Not Installed")
+
+    def test_missing_font_fails_for_newline_only_content(self):
+        with self.assertRaises(MissingFontError):
+            self.convert_text(content="\n", font_family="Not Installed")
+
+    def test_missing_font_style_fails_instead_of_falling_back(self):
+        with self.assertRaises(MissingFontError):
+            self.convert_text(
+                font_family="Solstice Serif",
+                font_weight="bold",
+                font_style="italic",
+            )
+
+    def test_empty_asset_id_emits_missing_asset_warning(self):
+        document = {
+            "canvas": {"width": 10, "height": 10},
+            "elements": [
+                {
+                    "id": "image",
+                    "type": "image",
+                    "x": 0,
+                    "y": 0,
+                    "width": 10,
+                    "height": 10,
+                    "asset_id": "",
+                }
+            ],
+        }
+        _converted, warnings = convert_chameleon_to_crello(
+            document, self.font_manager, str(ROOT / "brand_kit" / "assets")
+        )
+
+        self.assertEqual(
+            warnings, ["Missing asset '' for element 'image' - rendered a placeholder."]
+        )
 
     def test_style_run_typeface_width_changes_wrapping(self):
         candidates = (

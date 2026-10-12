@@ -5,10 +5,15 @@ from PIL import Image, ImageDraw
 
 
 def asset_path(assets_dir: Optional[str], asset_id: Optional[str]) -> Optional[Path]:
-    if not assets_dir or not asset_id:
+    if not assets_dir or not isinstance(asset_id, str) or not asset_id:
         return None
-    candidate = Path(assets_dir) / asset_id
-    return candidate if candidate.is_file() else None
+    try:
+        root = Path(assets_dir).resolve()
+        candidate = (root / asset_id).resolve()
+        candidate.relative_to(root)
+        return candidate if candidate.is_file() else None
+    except (OSError, ValueError):
+        return None
 
 
 def load_asset_image(

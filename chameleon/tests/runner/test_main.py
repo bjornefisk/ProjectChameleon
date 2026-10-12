@@ -1,9 +1,11 @@
 import builtins
+import io
 import hashlib
 import json
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
@@ -12,7 +14,9 @@ from PIL import Image
 
 PROJECT_ROOT = Path(__file__).parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / "chameleon"))
 
+from chameleon.renderer.converter.convert import render_design_to_png
 from chameleon.renderer.converter.wrap import MalformedTextError
 
 from engine import main
@@ -73,6 +77,97 @@ class RunnerPublicationTests(unittest.TestCase):
             self.assertEqual(
                 commit["png_sha256"], hashlib.sha256(png_path.read_bytes()).hexdigest()
             )
+
+    def test_publish_pair_returns_renderer_warnings(self):
+        source, target = self._empty_request()
+        output = {"canvas": target, "elements": []}
+
+        def render_with_warning(_design, _assets, path):
+            self._write_png(path)
+            return ["missing asset warning"]
+
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
+                main, "render_to_png", side_effect=render_with_warning
+            ):
+                warnings = main._publish_pair(source, target, output, "task")
+
+        self.assertEqual(warnings, ["missing asset warning"])
+
+    def test_main_emits_renderer_warnings_after_successful_commit(self):
+        task = {
+            "source": {"canvas": {"width": 1, "height": 1}, "elements": []},
+            "target_canvas": {"width": 1, "height": 1},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            input_dir = root / "input"
+            output_dir = root / "output"
+            input_dir.mkdir()
+            output_dir.mkdir()
+            (input_dir / "task.json").write_text(json.dumps(task), encoding="utf-8")
+
+            def render_with_warning(_design, _assets, path):
+                self._write_png(path)
+                return ["missing asset warning"]
+
+            stdout = io.StringIO()
+            with patch.object(main, "INPUT_DIR", input_dir), patch.object(
+                main, "OUTPUT_DIR", output_dir
+            ), patch.object(
+                main,
+                "resize",
+                return_value={"canvas": task["target_canvas"], "elements": []},
+            ), patch.object(main, "render_to_png", side_effect=render_with_warning):
+                with redirect_stdout(stdout):
+                    result = main.main()
+
+            self.assertEqual(result, 0)
+            self.assertIn("renderer warning: missing asset warning", stdout.getvalue())
+
+    def test_real_renderer_warning_reaches_runner_output(self):
+        source = {
+            "canvas": {"width": 1, "height": 1},
+            "elements": [
+                {
+                    "id": "image",
+                    "type": "image",
+                    "x": 0,
+                    "y": 0,
+                    "width": 1,
+                    "height": 1,
+                    "asset_id": "",
+                }
+            ],
+        }
+        task = {"source": source, "target_canvas": {"width": 1, "height": 1}}
+        output = {"canvas": task["target_canvas"], "elements": [dict(source["elements"][0])]}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            input_dir = root / "input"
+            output_dir = root / "output"
+            input_dir.mkdir()
+            output_dir.mkdir()
+            (input_dir / "task.json").write_text(json.dumps(task), encoding="utf-8")
+            stdout = io.StringIO()
+            with patch.object(main, "INPUT_DIR", input_dir), patch.object(
+                main, "OUTPUT_DIR", output_dir
+            ), patch.object(
+                main, "ASSETS_DIR", PROJECT_ROOT / "chameleon" / "brand_kit" / "assets"
+            ), patch.object(main, "resize", return_value=output), patch.object(
+                main,
+                "render_to_png",
+                side_effect=lambda design, assets, path: render_design_to_png(
+                    design, assets, path
+                ),
+            ):
+                with redirect_stdout(stdout):
+                    result = main.main()
+
+            self.assertEqual(result, 0)
+            self.assertIn("renderer warning: Missing asset ''", stdout.getvalue())
+            self.assertTrue((output_dir / "task_output.png").is_file())
 
     def test_decimal_immutable_tokens_survive_pair_serialization(self):
         opacity = Decimal("0.1234567890123456789")

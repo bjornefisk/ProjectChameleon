@@ -155,11 +155,11 @@ def self_check(source: dict, output: dict) -> list[str]:
     return problems
 
 
-def render_to_png(design: dict, assets_dir: Path, png_path: Path) -> None:
-    """Render with the pinned local adapter."""
+def render_to_png(design: dict, assets_dir: Path, png_path: Path) -> list[str]:
+    """Render with the pinned local adapter and return conversion warnings."""
     from renderer.converter.convert import render_design_to_png  # type: ignore
 
-    render_design_to_png(design, assets_dir, str(png_path))
+    return render_design_to_png(design, assets_dir, str(png_path))
 
 
 def _task_paths(stem: str) -> tuple[Path, Path, Path, Path, Path]:
@@ -180,7 +180,7 @@ def _cleanup_task_paths(stem: str) -> None:
 
 def _publish_pair(
     source: dict, target_canvas: dict, output: dict, stem: str
-) -> None:
+) -> list[str]:
     """Stage and validate a logical JSON/PNG pair before committing it."""
     json_path, png_path, json_tmp, png_tmp, commit_path = _task_paths(stem)
     commit_tmp = commit_path.with_suffix(".commit.tmp")
@@ -190,7 +190,7 @@ def _publish_pair(
             source, target_canvas, output
         )
         json_tmp.write_text(serialized, encoding="utf-8")
-        render_to_png(serialized_output, ASSETS_DIR, png_tmp)
+        render_warnings = render_to_png(serialized_output, ASSETS_DIR, png_tmp) or []
         _validate_staged_png(png_tmp)
         commit_tmp.write_text(
             json.dumps(
@@ -213,6 +213,7 @@ def _publish_pair(
         except Exception:
             pass
         raise
+    return render_warnings
 
 
 def _failure_code(error: Exception) -> InfeasibleReasonCode:
@@ -247,7 +248,7 @@ def main() -> int:
             output = resize(source, target_canvas)
             elapsed = time.monotonic() - t0
             problems = self_check(source, output)
-            _publish_pair(source, target_canvas, output, stem)
+            render_warnings = _publish_pair(source, target_canvas, output, stem)
         except Exception as error:
             exit_code = 1
             cleanup_error = None
@@ -269,13 +270,20 @@ def main() -> int:
                 )
             continue
 
-        status = "OK" if not problems else f"{len(problems)} self-check warning(s)"
+        if problems:
+            status = f"{len(problems)} self-check warning(s)"
+        elif render_warnings:
+            status = f"{len(render_warnings)} renderer warning(s)"
+        else:
+            status = "OK"
         print(
             f"[{task_path.name}] {status} in {elapsed:.2f}s "
             f"-> {stem}_output.json, {stem}_output.png"
         )
         for problem in problems:
             print(f"    - {problem}")
+        for warning in render_warnings:
+            print(f"    - renderer warning: {warning}")
 
     return exit_code
 
