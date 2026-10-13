@@ -7,6 +7,7 @@ as submission artifacts.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from dataclasses import dataclass
@@ -27,6 +28,8 @@ class TaskArtifactPaths:
     png_final: Path
     json_tmp: Path
     png_tmp: Path
+    commit_marker: Path
+    commit_marker_tmp: Path
 
 
 def artifact_paths(output_dir: Path, task_name: str) -> TaskArtifactPaths:
@@ -37,22 +40,36 @@ def artifact_paths(output_dir: Path, task_name: str) -> TaskArtifactPaths:
         png_final=output_dir / f"{task_name}_output.png",
         json_tmp=output_dir / f"{task_name}_output.json.tmp",
         png_tmp=output_dir / f"{task_name}_output.png.tmp",
+        commit_marker=output_dir / f".{task_name}_output.commit",
+        commit_marker_tmp=output_dir / f".{task_name}_output.commit.tmp",
     )
 
 
 def cleanup_task_artifacts(output_dir: Path, task_name: str) -> None:
     """Remove all final and staged paths for ``task_name``.
 
-    Missing paths are expected.  Other filesystem errors are allowed to reach
-    the runner as runtime failures rather than being silently ignored.
+    Missing paths are expected. Other filesystem errors are raised after all
+    task paths have been attempted.
     """
 
     paths = artifact_paths(output_dir, task_name)
-    for path in (paths.json_final, paths.png_final, paths.json_tmp, paths.png_tmp):
+    errors: list[OSError] = []
+    for path in (
+        paths.commit_marker,
+        paths.commit_marker_tmp,
+        paths.json_final,
+        paths.png_final,
+        paths.json_tmp,
+        paths.png_tmp,
+    ):
         try:
             path.unlink()
         except FileNotFoundError:
             pass
+        except OSError as error:
+            errors.append(error)
+    if errors:
+        raise errors[0]
 
 
 def _reject_constant(value: str) -> None:
@@ -114,6 +131,19 @@ def _read_serialized_design(path: Path) -> Any:
     )
 
 
+def _write_commit_marker(paths: TaskArtifactPaths) -> None:
+    marker = {
+        "json": paths.json_final.name,
+        "png": paths.png_final.name,
+        "json_sha256": hashlib.sha256(paths.json_tmp.read_bytes()).hexdigest(),
+        "png_sha256": hashlib.sha256(paths.png_tmp.read_bytes()).hexdigest(),
+    }
+    paths.commit_marker_tmp.write_text(
+        json.dumps(marker, sort_keys=True),
+        encoding="utf-8",
+    )
+
+
 def _canonicalize_response_mutables(response: Mapping[str, Any]) -> Mapping[str, Any]:
     """Convert integral Decimal mutables to serialized integers.
 
@@ -161,6 +191,8 @@ def validate_png(path: Path) -> None:
         if image.format != "PNG":
             raise ValueError(f"renderer produced {image.format!r}, not PNG")
         image.verify()
+    with Image.open(path) as image:
+        image.load()
 
 
 def publish_task(
@@ -171,14 +203,11 @@ def publish_task(
     target_canvas: Mapping[str, Any],
     response: Mapping[str, Any],
     assets_dir: Path,
-    render_to_png: Callable[[Mapping[str, Any], Path, Path], None],
+    render_to_png: Callable[
+        [Mapping[str, Any], Path, Path], list[str] | None
+    ],
 ) -> TaskArtifactPaths:
-    """Stage, validate, and logically publish one JSON/PNG task pair.
-
-    Any exception removes both staged and final paths.  Individual ``os.replace``
-    calls provide atomic visibility for each file; rollback on the second
-    replacement failure preserves the task-level all-or-nothing contract.
-    """
+    """Stage, validate, and marker-publish one JSON/PNG task pair."""
 
     output_dir.mkdir(parents=True, exist_ok=True)
     paths = artifact_paths(output_dir, task_name)
@@ -188,14 +217,11 @@ def publish_task(
         validate_response(source, target_canvas, serialized)
         render_to_png(serialized, assets_dir, paths.png_tmp)
         validate_png(paths.png_tmp)
+        _write_commit_marker(paths)
 
         os.replace(paths.json_tmp, paths.json_final)
-        try:
-            os.replace(paths.png_tmp, paths.png_final)
-        except BaseException:
-            # A failed second commit must not expose the first artifact.
-            cleanup_task_artifacts(output_dir, task_name)
-            raise
+        os.replace(paths.png_tmp, paths.png_final)
+        os.replace(paths.commit_marker_tmp, paths.commit_marker)
         return paths
     except BaseException:
         cleanup_task_artifacts(output_dir, task_name)

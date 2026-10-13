@@ -7,7 +7,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, Mapping
 
-from engine.contract import validate_source
+from engine.contract import validate_source, validate_target_canvas
 from engine.errors import InfeasibleLayoutError
 from engine.resize import resize
 from engine.staging import cleanup_task_artifacts, publish_task
@@ -40,16 +40,7 @@ def _load_task(path: Path) -> Mapping[str, Any]:
     if not isinstance(source, Mapping) or not isinstance(target, Mapping):
         raise ValueError("source and target_canvas must be JSON objects")
     validate_source(source)
-    for field in ("width", "height"):
-        value = target.get(field)
-        if isinstance(value, bool) or not isinstance(value, (int, Decimal)):
-            raise ValueError(f"target_canvas.{field} must be an integer")
-        if isinstance(value, Decimal) and (
-            not value.is_finite() or value != value.to_integral_value()
-        ):
-            raise ValueError(f"target_canvas.{field} must be an integer")
-        if value <= 0:
-            raise ValueError(f"target_canvas.{field} must be positive")
+    validate_target_canvas(target)
     return task
 
 
@@ -61,6 +52,30 @@ def _error_status(error: InfeasibleLayoutError) -> str:
     if error.code == "RUNTIME_IO_FAILURE":
         return "RUNTIME_IO_FAILURE"
     return "INFEASIBLE_LAYOUT"
+
+
+def _cleanup_after_failure(stem: str) -> str | None:
+    try:
+        cleanup_task_artifacts(OUTPUT_DIR, stem)
+    except Exception as error:
+        return f"{type(error).__name__}: {error}"
+    return None
+
+
+def _report_failure(
+    task_name: str,
+    status: str,
+    reason: str,
+    cleanup_error: str | None,
+) -> None:
+    if cleanup_error:
+        status = "RUNTIME_IO_FAILURE"
+        reason = f"{reason}; cleanup failed: {cleanup_error}"
+    print(
+        f"[{task_name}] status={status} reason={reason}",
+        file=sys.stderr,
+    )
+
 
 REQUIRED_COMMON = ["id", "type", "x", "y", "width", "height"]
 REQUIRED_BY_TYPE = {
@@ -104,46 +119,29 @@ def self_check(source: dict, output: dict) -> list[str]:
     return problems
 
 
-def render_to_png(design: dict, assets_dir: Path, png_path: Path) -> None:
-    """Renders `design` to a PNG. Prefers the real renderer
-    (transformer-convertor, wrapping cr-renderer) if it's vendored into
-    ./renderer; falls back to a plain box-and-label preview otherwise so
-    this repo is runnable before that's wired in. Swap the fallback out
-    once ./renderer is populated — don't ship the fallback's output as a
-    real preview."""
-    try:
-        from renderer.converter.convert import render_design_to_png  # type: ignore
-        render_design_to_png(design, assets_dir, str(png_path))
-        return
-    except ImportError:
-        pass
+def render_to_png(design: dict, assets_dir: Path, png_path: Path) -> list[str]:
+    """Render with the pinned local adapter and return conversion warnings."""
 
-    _fallback_render(design, png_path)
+    from renderer.converter.convert import render_design_to_png  # type: ignore
 
-
-def _fallback_render(design: dict, png_path: Path) -> None:
-    """Placeholder only — labeled boxes, not real text/asset rendering.
-    Confirms the pipeline runs end-to-end; do not use this to judge your
-    actual layout quality. Use transformer-convertor (RULES.md / FAQ Q3)
-    for a real preview."""
-    from PIL import Image, ImageDraw
-
-    w, h = design["canvas"]["width"], design["canvas"]["height"]
-    img = Image.new("RGB", (w, h), "#EDE7DD")
-    draw = ImageDraw.Draw(img)
-    palette = {"text": "#2B6CB0", "image": "#B7791F", "shape": "#2F855A"}
-    for el in sorted(design["elements"], key=lambda e: e.get("z_index", 0)):
-        x0, y0 = el["x"], el["y"]
-        x1, y1 = x0 + el["width"], y0 + el["height"]
-        color = palette.get(el["type"], "#555555")
-        draw.rectangle([x0, y0, x1, y1], outline=color, width=3)
-        draw.text((x0 + 4, y0 + 4), el["id"], fill=color)
-    img.save(png_path, format="PNG")
+    warnings = render_design_to_png(design, assets_dir, str(png_path)) or []
+    for warning in warnings:
+        print(f"renderer warning: {warning}", file=sys.stderr)
+    return warnings
 
 
 def main() -> int:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    task_files = sorted(INPUT_DIR.glob("*.json"))
+    try:
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        task_files = sorted(INPUT_DIR.glob("*.json"))
+    except OSError as error:
+        print(
+            f"[runner] status=RUNTIME_IO_FAILURE "
+            f"reason=RUNTIME_IO_FAILURE: {error}",
+            file=sys.stderr,
+        )
+        return 1
+
     if not task_files:
         print(f"No task files found in {INPUT_DIR}", file=sys.stderr)
         return 1
@@ -155,32 +153,46 @@ def main() -> int:
             cleanup_task_artifacts(OUTPUT_DIR, stem)
         except Exception as error:
             all_succeeded = False
-            print(
-                f"[{task_path.name}] status=RUNTIME_IO_FAILURE "
-                f"reason=RUNTIME_IO_FAILURE: {error}",
-                file=sys.stderr,
+            _report_failure(
+                task_path.name,
+                "RUNTIME_IO_FAILURE",
+                f"RUNTIME_IO_FAILURE: {error}",
+                None,
             )
             continue
+
         started = time.time()
         try:
             task = _load_task(task_path)
         except InfeasibleLayoutError as error:
             all_succeeded = False
-            print(
-                f"[{task_path.name}] status={_error_status(error)} "
-                f"reason={error.code}: {error}",
-                file=sys.stderr,
+            cleanup_error = _cleanup_after_failure(stem)
+            _report_failure(
+                task_path.name,
+                _error_status(error),
+                f"{error.code}: {error}",
+                cleanup_error,
             )
-            cleanup_task_artifacts(OUTPUT_DIR, stem)
+            continue
+        except OSError as error:
+            all_succeeded = False
+            cleanup_error = _cleanup_after_failure(stem)
+            _report_failure(
+                task_path.name,
+                "RUNTIME_IO_FAILURE",
+                f"RUNTIME_IO_FAILURE: {error}",
+                cleanup_error,
+            )
             continue
         except Exception as error:
             all_succeeded = False
-            print(
-                f"[{task_path.name}] status=MALFORMED_INPUT "
-                f"reason=MALFORMED_INPUT: {error}",
-                file=sys.stderr,
+            cleanup_error = _cleanup_after_failure(stem)
+            _report_failure(
+                task_path.name,
+                "MALFORMED_INPUT",
+                f"MALFORMED_INPUT: {error}",
+                cleanup_error,
             )
-            cleanup_task_artifacts(OUTPUT_DIR, stem)
             continue
 
         try:
@@ -197,21 +209,23 @@ def main() -> int:
             )
         except InfeasibleLayoutError as error:
             all_succeeded = False
-            print(
-                f"[{task_path.name}] status={_error_status(error)} "
-                f"reason={error.code}: {error}",
-                file=sys.stderr,
+            cleanup_error = _cleanup_after_failure(stem)
+            _report_failure(
+                task_path.name,
+                _error_status(error),
+                f"{error.code}: {error}",
+                cleanup_error,
             )
-            cleanup_task_artifacts(OUTPUT_DIR, stem)
             continue
         except Exception as error:
             all_succeeded = False
-            print(
-                f"[{task_path.name}] status=RUNTIME_IO_FAILURE "
-                f"reason=RUNTIME_IO_FAILURE: {error}",
-                file=sys.stderr,
+            cleanup_error = _cleanup_after_failure(stem)
+            _report_failure(
+                task_path.name,
+                "RUNTIME_IO_FAILURE",
+                f"RUNTIME_IO_FAILURE: {error}",
+                cleanup_error,
             )
-            cleanup_task_artifacts(OUTPUT_DIR, stem)
             continue
 
         elapsed = time.time() - started

@@ -55,9 +55,9 @@ This processes each task in `input/`, writes `<task>_output.json` and a PNG thro
 
 The upstream renderer consumes explicit internal line information, rotates around each element's local center, and maps the prepared image rectangle into the destination rectangle. The project adapter performs its own deterministic text preprocessing and `contain`/`cover`/`fill` handling. See `Docs/PROJECT_CONTRACT.md` and `Docs/DEPENDENCY_EVIDENCE.md` for the ratified behavior and known conformance gaps.
 
-Missing assets remain in the output record. The development renderer emits a labeled placeholder and warning for a missing file; that placeholder is renderer diagnostic output, not an asset replacement in the engine response.
+Missing assets remain in output record. Development renderer emits labeled placeholder and warning for missing file; placeholder is renderer diagnostic output, not asset replacement in engine response.
 
-The ImportError-only box renderer in `engine/main.py` is a development fallback and is not a conforming preview. Do not use it to judge layout quality.
+If renderer import fails, engine reports `RUNTIME_IO_FAILURE` and publishes no JSON/PNG pair. Install pinned dependencies before running `engine.main`.
 
 **Q4. Where do I find the actual brand assets and fonts?**
 

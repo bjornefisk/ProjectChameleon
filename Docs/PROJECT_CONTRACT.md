@@ -125,7 +125,7 @@ The current adapter is known not to meet every rule above: its style-run applica
 - Only a classified full-canvas background may use target-shape cover cropping. Foreground JSON box ratios remain source-invariant even when `fit=fill` or `fit=cover`.
 - Shapes are rasterized by the project adapter because `cr-renderer` has no native shape primitive. The current pinned adapter renders rectangles, rounded rectangles, ellipses, and horizontal lines; rectangle/ellipse stroke fields are retained but currently have no raster effect. This behavior is covered as an implementation gap, not an invitation to change source records.
 - A missing asset keeps its original `asset_id` and element record. The renderer MAY emit the deterministic labeled placeholder used by `assets.py` for a diagnostic PNG and MUST emit a warning. The engine never writes the placeholder into the response JSON or treats it as a replacement asset.
-- The ImportError box renderer in `engine/main.py` is a development fallback only. Its PNG is not a conforming render artifact.
+- Renderer import failure is a `RUNTIME_IO_FAILURE`; the engine MUST publish no JSON/PNG pair. Missing-asset placeholders remain permitted only as diagnostic render output after a successful adapter import.
 
 ## 7. Geometry, grouping, and image invariants
 

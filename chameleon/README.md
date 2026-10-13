@@ -81,11 +81,9 @@ fixture case.
 (the integrated converter, wrapping the pinned `cr-renderer` revision)
 to produce each task's PNG — already wired in, no setup needed. It reads
 fonts/assets from `brand_kit/` and writes a real rendered preview, not a
-placeholder. If you ever see plain labeled boxes instead of real text and
-images in `output/*.png`, that means the import in `main.py` failed (e.g.
-`cr-renderer` didn't install — check `requirements.txt` installed cleanly)
-and it silently fell back to the box-and-label placeholder; don't judge
-your layout quality by that fallback.
+placeholder. If the renderer import fails, that task reports
+`RUNTIME_IO_FAILURE` and publishes no JSON/PNG pair. Install the pinned
+dependencies from `requirements.txt` before running the engine.
 
 ## Docker (how you'll actually be run)
 

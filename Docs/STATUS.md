@@ -48,7 +48,7 @@ These are contract artifacts, not solver or renderer implementation:
 - `chameleon/chameleon_design_schema_v0.9.json` is no longer provisional, accepts empty designs, and records structural ranges/defaults.
 - Contract fixtures live under `chameleon/tests/fixtures/contract/`.
 - The Level 2 public sample's style range is corrected to valid end-exclusive `[6, 15)` semantics; this is fixture/source-data correction, not solver implementation.
-- Ticket 01's semantic validator and contract tests are implemented at `engine.contract`; Ticket 03's fail-closed runner and staging path have focused integration evidence; the renderer adapter, solver, and full Gate 1 qualification remain pending in later tickets.
+- Ticket 01's semantic validator and contract tests are implemented at `engine.contract`; Ticket 03's fail-closed runner now uses marker-gated JSON/PNG publication and focused failure evidence; the renderer adapter, solver, and full Gate 1 qualification remain pending in later tickets.
 
 ## Known implementation gaps before the solver
 
@@ -57,7 +57,7 @@ These are intentionally visible; none is silently promoted to contract behavior:
 1. `engine/resize.py` is the documented uniform-stretch baseline and violates image-ratio, group, overlap, rotation, and typography rules.
 2. `engine/main.py` has a warning-only self-check that checks unrotated rectangles and ID sets; it is not the contract validator.
 3. The renderer adapter's style-run end handling, Unicode-safe wrapping, letter-spacing/style-width measurement, explicit line/max-lines/height enforcement, glyph-bound validation, and rectangle/ellipse stroke behavior need conformance work.
-4. The runner's typed-status, stale-output, logical-pair publication, aggregate exit, and exact numeric-ingress path are implemented and focused-tested; deterministic cutoff semantics and full runtime qualification remain pending.
+4. The runner's typed-status, stale-output, marker-gated pair publication, aggregate exit, exact target validation, and exact numeric-ingress paths are implemented and focused-tested; deterministic cutoff semantics and full runtime qualification remain pending.
 5. The deterministic role-inference, four-topology candidate search, renderer-in-loop ranking, and held-out evaluation path have not been implemented.
 6. The Docker build has no project-owned hash-locked wheelhouse or apt-version lock; the direct compatibility pins are an initial baseline.
 
@@ -82,8 +82,8 @@ These are not unresolved internal design choices. They require external facts or
 
 ## Ticket 03 verification record
 
-- `cd chameleon && ../.venv/bin/python -m unittest tests.engine.test_runner -v` — 7 tests passed.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 35 tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest tests.runner.test_runner -v` — 17 tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 45 tests passed.
 - `python3 scripts/verify_repository.py` — passed.
 - `../.venv/bin/python -m engine.main` — failed closed for all three sample tasks because the current uniform-stretch `resize.py` baseline emits non-integer geometry; no JSON/PNG pair was published.
 - `docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — completed with the existing `FROM --platform` warning.
