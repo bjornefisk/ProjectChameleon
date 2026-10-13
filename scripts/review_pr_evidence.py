@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import stat
 import tempfile
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -39,6 +40,30 @@ def verify_evidence_directory(path: Path, descriptor: int) -> None:
 
 def evidence_directory_entries(descriptor: int) -> list[str]:
     return sorted(os.listdir(descriptor))
+
+def create_staging_directory(target: Path) -> Path:
+    try:
+        target_stat = os.lstat(target)
+    except FileNotFoundError:
+        target_stat = None
+    if target_stat is not None:
+        if stat.S_ISLNK(target_stat.st_mode):
+            raise ValueError(f"report directory must not be a symlink: {target}")
+        if not stat.S_ISDIR(target_stat.st_mode):
+            raise ValueError(f"report path is not a directory: {target}")
+        raise ValueError(f"report directory must not already exist: {target}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    return Path(tempfile.mkdtemp(prefix=f".{target.name}.", dir=target.parent))
+
+
+def publish_staging_directory(staging: Path, target: Path) -> None:
+    try:
+        os.lstat(target)
+    except FileNotFoundError:
+        pass
+    else:
+        raise ValueError(f"report directory appeared during checks: {target}")
+    os.replace(staging, target)
 
 
 def _write_descriptor(descriptor: int, content: bytes) -> None:

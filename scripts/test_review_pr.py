@@ -105,6 +105,7 @@ class ReviewCapsuleTests(unittest.TestCase):
             )
             self.assertEqual(checks[0]["name"], "contract-sources")
             self.assertEqual(checks[0]["status"], "SKIP")
+            self.assertEqual(Path(checks[1]["log"]).parent, report_dir)
 
     def test_main_blocks_submission_when_checks_are_incomplete(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -227,6 +228,7 @@ class ReviewCapsuleTests(unittest.TestCase):
 
             def fail_on_second_write(path, content, directory_fd=None):
                 nonlocal calls
+                self.assertFalse(report_dir.exists())
                 calls += 1
                 if calls == 2:
                     raise OSError("simulated evidence failure")

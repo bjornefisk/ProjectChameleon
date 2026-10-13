@@ -33,6 +33,8 @@ except ImportError:
 try:
     from .review_pr_evidence import (
         CheckResult,
+        create_staging_directory,
+        publish_staging_directory,
         cleanup_evidence_files,
         evidence_directory_entries,
         flush_check_logs,
@@ -51,6 +53,8 @@ try:
 except ImportError:
     from review_pr_evidence import (
         CheckResult,
+        create_staging_directory,
+        publish_staging_directory,
         cleanup_evidence_files,
         evidence_directory_entries,
         flush_check_logs,
@@ -589,7 +593,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--report-dir",
         type=Path,
-        help="Directory for the capsule; defaults to a temporary directory",
+        help="New directory for the capsule; defaults to a temporary directory",
     )
     parser.add_argument(
         "--run-checks",
@@ -885,9 +889,10 @@ def main() -> int:
     if body_source is not None:
         ensure_file(body_source)
 
-    report_dir = args.report_dir.absolute() if args.report_dir else Path(
-        tempfile.mkdtemp(prefix=f"chameleon-pr-{args.pr}-")
+    target_report_dir = args.report_dir.absolute() if args.report_dir else (
+        Path(tempfile.mkdtemp(prefix=f"chameleon-pr-{args.pr}-")) / "report"
     )
+    report_dir: Path | None = None
     checks: list[CheckResult] = []
     checkout: Path | None = None
     execution_dir: Path | None = None
@@ -896,17 +901,19 @@ def main() -> int:
     report_directory_validated = False
     review_refs: tuple[str, ...] = ()
     metadata: dict
-    exit_code = 2
-
+    summary_path: Path | None = None
+    publish_ready = False
+    published = False
     try:
-        report_dir.mkdir(parents=True, exist_ok=True)
+        report_dir = create_staging_directory(target_report_dir)
         report_fd = open_evidence_directory(report_dir)
         existing_entries = evidence_directory_entries(report_fd)
         if existing_entries:
             raise ReviewError(
-                "report directory must be empty: " + ", ".join(existing_entries[:5])
+                "staging directory must be empty: " + ", ".join(existing_entries[:5])
             )
         report_directory_validated = True
+        publish_ready = True
         if body_source is not None:
             body_content = snapshot_file(body_source)
 
@@ -1154,9 +1161,12 @@ def main() -> int:
         )
         write_evidence_bytes(report_dir / "commits.txt", commits_blob, report_fd)
         flush_check_logs(checks, report_fd)
+        for check in checks:
+            if check.log is not None:
+                check.log = str(target_report_dir / Path(check.log).name)
 
         provenance = {
-            "run_id": report_dir.name,
+            "run_id": target_report_dir.name,
             "capsule_revision": capsule_revision,
             "role": ".agents/roles/reviewer.md",
             "workflow": ".agents/workflows/06-review.md; .agents/workflows/07-github-pr.md",
@@ -1173,12 +1183,12 @@ def main() -> int:
             "next_owner": next_owner(checks, args.submit),
         }
         write_text(
-            report_dir / "checks.json",
+            target_report_dir / "checks.json",
             json.dumps([serialize_check(check) for check in checks], indent=2),
             report_fd,
         )
         summary_path = make_summary(
-            report_dir,
+            target_report_dir,
             metadata,
             base_sha,
             head_sha,
@@ -1188,9 +1198,6 @@ def main() -> int:
             provenance,
             directory_fd=report_fd,
         )
-        print(f"report: {summary_path}")
-        for check in checks:
-            print(f"{check.status:4} {check.name}")
         if any(check.status == "FAIL" for check in checks):
             exit_code = 1
         elif any(check.status == "SKIP" for check in checks):
@@ -1218,7 +1225,7 @@ def main() -> int:
             except OSError:
                 pass
         print(f"error: {error}", file=sys.stderr)
-        print(f"report: {report_dir}", file=sys.stderr)
+        print(f"report: {target_report_dir}", file=sys.stderr)
         exit_code = 2
     finally:
         try:
@@ -1230,6 +1237,25 @@ def main() -> int:
             shutil.rmtree(execution_dir, ignore_errors=True)
         if report_fd is not None:
             os.close(report_fd)
+    if report_dir is not None:
+        if not publish_ready:
+            shutil.rmtree(report_dir, ignore_errors=True)
+        else:
+            try:
+                publish_staging_directory(report_dir, target_report_dir)
+            except (OSError, ValueError) as publication_error:
+                shutil.rmtree(report_dir, ignore_errors=True)
+                print(
+                    f"error: report publication failed: {publication_error}",
+                    file=sys.stderr,
+                )
+                exit_code = 2
+            else:
+                published = True
+    if published and summary_path is not None:
+        print(f"report: {target_report_dir / 'summary.md'}")
+        for check in checks:
+            print(f"{check.status:4} {check.name}")
     return exit_code
 
 
