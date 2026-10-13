@@ -23,7 +23,7 @@ import tempfile
 import threading
 import time
 import uuid
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
@@ -32,6 +32,14 @@ from typing import Iterable, Mapping, Sequence
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TIMEOUT = 300
 GH_TIMEOUT = 60
+COMMAND_TIMEOUT = 60
+MAX_COMMAND_OUTPUT_BYTES = 16 * 1024 * 1024
+MAX_DIFF_BYTES = 64 * 1024 * 1024
+MAX_ARCHIVE_BYTES = 256 * 1024 * 1024
+MAX_ARCHIVE_MEMBERS = 100_000
+MAX_ARCHIVE_MEMBER_BYTES = 128 * 1024 * 1024
+MAX_EXTRACTED_BYTES = 512 * 1024 * 1024
+MAX_BODY_BYTES = 1 * 1024 * 1024
 MAX_LOG_BYTES = 4 * 1024 * 1024
 LOG_TRUNCATION_MARKER = b"\n[output truncated]\n"
 CONTRACT_SOURCES = (
@@ -87,7 +95,147 @@ class CheckResult:
     returncode: int | None = None
     log: str | None = None
     reason: str | None = None
+    output: bytes | None = field(default=None, repr=False, compare=False)
 
+@dataclass(frozen=True)
+class CommandResult:
+    returncode: int | None
+    stdout: bytes
+    stderr: bytes
+    timed_out: bool = False
+    output_limited: bool = False
+
+
+def run_bounded_command(
+    command: Sequence[str],
+    cwd: Path,
+    timeout: int,
+    max_output_bytes: int = MAX_COMMAND_OUTPUT_BYTES,
+    env: Mapping[str, str] | None = None,
+    stdout_path: Path | None = None,
+) -> CommandResult:
+    """Run a command with bounded output, timeout, and process cleanup."""
+    output_file = stdout_path.open("wb") if stdout_path is not None else None
+    try:
+        process = subprocess.Popen(
+            list(command),
+            cwd=cwd,
+            env=dict(env) if env is not None else None,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=os.name == "posix",
+        )
+    except OSError as error:
+        if output_file is not None:
+            output_file.close()
+        raise ReviewError(f"cannot run {shlex.join(command)}: {error}") from error
+
+    captured = {"stdout": bytearray(), "stderr": bytearray()}
+    total = 0
+    lock = threading.Lock()
+    output_limited = threading.Event()
+    reader_error: list[BaseException] = []
+
+    def drain(name: str, stream: object) -> None:
+        nonlocal total
+        if stream is None:
+            return
+        try:
+            while True:
+                chunk = stream.read(65536)  # type: ignore[union-attr]
+                if not chunk:
+                    return
+                with lock:
+                    remaining = max_output_bytes - total
+                    accepted = chunk[: max(0, remaining)]
+                    if accepted:
+                        if name == "stdout" and output_file is not None:
+                            output_file.write(accepted)
+                        else:
+                            captured[name].extend(accepted)
+                        total += len(accepted)
+                    if len(chunk) > remaining:
+                        output_limited.set()
+                        return
+        except (OSError, ValueError) as error:
+            reader_error.append(error)
+
+    readers = [
+        threading.Thread(
+            target=drain,
+            args=("stdout", process.stdout),
+            daemon=True,
+        ),
+        threading.Thread(
+            target=drain,
+            args=("stderr", process.stderr),
+            daemon=True,
+        ),
+    ]
+    for reader in readers:
+        reader.start()
+
+    deadline = time.monotonic() + timeout
+    timed_out = False
+    while process.poll() is None:
+        if output_limited.is_set():
+            terminate_process(process)
+            break
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            timed_out = True
+            terminate_process(process)
+            break
+        time.sleep(min(0.05, remaining))
+
+    for reader in readers:
+        reader.join(timeout=5)
+    if any(reader.is_alive() for reader in readers):
+        if process.stdout is not None:
+            process.stdout.close()
+        if process.stderr is not None:
+            process.stderr.close()
+        for reader in readers:
+            reader.join(timeout=1)
+    if process.stdout is not None and not process.stdout.closed:
+        process.stdout.close()
+    if process.stderr is not None and not process.stderr.closed:
+        process.stderr.close()
+    if output_file is not None:
+        output_file.flush()
+        output_file.close()
+    if reader_error and not timed_out and not output_limited.is_set():
+        raise ReviewError(f"command output capture failed: {reader_error[0]}")
+
+    return CommandResult(
+        returncode=process.returncode,
+        stdout=bytes(captured["stdout"]),
+        stderr=bytes(captured["stderr"]),
+        timed_out=timed_out,
+        output_limited=output_limited.is_set(),
+    )
+
+
+def require_command_success(
+    command: Sequence[str],
+    result: CommandResult,
+    timeout: int,
+    max_output_bytes: int,
+) -> CommandResult:
+    if result.timed_out:
+        raise ReviewError(f"timed out after {timeout}s: {shlex.join(command)}")
+    if result.output_limited:
+        raise ReviewError(
+            f"output exceeded {max_output_bytes} bytes: {shlex.join(command)}"
+        )
+    if result.returncode != 0:
+        error = result.stderr.decode("utf-8", errors="replace").strip()
+        raise ReviewError(error or shlex.join(command))
+    return result
+
+
+def decode_output(value: bytes) -> str:
+    return value.decode("utf-8", errors="replace")
 
 def terminate_process(process: subprocess.Popen) -> None:
     if process.poll() is not None:
@@ -120,6 +268,8 @@ def run_process(
     log_path: Path,
     timeout: int,
     env: Mapping[str, str] | None = None,
+    defer_log: bool = False,
+    input_bytes: bytes | None = None,
 ) -> CheckResult:
     started = time.monotonic()
     try:
@@ -127,12 +277,15 @@ def run_process(
             list(command),
             cwd=cwd,
             env=dict(env) if env is not None else None,
+            stdin=subprocess.PIPE if input_bytes is not None else None,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             start_new_session=os.name == "posix",
         )
     except OSError as error:
-        log_path.write_text(f"{type(error).__name__}: {error}\n", encoding="utf-8")
+        content = f"{type(error).__name__}: {error}\n".encode()
+        if not defer_log:
+            log_path.write_bytes(content)
         return CheckResult(
             name=log_path.stem,
             status="FAIL",
@@ -140,53 +293,83 @@ def run_process(
             command=list(command),
             reason=str(error),
             log=str(log_path),
+            output=content if defer_log else None,
         )
 
     written = 0
     output_truncated = False
-    reader_error: OSError | None = None
+    reader_error: BaseException | None = None
+    captured = bytearray()
+    log = None if defer_log else log_path.open("wb")
 
-    with log_path.open("wb") as log:
-        def drain_output() -> None:
-            nonlocal output_truncated, reader_error, written
-            stream = process.stdout
-            if stream is None:
-                return
+    def append_output(content: bytes) -> None:
+        captured.extend(content)
+        if log is not None:
+            log.write(content)
+
+    def drain_output() -> None:
+        nonlocal output_truncated, reader_error, written
+        stream = process.stdout
+        if stream is None:
+            return
+        try:
+            while True:
+                chunk = stream.read(65536)
+                if not chunk:
+                    return
+                remaining = MAX_LOG_BYTES - written
+                if remaining > 0:
+                    accepted = chunk[:remaining]
+                    append_output(accepted)
+                    written += len(accepted)
+                if len(chunk) > remaining:
+                    output_truncated = True
+        except (OSError, ValueError) as error:
+            reader_error = error
+
+    reader = threading.Thread(target=drain_output, daemon=True)
+    reader.start()
+    writer: threading.Thread | None = None
+    if input_bytes is not None and process.stdin is not None:
+        def write_input() -> None:
             try:
-                while True:
-                    chunk = stream.read(65536)
-                    if not chunk:
-                        return
-                    remaining = MAX_LOG_BYTES - written
-                    if remaining > 0:
-                        log.write(chunk[:remaining])
-                        written += min(len(chunk), remaining)
-                    if len(chunk) > remaining:
-                        output_truncated = True
-            except OSError as error:
-                reader_error = error
+                process.stdin.write(input_bytes)
+                process.stdin.close()
+            except (BrokenPipeError, OSError, ValueError):
+                pass
 
-        reader = threading.Thread(target=drain_output, daemon=True)
-        reader.start()
-        timed_out = False
+        writer = threading.Thread(target=write_input, daemon=True)
+        writer.start()
+    timed_out = False
+    try:
         try:
             returncode = process.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
             timed_out = True
             terminate_process(process)
             returncode = process.returncode
+        if writer is not None:
+            writer.join(timeout=1)
+            if writer.is_alive() and process.stdin is not None:
+                process.stdin.close()
+            if process.stdin is not None and not process.stdin.closed:
+                process.stdin.close()
         reader.join(timeout=5)
         if reader.is_alive():
             output_truncated = True
             if process.stdout is not None:
                 process.stdout.close()
             reader.join(timeout=1)
-        if process.stdout is not None:
+        if process.stdout is not None and not process.stdout.closed:
             process.stdout.close()
-        if reader_error is not None:
-            log.write(f"\nOutput capture failed: {reader_error}\n".encode())
+        if reader_error is not None and not output_truncated:
+            append_output(f"\nOutput capture failed: {reader_error}\n".encode())
         if output_truncated:
-            log.write(LOG_TRUNCATION_MARKER)
+            append_output(LOG_TRUNCATION_MARKER)
+    finally:
+        if log is not None:
+            log.flush()
+            log.close()
 
     if timed_out:
         status = "FAIL"
@@ -203,6 +386,7 @@ def run_process(
         returncode=returncode,
         log=str(log_path),
         reason=reason,
+        output=bytes(captured) if defer_log else None,
     )
 
 
@@ -223,34 +407,90 @@ def run_check(
     report_dir: Path,
     timeout: int,
     env: Mapping[str, str] | None = None,
+    input_bytes: bytes | None = None,
 ) -> CheckResult:
     log_path = report_dir / f"{len(list(report_dir.glob('*.log'))):02d}-{name}.log"
-    result = run_process(command, cwd, log_path, timeout, env)
+    result = run_process(
+        command,
+        cwd,
+        log_path,
+        timeout,
+        env,
+        input_bytes=input_bytes,
+        defer_log=True,
+    )
     result.name = name
     return result
 
 
+def open_evidence_directory(path: Path) -> int:
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    return os.open(path, flags)
+
+
+def verify_evidence_directory(path: Path, descriptor: int) -> None:
+    expected = os.fstat(descriptor)
+    actual = os.stat(path, follow_symlinks=False)
+    if (actual.st_dev, actual.st_ino) != (expected.st_dev, expected.st_ino):
+        raise ReviewError("evidence directory changed during PR checks")
+
+
+def write_evidence_bytes(
+    path: Path,
+    content: bytes,
+    directory_fd: int | None = None,
+) -> None:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    if directory_fd is None:
+        descriptor = os.open(path, flags, 0o600)
+    else:
+        descriptor = os.open(path.name, flags, 0o600, dir_fd=directory_fd)
+    try:
+        with os.fdopen(descriptor, "wb") as evidence:
+            evidence.write(content)
+    except BaseException:
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
+        raise
+
+
+def flush_check_logs(
+    checks: Iterable[CheckResult],
+    directory_fd: int | None = None,
+) -> None:
+    for check in checks:
+        if check.log is None or check.output is None:
+            continue
+        write_evidence_bytes(Path(check.log), check.output, directory_fd)
+        check.output = None
+
+
+def serialize_check(check: CheckResult) -> dict:
+    value = asdict(check)
+    value.pop("output", None)
+    return value
+
 def run_gh_json(
-    command: Sequence[str], cwd: Path = ROOT, timeout: int = GH_TIMEOUT
+    command: Sequence[str], cwd: Path | None = None, timeout: int = GH_TIMEOUT
 ) -> dict:
+    cwd = cwd or ROOT
+    result = require_command_success(
+        command,
+        run_bounded_command(
+            command,
+            cwd,
+            timeout,
+            max_output_bytes=MAX_COMMAND_OUTPUT_BYTES,
+        ),
+        timeout,
+        MAX_COMMAND_OUTPUT_BYTES,
+    )
     try:
-        completed = subprocess.run(
-            list(command),
-            cwd=cwd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=timeout,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as error:
-        raise ReviewError(f"timed out after {timeout}s: {shlex.join(command)}") from error
-    except OSError as error:
-        raise ReviewError(f"cannot run {shlex.join(command)}: {error}") from error
-    if completed.returncode != 0:
-        raise ReviewError(completed.stderr.strip() or shlex.join(command))
-    try:
-        value = json.loads(completed.stdout)
+        value = json.loads(decode_output(result.stdout))
     except json.JSONDecodeError as error:
         raise ReviewError(f"invalid JSON from {shlex.join(command)}: {error}") from error
     if not isinstance(value, dict):
@@ -258,26 +498,46 @@ def run_gh_json(
     return value
 
 
-def git_output(*args: str, cwd: Path = ROOT, strip: bool = True) -> str:
-    try:
-        completed = subprocess.run(
-            ["git", *args],
-            cwd=cwd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=False,
-        )
-    except OSError as error:
-        raise ReviewError(f"cannot run git {shlex.join(args)}: {error}") from error
-    if completed.returncode != 0:
-        raise ReviewError(completed.stderr.strip() or shlex.join(["git", *args]))
-    return completed.stdout.strip() if strip else completed.stdout
+def git_output_bytes(
+    *args: str,
+    cwd: Path | None = None,
+    strip: bool = True,
+    timeout: int = COMMAND_TIMEOUT,
+    max_output_bytes: int = MAX_COMMAND_OUTPUT_BYTES,
+) -> bytes:
+    cwd = cwd or ROOT
+    command = ["git", *args]
+    result = require_command_success(
+        command,
+        run_bounded_command(
+            command,
+            cwd,
+            timeout,
+            max_output_bytes=max_output_bytes,
+        ),
+        timeout,
+        max_output_bytes,
+    )
+    return result.stdout.strip() if strip else result.stdout
+
+
+def git_output(*args: str, cwd: Path | None = None, strip: bool = True) -> str:
+    return decode_output(git_output_bytes(*args, cwd=cwd, strip=strip))
 
 
 def ensure_file(path: Path) -> None:
     if not path.is_file():
         raise SystemExit(f"--body-file must be a file: {path}")
+
+
+def snapshot_file(source: Path, max_bytes: int = MAX_BODY_BYTES) -> bytes:
+    size = source.stat().st_size
+    if size > max_bytes:
+        raise ReviewError(f"file exceeds {max_bytes} bytes: {source}")
+    content = source.read_bytes()
+    if len(content) > max_bytes:
+        raise ReviewError(f"file exceeds {max_bytes} bytes: {source}")
+    return content
 
 
 def changed_contract_sources(changed_files: Iterable[str]) -> list[str]:
@@ -330,45 +590,121 @@ def missing_contract_sources(root: Path, sources: Iterable[str]) -> list[str]:
     return missing
 
 
-def write_text(path: Path, content: str) -> None:
+def write_text(
+    path: Path,
+    content: str,
+    directory_fd: int | None = None,
+) -> None:
     if not content.endswith("\n"):
         content += "\n"
-    path.write_text(content, encoding="utf-8")
+    write_evidence_bytes(path, content.encode("utf-8"), directory_fd)
 
 
 def create_checkout(head_sha: str, checkout: Path) -> None:
-    """Extract PR files into an isolated local Git repository."""
+    """Extract the complete PR tree into an isolated local Git repository."""
     if checkout.exists():
         raise ReviewError(f"checkout path already exists: {checkout}")
     checkout.mkdir(parents=True)
-    archive_path = checkout.parent / "source.tar"
+    archive_fd, archive_name = tempfile.mkstemp(
+        prefix=".source-",
+        suffix=".tar",
+        dir=checkout.parent,
+    )
+    os.close(archive_fd)
+    archive_path = Path(archive_name)
+    checkout_root = checkout.resolve()
     try:
-        try:
-            with archive_path.open("wb") as archive_file:
-                subprocess.run(
-                    ["git", "archive", "--format=tar", head_sha],
-                    cwd=ROOT,
-                    stdout=archive_file,
-                    stderr=subprocess.PIPE,
-                    check=True,
+        expected_paths = {
+            os.fsdecode(path)
+            for path in git_output_bytes(
+                "ls-tree",
+                "-r",
+                "--name-only",
+                "-z",
+                head_sha,
+                strip=False,
+            ).split(b"\0")
+            if path
+        }
+        archive_command = ["git", "archive", "--format=tar", head_sha]
+        archive_result = run_bounded_command(
+            archive_command,
+            ROOT,
+            COMMAND_TIMEOUT,
+            max_output_bytes=MAX_ARCHIVE_BYTES,
+            stdout_path=archive_path,
+        )
+        require_command_success(
+            archive_command,
+            archive_result,
+            COMMAND_TIMEOUT,
+            MAX_ARCHIVE_BYTES,
+        )
+        if archive_path.stat().st_size > MAX_ARCHIVE_BYTES:
+            raise ReviewError(f"archive exceeds {MAX_ARCHIVE_BYTES} bytes")
+
+        with tarfile.open(archive_path, mode="r") as archive:
+            members = []
+            archive_paths = set()
+            extracted_bytes = 0
+            for index, member in enumerate(archive, start=1):
+                if index > MAX_ARCHIVE_MEMBERS:
+                    raise ReviewError(
+                        f"archive exceeds {MAX_ARCHIVE_MEMBERS} members"
+                    )
+                if member.issym() or member.islnk():
+                    raise ReviewError(f"refusing link in PR archive: {member.name}")
+                if not member.isdir() and not member.isfile():
+                    raise ReviewError(f"refusing special file in PR archive: {member.name}")
+                target = (checkout_root / member.name).resolve()
+                if target != checkout_root and checkout_root not in target.parents:
+                    raise ReviewError(f"unsafe archive path: {member.name}")
+                if member.isfile():
+                    if member.size > MAX_ARCHIVE_MEMBER_BYTES:
+                        raise ReviewError(
+                            f"archive member exceeds {MAX_ARCHIVE_MEMBER_BYTES} bytes: "
+                            f"{member.name}"
+                        )
+                    extracted_bytes += member.size
+                    if extracted_bytes > MAX_EXTRACTED_BYTES:
+                        raise ReviewError(
+                            f"archive contents exceed {MAX_EXTRACTED_BYTES} bytes"
+                        )
+                    archive_paths.add(member.name)
+                members.append(member)
+
+            if archive_paths != expected_paths:
+                missing = sorted(expected_paths - archive_paths)[:5]
+                extra = sorted(archive_paths - expected_paths)[:5]
+                raise ReviewError(
+                    "PR archive manifest mismatch; "
+                    f"missing={missing!r}, extra={extra!r}"
                 )
-            with tarfile.open(archive_path, mode="r") as archive:
-                for member in archive.getmembers():
-                    if member.issym() or member.islnk():
-                        raise ReviewError(f"refusing link in PR archive: {member.name}")
-                    target = (checkout / member.name).resolve()
-                    if target != checkout and checkout not in target.parents:
-                        raise ReviewError(f"unsafe archive path: {member.name}")
+
+            for member in members:
+                if sys.version_info >= (3, 12):
+                    archive.extract(member, checkout, filter="data")
+                else:
                     archive.extract(member, checkout)
-        except subprocess.CalledProcessError as error:
-            raise ReviewError(f"cannot archive PR head {head_sha}: {error}") from error
-        finally:
-            archive_path.unlink(missing_ok=True)
-        subprocess.run(
-            ["git", "init", "--quiet"],
-            cwd=checkout,
+    except BaseException:
+        shutil.rmtree(checkout, ignore_errors=True)
+        raise
+    finally:
+        archive_path.unlink(missing_ok=True)
+
+    try:
+        init_command = ["git", "init", "--quiet"]
+        init_result = run_bounded_command(
+            init_command,
+            checkout,
+            COMMAND_TIMEOUT,
             env={"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull},
-            check=True,
+        )
+        require_command_success(
+            init_command,
+            init_result,
+            COMMAND_TIMEOUT,
+            MAX_COMMAND_OUTPUT_BYTES,
         )
     except BaseException:
         shutil.rmtree(checkout, ignore_errors=True)
@@ -478,6 +814,7 @@ def make_summary(
     checks: list[CheckResult],
     contract_sources: list[str],
     provenance: Mapping[str, str] | None = None,
+    directory_fd: int | None = None,
 ) -> Path:
     if any(check.status == "FAIL" for check in checks):
         overall = "FAIL"
@@ -567,7 +904,7 @@ def make_summary(
         ]
     )
     summary_path = report_dir / "summary.md"
-    write_text(summary_path, "\n".join(lines))
+    write_text(summary_path, "\n".join(lines), directory_fd)
     return summary_path
 
 
@@ -634,24 +971,22 @@ def resolve_repository(repo: str | None) -> str:
     ]
     environment = os.environ.copy()
     environment["GH_PROMPT_DISABLED"] = "1"
-    try:
-        completed = subprocess.run(
+    result = require_command_success(
+        command,
+        run_bounded_command(
             command,
-            cwd=ROOT,
+            ROOT,
+            GH_TIMEOUT,
+            max_output_bytes=1024,
             env=environment,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=GH_TIMEOUT,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as error:
-        raise ReviewError(f"timed out after {GH_TIMEOUT}s: {shlex.join(command)}") from error
-    except OSError as error:
-        raise ReviewError(f"cannot run {shlex.join(command)}: {error}") from error
-    if completed.returncode != 0 or not completed.stdout.strip():
-        raise ReviewError(completed.stderr.strip() or "cannot resolve GitHub repository")
-    return completed.stdout.strip()
+        ),
+        GH_TIMEOUT,
+        1024,
+    )
+    repository = decode_output(result.stdout).strip()
+    if not repository:
+        raise ReviewError("cannot resolve GitHub repository")
+    return repository
 
 
 def fetch_pr_refs(
@@ -684,27 +1019,18 @@ def fetch_pr_refs(
     environment["GIT_TERMINAL_PROMPT"] = "0"
     try:
         for command in commands:
-            try:
-                completed = subprocess.run(
+            result = require_command_success(
+                command,
+                run_bounded_command(
                     command,
-                    cwd=ROOT,
+                    ROOT,
+                    GH_TIMEOUT,
+                    max_output_bytes=MAX_COMMAND_OUTPUT_BYTES,
                     env=environment,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    timeout=GH_TIMEOUT,
-                    check=False,
-                )
-            except subprocess.TimeoutExpired as error:
-                raise ReviewError(
-                    f"timed out after {GH_TIMEOUT}s: {shlex.join(command)}"
-                ) from error
-            except OSError as error:
-                raise ReviewError(
-                    f"cannot run {shlex.join(command)}: {error}"
-                ) from error
-            if completed.returncode != 0:
-                raise ReviewError(completed.stderr.strip() or shlex.join(command))
+                ),
+                GH_TIMEOUT,
+                MAX_COMMAND_OUTPUT_BYTES,
+            )
     except ReviewError:
         delete_review_refs((head_ref, base_ref))
         raise
@@ -719,15 +1045,46 @@ def delete_review_refs(refs: Iterable[str]) -> None:
             continue
 
 
+def review_entries(payload: Mapping[str, object]) -> list[Mapping[str, object]]:
+    raw_reviews = payload.get("reviews")
+    if not isinstance(raw_reviews, list):
+        raise ReviewError("GitHub response did not contain a reviews list")
+    reviews = []
+    for review in raw_reviews:
+        if not isinstance(review, dict):
+            raise ReviewError("GitHub response contained a malformed review")
+        reviews.append(review)
+    return reviews
+
+
+def review_login(review: Mapping[str, object]) -> str | None:
+    author = review.get("author")
+    if not isinstance(author, dict):
+        return None
+    login = author.get("login")
+    return str(login) if login is not None else None
+
+
+def review_id(review: Mapping[str, object]) -> str | None:
+    value = review.get("id")
+    return str(value) if value is not None else None
+
+
+def review_body(review: Mapping[str, object]) -> str | None:
+    value = review.get("body")
+    return str(value).strip() if value is not None else None
+
+
 def submit_review(
     pr: int,
     repo: str,
     mode: str,
-    body_file: Path,
+    body_content: bytes,
     report_dir: Path,
     timeout: int,
 ) -> CheckResult:
     flag = "--request-changes" if mode == "request-changes" else "--comment"
+    expected_state = "CHANGES_REQUESTED" if mode == "request-changes" else "COMMENTED"
     command = [
         "gh",
         "pr",
@@ -737,56 +1094,134 @@ def submit_review(
         repo,
         flag,
         "--body-file",
-        str(body_file),
+        "-",
     ]
-    expected = "CHANGES_REQUESTED" if mode == "request-changes" else None
-    result = run_check("submit-review", command, ROOT, report_dir, timeout)
-    if result.status != "PASS":
-        if result.reason and "timeout" in result.reason.lower():
+    try:
+        if len(body_content) > MAX_BODY_BYTES:
+            raise ReviewError(f"review body exceeds {MAX_BODY_BYTES} bytes")
+        expected_body = body_content.decode("utf-8").strip()
+
+        try:
+            actor_payload = run_gh_json(["gh", "api", "user"], timeout=timeout)
+            actor = actor_payload.get("login")
+            if not isinstance(actor, str) or not actor:
+                raise ReviewError("authenticated GitHub actor was not returned")
+            reviews_command = [
+                "gh",
+                "pr",
+                "view",
+                str(pr),
+                "--repo",
+                repo,
+                "--json",
+                "reviews",
+            ]
+            before_reviews = review_entries(
+                run_gh_json(reviews_command, timeout=timeout)
+            )
+            before_ids = {
+                identifier
+                for review in before_reviews
+                if (identifier := review_id(review)) is not None
+            }
+        except (OSError, ReviewError, UnicodeError) as error:
+            return CheckResult(
+                name="submit-review",
+                status="FAIL",
+                duration_seconds=0.0,
+                command=command,
+                reason=(
+                    "pre-submission verification failed: "
+                    f"{error}; submission not attempted"
+                ),
+            )
+
+        result = run_check(
+            "submit-review",
+            command,
+            ROOT,
+            report_dir,
+            timeout,
+            input_bytes=body_content,
+        )
+        if result.status != "PASS":
+            if result.reason and "timeout" in result.reason.lower():
+                result.reason = (
+                    f"{result.reason}; submission outcome indeterminate; "
+                    "inspect GitHub before retrying"
+                )
+            else:
+                result.reason = (
+                    f"{result.reason or 'submission failed'}; "
+                    "submission not confirmed; inspect GitHub before retrying"
+                )
+            return result
+
+        try:
+            after_reviews = review_entries(
+                run_gh_json(reviews_command, timeout=timeout)
+            )
+        except ReviewError as error:
+            result.status = "FAIL"
             result.reason = (
-                f"{result.reason}; submission outcome indeterminate; "
+                f"review submitted; verification failed: {error}; "
                 "inspect GitHub before retrying"
             )
-        else:
+            return result
+
+        matching_review = next(
+            (
+                review
+                for review in after_reviews
+                if review_id(review) is not None
+                and review_id(review) not in before_ids
+                and review_login(review) == actor
+                and review.get("state") == expected_state
+                and review_body(review) == expected_body
+            ),
+            None,
+        )
+        if matching_review is None:
+            result.status = "FAIL"
             result.reason = (
-                f"{result.reason or 'submission failed'}; "
-                "submission not confirmed; inspect GitHub before retrying"
+                "review submitted; no new matching review was observed "
+                f"for actor {actor!r} with state {expected_state!r}; "
+                "submission outcome indeterminate; inspect GitHub before retrying"
             )
         return result
-
-    try:
-        verification = run_gh_json(
-            ["gh", "pr", "view", str(pr), "--repo", repo, "--json", "reviewDecision"],
-            timeout=timeout,
+    except (OSError, ReviewError, UnicodeError) as error:
+        return CheckResult(
+            name="submit-review",
+            status="FAIL",
+            duration_seconds=0.0,
+            command=command,
+            reason=f"pre-submission verification failed: {error}; submission not attempted",
         )
-    except ReviewError as error:
-        result.status = "FAIL"
-        result.reason = f"review submitted; verification failed: {error}; do not retry"
-        return result
-    actual = verification.get("reviewDecision")
-    if expected and actual != expected:
-        result.status = "FAIL"
-        result.reason = f"expected reviewDecision={expected}, got {actual!r}"
-    return result
 
 
 def main() -> int:
     args = parse_args()
-    body_file = args.body_file.resolve() if args.body_file else None
-    if body_file is not None:
-        ensure_file(body_file)
+    body_source = args.body_file.resolve() if args.body_file else None
+    if body_source is not None:
+        ensure_file(body_source)
 
     report_dir = args.report_dir.resolve() if args.report_dir else Path(
         tempfile.mkdtemp(prefix=f"chameleon-pr-{args.pr}-")
     )
     report_dir.mkdir(parents=True, exist_ok=True)
     checks: list[CheckResult] = []
-    checkout = report_dir / "checkout"
-    checkout_created = False
+    checkout: Path | None = None
+    execution_dir: Path | None = None
+    body_content: bytes | None = None
+    report_fd: int | None = None
     review_refs: tuple[str, ...] = ()
     metadata: dict
 
     try:
+        report_fd = open_evidence_directory(report_dir)
+        if body_source is not None:
+            body_content = snapshot_file(body_source)
+
         repository = resolve_repository(args.repo)
         metadata = run_gh_json(
             [
@@ -812,22 +1247,38 @@ def main() -> int:
             raise ReviewError("fetched PR base does not match GitHub base SHA")
 
         diff_range = f"{base_sha}...{head_sha}"
-        write_text(
-            report_dir / "diff.patch",
-            git_output("diff", "--no-ext-diff", diff_range, strip=False),
+        diff_patch = git_output_bytes(
+            "diff",
+            "--no-ext-diff",
+            diff_range,
+            strip=False,
+            max_output_bytes=MAX_DIFF_BYTES,
         )
-        write_text(report_dir / "diff-stat.txt", git_output("diff", "--stat", diff_range))
-        write_text(report_dir / "changed-files.txt", git_output("diff", "--name-only", diff_range))
-        write_text(report_dir / "commits.txt", git_output("log", "--oneline", f"{base_sha}..{head_sha}"))
+        diff_stat = git_output_bytes("diff", "--stat", diff_range, strip=False)
+        changed_files_blob = git_output_bytes(
+            "diff",
+            "--name-only",
+            diff_range,
+            strip=False,
+        )
+        commits_blob = git_output_bytes(
+            "log",
+            "--oneline",
+            f"{base_sha}..{head_sha}",
+            strip=False,
+        )
         changed_files = [
             line
-            for line in (report_dir / "changed-files.txt").read_text(encoding="utf-8").splitlines()
+            for line in decode_output(changed_files_blob).splitlines()
             if line
         ]
         contract_sources = changed_contract_sources(changed_files)
         capsule_revision = git_output("rev-parse", "HEAD")
+        execution_dir = Path(
+            tempfile.mkdtemp(prefix=f"chameleon-pr-{args.pr}-checks-")
+        )
+        checkout = execution_dir / "checkout"
         create_checkout(head_sha, checkout)
-        checkout_created = True
         missing_sources = missing_contract_sources(checkout, contract_sources)
         changed_sources = changed_authority_sources(changed_files, contract_sources)
         contract_issues = []
@@ -873,7 +1324,9 @@ def main() -> int:
                 ]
             )
         else:
-            check_env = isolated_environment(report_dir)
+            if execution_dir is None:
+                raise ReviewError("check execution directory was not created")
+            check_env = isolated_environment(execution_dir)
             checks.append(
                 run_check("diff-check", ["git", "diff", "--check", diff_range], ROOT, report_dir, args.timeout)
             )
@@ -987,16 +1440,30 @@ def main() -> int:
                     )
                 )
             else:
+                if body_content is None:
+                    raise ReviewError("review body snapshot is unavailable")
                 checks.append(
                     submit_review(
                         args.pr,
                         repository,
                         args.submit,
-                        body_file,
+                        body_content,
                         report_dir,
                         args.timeout,
                     )
                 )
+        if report_fd is None:
+            raise ReviewError("evidence directory is not open")
+        verify_evidence_directory(report_dir, report_fd)
+        write_evidence_bytes(report_dir / "diff.patch", diff_patch, report_fd)
+        write_evidence_bytes(report_dir / "diff-stat.txt", diff_stat, report_fd)
+        write_evidence_bytes(
+            report_dir / "changed-files.txt",
+            changed_files_blob,
+            report_fd,
+        )
+        write_evidence_bytes(report_dir / "commits.txt", commits_blob, report_fd)
+        flush_check_logs(checks, report_fd)
 
         provenance = {
             "run_id": report_dir.name,
@@ -1017,7 +1484,8 @@ def main() -> int:
         }
         write_text(
             report_dir / "checks.json",
-            json.dumps([asdict(check) for check in checks], indent=2),
+            json.dumps([serialize_check(check) for check in checks], indent=2),
+            report_fd,
         )
         summary_path = make_summary(
             report_dir,
@@ -1028,6 +1496,7 @@ def main() -> int:
             checks,
             contract_sources,
             provenance,
+            directory_fd=report_fd,
         )
         print(f"report: {summary_path}")
         for check in checks:
@@ -1037,15 +1506,17 @@ def main() -> int:
         if any(check.status == "SKIP" for check in checks):
             return 2
         return 0
-    except (ReviewError, OSError, subprocess.CalledProcessError) as error:
-        write_text(report_dir / "error.txt", str(error))
+    except (ReviewError, OSError, subprocess.CalledProcessError, tarfile.TarError) as error:
+        write_text(report_dir / "error.txt", str(error), report_fd)
         print(f"error: {error}", file=sys.stderr)
         print(f"report: {report_dir}", file=sys.stderr)
         return 2
     finally:
         delete_review_refs(review_refs)
-        if checkout_created:
-            shutil.rmtree(checkout, ignore_errors=True)
+        if execution_dir is not None:
+            shutil.rmtree(execution_dir, ignore_errors=True)
+        if report_fd is not None:
+            os.close(report_fd)
 
 
 if __name__ == "__main__":

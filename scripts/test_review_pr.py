@@ -43,22 +43,32 @@ class ReviewCapsuleTests(unittest.TestCase):
             self.assertEqual(path.read_text(encoding="utf-8"), "+trailing spaces   \n")
 
     def test_git_output_raw_mode_preserves_trailing_whitespace(self):
-        completed = review_pr.subprocess.CompletedProcess(
-            ["git"], 0, "diff line  \n\n", ""
+        completed = review_pr.CommandResult(
+            0,
+            b"diff line  \n\n",
+            b"",
         )
-        with patch.object(review_pr.subprocess, "run", return_value=completed):
+        with patch.object(review_pr, "run_bounded_command", return_value=completed):
             output = review_pr.git_output("diff", strip=False)
 
         self.assertEqual(output, "diff line  \n\n")
 
     def test_repository_resolution_wraps_missing_gh(self):
-        with patch.object(review_pr.subprocess, "run", side_effect=FileNotFoundError("gh")):
+        with patch.object(
+            review_pr,
+            "run_bounded_command",
+            side_effect=review_pr.ReviewError("cannot run gh"),
+        ):
             with self.assertRaises(review_pr.ReviewError):
                 review_pr.resolve_repository(None)
 
     def test_fetch_pr_refs_uses_private_noncolliding_namespace(self):
-        completed = review_pr.subprocess.CompletedProcess([], 0, "", "")
-        with patch.object(review_pr.subprocess, "run", return_value=completed) as run:
+        completed = review_pr.CommandResult(0, b"", b"")
+        with patch.object(
+            review_pr,
+            "run_bounded_command",
+            return_value=completed,
+        ) as run:
             head_ref, base_ref = review_pr.fetch_pr_refs(
                 8,
                 "pr/8",
@@ -73,32 +83,131 @@ class ReviewCapsuleTests(unittest.TestCase):
         self.assertIn("refs/review-capsule/run-1/base", commands[1][-1])
 
     def test_timeout_submission_stays_failed_and_indeterminate(self):
-        timed_out = review_pr.CheckResult(
-            name="submit-review",
-            status="FAIL",
-            duration_seconds=1.0,
-            command=["gh"],
-            returncode=None,
-            reason="timeout after 60s",
-        )
-        with patch.object(review_pr, "run_check", return_value=timed_out), patch.object(
-            review_pr, "run_gh_json"
-        ) as verify:
-            result = review_pr.submit_review(
-                8,
-                "owner/repo",
-                "request-changes",
-                Path("review.md"),
-                Path("."),
-                60,
+        with tempfile.TemporaryDirectory() as directory:
+            body_file = Path(directory) / "review.md"
+            body_file.write_text("body\n", encoding="utf-8")
+            timed_out = review_pr.CheckResult(
+                name="submit-review",
+                status="FAIL",
+                duration_seconds=1.0,
+                command=["gh"],
+                returncode=None,
+                reason="timeout after 60s",
             )
+            with patch.object(
+                review_pr,
+                "run_check",
+                return_value=timed_out,
+            ), patch.object(
+                review_pr,
+                "run_gh_json",
+                side_effect=[{"login": "reviewer"}, {"reviews": []}],
+            ) as verify:
+                result = review_pr.submit_review(
+                    8,
+                    "owner/repo",
+                    "request-changes",
+                    body_file.read_bytes(),
+                    Path(directory),
+                    60,
+                )
 
         self.assertEqual(result.status, "FAIL")
         self.assertIn("indeterminate", result.reason)
-        verify.assert_not_called()
+        self.assertEqual(verify.call_count, 2)
+
+    def test_submission_accepts_new_matching_review(self):
+        with tempfile.TemporaryDirectory() as directory:
+            body_file = Path(directory) / "review.md"
+            body_file.write_text("body\n", encoding="utf-8")
+            before = {
+                "id": "old",
+                "author": {"login": "reviewer"},
+                "state": "COMMENTED",
+                "body": "older",
+            }
+            after = {
+                **before,
+                "id": "new",
+                "state": "CHANGES_REQUESTED",
+                "body": "body",
+            }
+            passed = review_pr.CheckResult(
+                "submit-review",
+                "PASS",
+                0.1,
+                ["gh", "pr", "review"],
+            )
+            with patch.object(
+                review_pr,
+                "run_gh_json",
+                side_effect=[
+                    {"login": "reviewer"},
+                    {"reviews": [before]},
+                    {"reviews": [before, after]},
+                ],
+            ), patch.object(
+                review_pr,
+                "run_check",
+                return_value=passed,
+            ) as execute:
+                result = review_pr.submit_review(
+                    8,
+                    "owner/repo",
+                    "request-changes",
+                    body_file.read_bytes(),
+                    Path(directory),
+                    60,
+                )
+
+        self.assertEqual(result.status, "PASS")
+        self.assertEqual(execute.call_args.args[1][-2:], ["--body-file", "-"])
+        self.assertEqual(execute.call_args.kwargs["input_bytes"], b"body\n")
+
+    def test_submission_rejects_preexisting_matching_review(self):
+        with tempfile.TemporaryDirectory() as directory:
+            body_file = Path(directory) / "review.md"
+            body_file.write_text("body\n", encoding="utf-8")
+            existing = {
+                "id": "old",
+                "author": {"login": "reviewer"},
+                "state": "CHANGES_REQUESTED",
+                "body": "body",
+            }
+            passed = review_pr.CheckResult(
+                "submit-review",
+                "PASS",
+                0.1,
+                ["gh", "pr", "review"],
+            )
+            with patch.object(
+                review_pr,
+                "run_gh_json",
+                side_effect=[
+                    {"login": "reviewer"},
+                    {"reviews": [existing]},
+                    {"reviews": [existing]},
+                ],
+            ), patch.object(review_pr, "run_check", return_value=passed):
+                result = review_pr.submit_review(
+                    8,
+                    "owner/repo",
+                    "request-changes",
+                    body_file.read_bytes(),
+                    Path(directory),
+                    60,
+                )
+
+        self.assertEqual(result.status, "FAIL")
+        self.assertIn("no new matching review", result.reason)
+
 
     def test_missing_gh_is_a_review_error(self):
-        with patch.object(review_pr.subprocess, "run", side_effect=FileNotFoundError("gh")):
+        with patch.object(
+            review_pr,
+            "run_bounded_command",
+            side_effect=review_pr.ReviewError("cannot run gh"),
+        ):
             with self.assertRaises(review_pr.ReviewError):
                 review_pr.run_gh_json(["gh", "pr", "view"])
 
@@ -153,6 +262,90 @@ class ReviewCapsuleTests(unittest.TestCase):
                 len(content),
                 32 + len(review_pr.LOG_TRUNCATION_MARKER),
             )
+
+    def test_run_check_defers_report_log_until_flush(self):
+        with tempfile.TemporaryDirectory() as directory:
+            report_dir = Path(directory)
+            result = review_pr.run_check(
+                "check",
+                [sys.executable, "-c", "print('captured')"],
+                ROOT,
+                report_dir,
+                10,
+            )
+
+            log_path = Path(result.log)
+            self.assertFalse(log_path.exists())
+            self.assertIn(b"captured", result.output)
+            review_pr.flush_check_logs([result])
+
+            self.assertEqual(log_path.read_text(encoding="utf-8"), "captured\n")
+
+    def test_run_process_passes_review_body_on_stdin(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log_path = Path(directory) / "check.log"
+            result = review_pr.run_process(
+                [
+                    sys.executable,
+                    "-c",
+                    "import sys; sys.stdout.write(sys.stdin.read())",
+                ],
+                ROOT,
+                log_path,
+                10,
+                input_bytes=b"body\n",
+            )
+
+            self.assertEqual(result.status, "PASS")
+            self.assertEqual(log_path.read_bytes(), b"body\n")
+
+    def test_bounded_command_rejects_excessive_output(self):
+        result = review_pr.run_bounded_command(
+            [
+                sys.executable,
+                "-c",
+                "import sys; sys.stdout.write('x' * 256)",
+            ],
+            ROOT,
+            10,
+            max_output_bytes=32,
+        )
+
+        self.assertTrue(result.output_limited)
+        self.assertLessEqual(len(result.stdout), 32)
+
+    def test_create_checkout_rejects_export_ignored_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory) / "repo"
+            repo.mkdir()
+            run_git = lambda *args: review_pr.subprocess.run(
+                ["git", *args],
+                cwd=repo,
+                stdout=review_pr.subprocess.PIPE,
+                stderr=review_pr.subprocess.PIPE,
+                check=True,
+            )
+            run_git("init", "--quiet")
+            run_git("config", "user.email", "test@example.invalid")
+            run_git("config", "user.name", "Test")
+            (repo / ".gitattributes").write_text(
+                "hidden.txt export-ignore\n",
+                encoding="utf-8",
+            )
+            (repo / "hidden.txt").write_text("hidden\n", encoding="utf-8")
+            (repo / "visible.txt").write_text("visible\n", encoding="utf-8")
+            run_git("add", ".")
+            run_git("commit", "--quiet", "-m", "test")
+            checkout = Path(directory) / "checkout"
+
+            with patch.object(review_pr, "ROOT", repo):
+                with self.assertRaisesRegex(
+                    review_pr.ReviewError,
+                    "archive manifest mismatch",
+                ):
+                    review_pr.create_checkout("HEAD", checkout)
+
+        self.assertFalse(checkout.exists())
 
     def test_resolve_runner_python_requires_executable_path(self):
         with tempfile.TemporaryDirectory() as directory:
