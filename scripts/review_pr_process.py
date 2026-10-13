@@ -24,29 +24,35 @@ class ProcessResult:
 
 
 def _terminate_process(process: subprocess.Popen) -> None:
-    if process.poll() is not None:
-        return
-    try:
-        if os.name == "posix":
+    if os.name == "posix":
+        try:
             os.killpg(process.pid, signal.SIGTERM)
-        else:
+        except OSError:
+            pass
+    elif process.poll() is None:
+        try:
             process.terminate()
-        process.wait(timeout=5)
-        return
-    except (OSError, subprocess.TimeoutExpired):
-        pass
-    try:
-        if os.name == "posix":
-            os.killpg(process.pid, signal.SIGKILL)
-        else:
-            process.kill()
-    except OSError:
-        pass
+        except OSError:
+            pass
     try:
         process.wait(timeout=5)
     except subprocess.TimeoutExpired:
         pass
 
+    if os.name == "posix":
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except OSError:
+            pass
+    elif process.poll() is None:
+        try:
+            process.kill()
+        except OSError:
+            pass
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        pass
 
 def execute_process(
     command: Sequence[str],
@@ -142,6 +148,7 @@ def execute_process(
             _terminate_process(process)
             break
         time.sleep(min(0.05, remaining))
+    _terminate_process(process)
 
     if writer is not None:
         writer.join(timeout=1)

@@ -41,6 +41,7 @@ def verify_evidence_directory(path: Path, descriptor: int) -> None:
 def evidence_directory_entries(descriptor: int) -> list[str]:
     return sorted(os.listdir(descriptor))
 
+
 def create_staging_directory(target: Path) -> Path:
     try:
         target_stat = os.lstat(target)
@@ -57,13 +58,40 @@ def create_staging_directory(target: Path) -> Path:
 
 
 def publish_staging_directory(staging: Path, target: Path) -> None:
+    lock_path = target.parent / f".{target.name}.publish.lock"
+    lock_fd: int | None = None
+    owns_lock = False
     try:
-        os.lstat(target)
-    except FileNotFoundError:
-        pass
-    else:
-        raise ValueError(f"report directory appeared during checks: {target}")
-    os.replace(staging, target)
+        try:
+            lock_fd = os.open(
+                lock_path,
+                os.O_WRONLY
+                | os.O_CREAT
+                | os.O_EXCL
+                | getattr(os, "O_NOFOLLOW", 0),
+                0o600,
+            )
+            owns_lock = True
+        except FileExistsError as error:
+            raise ValueError(
+                f"report publication already in progress: {target}"
+            ) from error
+        os.write(lock_fd, f"{os.getpid()}\n".encode("ascii"))
+        try:
+            os.lstat(target)
+        except FileNotFoundError:
+            pass
+        else:
+            raise ValueError(f"report directory appeared during checks: {target}")
+        os.replace(staging, target)
+    finally:
+        if lock_fd is not None:
+            os.close(lock_fd)
+        if owns_lock:
+            try:
+                os.unlink(lock_path)
+            except FileNotFoundError:
+                pass
 
 
 def _write_descriptor(descriptor: int, content: bytes) -> None:
@@ -181,6 +209,7 @@ def markdown_code(value: object) -> str:
         .replace("\\", "\\\\")
         .replace("\r", "\\r")
         .replace("\n", "\\n")
+        .replace("|", "\\|")
     )
     longest_backtick_run = max(
         (len(run) for run in re.findall(r"`+", escaped)),
@@ -305,7 +334,7 @@ def make_summary(
             f"{check.duration_seconds:.3f} | {log} |"
         )
         if check.reason:
-            lines.append(f"| reason | {markdown_cell(check.reason)} |  |  |")
+            lines.append(f"| reason | {markdown_code(check.reason)} |  |  |")
     lines.extend(
         [
             "",

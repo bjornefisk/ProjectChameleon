@@ -672,11 +672,13 @@ def fetch_pr_refs(
     base_ref_name: str,
     repository: str,
     namespace: str | None = None,
+    base_sha: str | None = None,
 ) -> tuple[str, str]:
     remote_url = f"https://github.com/{repository}.git"
     namespace = namespace or f"pr-{pr}-{uuid.uuid4().hex}"
     head_ref = f"refs/review-capsule/{namespace}/head"
     base_ref = f"refs/review-capsule/{namespace}/base"
+    base_source = base_sha or f"refs/heads/{base_ref_name}"
     commands = (
         [
             "git",
@@ -690,7 +692,7 @@ def fetch_pr_refs(
             "fetch",
             "--no-tags",
             remote_url,
-            f"+refs/heads/{base_ref_name}:{base_ref}",
+            f"+{base_source}:{base_ref}",
         ],
     )
     environment = os.environ.copy()
@@ -889,6 +891,11 @@ def main() -> int:
     if body_source is not None:
         ensure_file(body_source)
 
+    run_id = f"pr-{args.pr}-{uuid.uuid4().hex}"
+    environment = (
+        f"{platform.python_implementation()} {platform.python_version()} "
+        f"on {platform.platform()}"
+    )
     target_report_dir = args.report_dir.absolute() if args.report_dir else (
         Path(tempfile.mkdtemp(prefix=f"chameleon-pr-{args.pr}-")) / "report"
     )
@@ -901,6 +908,9 @@ def main() -> int:
     report_directory_validated = False
     review_refs: tuple[str, ...] = ()
     metadata: dict
+    repository = args.repo or "unresolved"
+    capsule_revision = "unavailable"
+    contract_issues: list[str] = []
     summary_path: Path | None = None
     publish_ready = False
     published = False
@@ -934,7 +944,12 @@ def main() -> int:
         metadata["repository"] = repository
         base_sha = str(metadata["baseRefOid"])
         head_sha = str(metadata["headRefOid"])
-        head_ref, base_ref = fetch_pr_refs(args.pr, str(metadata["baseRefName"]), repository)
+        head_ref, base_ref = fetch_pr_refs(
+            args.pr,
+            str(metadata["baseRefName"]),
+            repository,
+            base_sha=base_sha,
+        )
         review_refs = (head_ref, base_ref)
         if git_output("rev-parse", head_ref) != head_sha:
             raise ReviewError("fetched PR head does not match GitHub head SHA")
@@ -1166,12 +1181,12 @@ def main() -> int:
                 check.log = str(target_report_dir / Path(check.log).name)
 
         provenance = {
-            "run_id": target_report_dir.name,
+            "run_id": run_id,
             "capsule_revision": capsule_revision,
             "role": ".agents/roles/reviewer.md",
             "workflow": ".agents/workflows/06-review.md; .agents/workflows/07-github-pr.md",
             "gate": "Gate 1: renderer and validator qualification before solver",
-            "environment": f"{platform.python_implementation()} {platform.python_version()} on {platform.platform()}",
+            "environment": environment,
             "validation": (
                 "PR-controlled checks requested; inspect statuses; execution is not sandboxed"
                 if args.run_checks
@@ -1220,12 +1235,36 @@ def main() -> int:
                 cleanup_evidence_files(report_fd, names)
             except OSError:
                 pass
+            error_checks = []
+            for check in checks:
+                serialized = serialize_check(check)
+                if check.log is not None:
+                    serialized["log"] = str(
+                        target_report_dir / Path(check.log).name
+                    )
+                error_checks.append(serialized)
+            error_record = {
+                "error": str(error),
+                "pull_request": args.pr,
+                "repository": repository,
+                "run_id": run_id,
+                "capsule_revision": capsule_revision,
+                "environment": environment,
+                "validation": (
+                    "capsule generation failed before complete evidence publication"
+                ),
+                "next_owner": "reviewer/maintainer",
+                "checks": error_checks,
+            }
             try:
-                write_text(report_dir / "error.txt", str(error), report_fd)
+                write_text(
+                    report_dir / "error.txt",
+                    json.dumps(error_record, indent=2),
+                    report_fd,
+                )
             except OSError:
                 pass
         print(f"error: {error}", file=sys.stderr)
-        print(f"report: {target_report_dir}", file=sys.stderr)
         exit_code = 2
     finally:
         try:
@@ -1252,10 +1291,13 @@ def main() -> int:
                 exit_code = 2
             else:
                 published = True
-    if published and summary_path is not None:
-        print(f"report: {target_report_dir / 'summary.md'}")
-        for check in checks:
-            print(f"{check.status:4} {check.name}")
+    if published:
+        if summary_path is not None:
+            print(f"report: {target_report_dir / 'summary.md'}")
+            for check in checks:
+                print(f"{check.status:4} {check.name}")
+        else:
+            print(f"report: {target_report_dir}", file=sys.stderr)
     return exit_code
 
 

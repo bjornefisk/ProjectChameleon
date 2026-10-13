@@ -1,9 +1,11 @@
-import os
 import json
+import os
+import shutil
 import sys
 import tempfile
+import time
 import unittest
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
@@ -58,7 +60,6 @@ class ReviewCapsuleTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             repository, base_sha, head_sha = self._review_repository(root)
-            report_dir = root / "report"
             metadata = {
                 "baseRefName": "base",
                 "baseRefOid": base_sha,
@@ -72,40 +73,51 @@ class ReviewCapsuleTests(unittest.TestCase):
                 "1",
                 "--repo",
                 "owner/repo",
-                "--report-dir",
-                str(report_dir),
             ]
+            output = StringIO()
             with patch.object(review_pr, "ROOT", repository), patch.object(
                 review_pr, "run_gh_json", return_value=metadata
             ), patch.object(
                 review_pr,
                 "fetch_pr_refs",
                 return_value=("refs/heads/pr-head", "refs/heads/base"),
-            ), patch.object(review_pr.sys, "argv", argv):
+            ), patch.object(review_pr.sys, "argv", argv), redirect_stdout(output):
                 result = review_pr.main()
 
-            self.assertEqual(result, 2)
-            self.assertEqual(
-                {
-                    path.name
-                    for path in report_dir.iterdir()
-                },
-                {
-                    "00-diff-check.log",
-                    "changed-files.txt",
-                    "checks.json",
-                    "commits.txt",
-                    "diff-stat.txt",
-                    "diff.patch",
-                    "summary.md",
-                },
+            report_line = next(
+                line for line in output.getvalue().splitlines() if line.startswith("report: ")
             )
-            checks = json.loads(
-                (report_dir / "checks.json").read_text(encoding="utf-8")
-            )
-            self.assertEqual(checks[0]["name"], "contract-sources")
-            self.assertEqual(checks[0]["status"], "SKIP")
-            self.assertEqual(Path(checks[1]["log"]).parent, report_dir)
+            report_dir = Path(report_line.removeprefix("report: ")).parent
+            try:
+                self.assertEqual(result, 2)
+                self.assertEqual(
+                    {
+                        path.name
+                        for path in report_dir.iterdir()
+                    },
+                    {
+                        "00-diff-check.log",
+                        "changed-files.txt",
+                        "checks.json",
+                        "commits.txt",
+                        "diff-stat.txt",
+                        "diff.patch",
+                        "summary.md",
+                    },
+                )
+                checks = json.loads(
+                    (report_dir / "checks.json").read_text(encoding="utf-8")
+                )
+                self.assertEqual(checks[0]["name"], "contract-sources")
+                self.assertEqual(checks[0]["status"], "SKIP")
+                self.assertEqual(Path(checks[1]["log"]).parent, report_dir)
+                summary = (report_dir / "summary.md").read_text(encoding="utf-8")
+                self.assertRegex(
+                    summary,
+                    r"- Run Id: `pr-1-[0-9a-f]{32}`",
+                )
+            finally:
+                shutil.rmtree(report_dir.parent)
 
     def test_main_blocks_submission_when_checks_are_incomplete(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -173,12 +185,14 @@ class ReviewCapsuleTests(unittest.TestCase):
                 "--report-dir",
                 str(report_dir),
             ]
-            with patch.object(review_pr.sys, "argv", argv):
+            error_output = StringIO()
+            with patch.object(review_pr.sys, "argv", argv), redirect_stderr(error_output):
                 result = review_pr.main()
 
             self.assertEqual(result, 2)
             self.assertEqual(stale.read_text(encoding="utf-8"), "old\n")
             self.assertFalse((report_dir / "error.txt").exists())
+            self.assertNotIn("report:", error_output.getvalue())
 
     def test_main_rejects_symlinked_report_directory(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -202,7 +216,7 @@ class ReviewCapsuleTests(unittest.TestCase):
             self.assertEqual(result, 2)
             self.assertEqual(list(target.iterdir()), [])
 
-    def test_main_cleans_partial_report_on_publication_failure(self):
+    def test_main_publishes_typed_error_after_evidence_failure(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             repository, base_sha, head_sha = self._review_repository(root)
@@ -252,6 +266,54 @@ class ReviewCapsuleTests(unittest.TestCase):
                 {path.name for path in report_dir.iterdir()},
                 {"error.txt"},
             )
+            error_record = json.loads(
+                (report_dir / "error.txt").read_text(encoding="utf-8")
+            )
+            self.assertEqual(error_record["pull_request"], 1)
+            self.assertIn("run_id", error_record)
+            self.assertIn("capsule_revision", error_record)
+            self.assertIn("environment", error_record)
+            self.assertEqual(
+                error_record["validation"],
+                "capsule generation failed before complete evidence publication",
+            )
+            self.assertEqual(error_record["next_owner"], "reviewer/maintainer")
+
+    def test_publish_staging_directory_rejects_target_collision(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            staging = root / "staging"
+            target = root / "report"
+            staging.mkdir()
+            target.mkdir()
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "report directory appeared during checks",
+            ):
+                review_pr.publish_staging_directory(staging, target)
+
+            self.assertTrue(staging.exists())
+
+    def test_publish_staging_directory_rejects_publication_lock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            staging = root / "staging"
+            target = root / "report"
+            staging.mkdir()
+            lock = root / ".report.publish.lock"
+            lock.touch()
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "report publication already in progress",
+            ):
+                review_pr.publish_staging_directory(staging, target)
+
+            self.assertTrue(staging.exists())
+            self.assertTrue(lock.exists())
+
+
     def test_contract_sources_are_canonical_and_present(self):
         self.assertNotIn("Docs/AGENTS/PR_REVIEW_AGENT.md", review_pr.CONTRACT_SOURCES)
         for source in review_pr.CONTRACT_SOURCES:
@@ -313,13 +375,14 @@ class ReviewCapsuleTests(unittest.TestCase):
                 "pr/8",
                 "owner/repo",
                 namespace="run-1",
+                base_sha="base-sha",
             )
 
         self.assertEqual(head_ref, "refs/review-capsule/run-1/head")
         self.assertEqual(base_ref, "refs/review-capsule/run-1/base")
         commands = [call.args[0] for call in run.call_args_list]
         self.assertIn("refs/review-capsule/run-1/head", commands[0][-1])
-        self.assertIn("refs/review-capsule/run-1/base", commands[1][-1])
+        self.assertIn("+base-sha:refs/review-capsule/run-1/base", commands[1][-1])
 
     def test_delete_review_refs_surfaces_cleanup_failure(self):
         with patch.object(
@@ -570,6 +633,34 @@ class ReviewCapsuleTests(unittest.TestCase):
         self.assertTrue(result.output_limited)
         self.assertLessEqual(len(result.stdout), 32)
 
+    @unittest.skipUnless(os.name == "posix", "requires process groups")
+    def test_run_bounded_command_kills_descendants_after_parent_exit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / "child-alive"
+            child_code = (
+                "import pathlib, sys, time; "
+                "time.sleep(0.4); pathlib.Path(sys.argv[1]).write_text('alive')"
+            )
+            parent_code = (
+                "import subprocess, sys; "
+                "subprocess.Popen([sys.executable, '-c', sys.argv[2], sys.argv[1]])"
+            )
+            result = review_pr.run_bounded_command(
+                [
+                    sys.executable,
+                    "-c",
+                    parent_code,
+                    str(marker),
+                    child_code,
+                ],
+                ROOT,
+                10,
+            )
+
+            self.assertEqual(result.returncode, 0)
+            time.sleep(0.7)
+            self.assertFalse(marker.exists())
+
     def test_create_checkout_rejects_export_ignored_file(self):
         with tempfile.TemporaryDirectory() as directory:
             repo = Path(directory) / "repo"
@@ -718,15 +809,15 @@ class ReviewCapsuleTests(unittest.TestCase):
                         "SKIP",
                         0.0,
                         [],
-                        reason="bad|reason\nnext",
+                        reason="![x](https://evil.test)|reason\nnext",
                     )
                 ],
                 list(review_pr.CONTRACT_SOURCES),
             )
             content = summary.read_text(encoding="utf-8")
 
-        self.assertIn("``bad`|name\\nline``", content)
-        self.assertIn("bad\\|reason\\nnext", content)
+        self.assertIn("``bad`\\|name\\nline``", content)
+        self.assertIn("`![x](https://evil.test)\\|reason\\nnext`", content)
         self.assertIn("&lt;tag&gt;", review_pr.markdown_cell("<tag>"))
 
     def test_markdown_code_uses_fence_longer_than_embedded_backticks(self):

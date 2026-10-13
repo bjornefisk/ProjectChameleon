@@ -1,6 +1,6 @@
 ---
 id: chameleon.reviewer
-version: 2.2
+version: 2.3
 kind: role
 capabilities: [repo.read, repo.search, repo.lsp, exec.safe, web.search, web.fetch, web.browser, git.inspect]
 web_search: conditional
