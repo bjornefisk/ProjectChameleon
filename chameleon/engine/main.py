@@ -17,7 +17,7 @@ from pathlib import Path
 from PIL import Image
 
 from engine.contract import validate_response, validate_source
-from engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
+from engine.errors import InfeasibleLayoutError, InfeasibleReasonCode, TaskStatus
 from engine.resize import resize
 
 try:
@@ -204,9 +204,9 @@ def _publish_pair(
             ),
             encoding="utf-8",
         )
+        os.replace(commit_tmp, commit_path)
         os.replace(json_tmp, json_path)
         os.replace(png_tmp, png_path)
-        os.replace(commit_tmp, commit_path)
     except BaseException:
         try:
             _cleanup_task_paths(stem)
@@ -216,38 +216,88 @@ def _publish_pair(
     return render_warnings
 
 
-def _failure_code(error: Exception) -> InfeasibleReasonCode:
+def _failure_reason(error: Exception) -> str:
     if isinstance(error, InfeasibleLayoutError):
-        return error.reason_code
+        return error.reason_code.value
     if _MalformedTextError is not None and isinstance(error, _MalformedTextError):
-        return InfeasibleReasonCode.MALFORMED_INPUT
+        return InfeasibleReasonCode.MALFORMED_INPUT.value
     if _TextLayoutError is not None and isinstance(error, _TextLayoutError):
-        return InfeasibleReasonCode.TEXT_OVERFLOW
-    if isinstance(error, (_MalformedInputError, json.JSONDecodeError, KeyError, TypeError)):
-        return InfeasibleReasonCode.MALFORMED_INPUT
-    return InfeasibleReasonCode.RUNTIME_IO_FAILURE
+        return InfeasibleReasonCode.TEXT_OVERFLOW.value
+    if isinstance(error, (_MalformedInputError, json.JSONDecodeError)):
+        return InfeasibleReasonCode.MALFORMED_INPUT.value
+    return type(error).__name__
+
+
+def _classify_failure(
+    error: Exception, phase: str
+) -> tuple[TaskStatus, str]:
+    """Map a failure to an accepted task status and stable diagnostic reason."""
+    reason = _failure_reason(error)
+
+    if isinstance(error, InfeasibleLayoutError):
+        code = error.reason_code
+        if code in {
+            InfeasibleReasonCode.INVALID_SOURCE,
+            InfeasibleReasonCode.INVALID_TARGET,
+            InfeasibleReasonCode.MALFORMED_INPUT,
+        }:
+            return TaskStatus.MALFORMED_INPUT, reason
+        if code == InfeasibleReasonCode.INCOMPLETE_SEARCH:
+            return TaskStatus.INCOMPLETE_SEARCH, reason
+        if code == InfeasibleReasonCode.RUNTIME_IO_FAILURE:
+            return TaskStatus.RUNTIME_IO_FAILURE, reason
+        if phase == "input":
+            return TaskStatus.MALFORMED_INPUT, reason
+        return TaskStatus.INFEASIBLE_LAYOUT, reason
+
+    if phase == "input":
+        if isinstance(error, (_MalformedInputError, json.JSONDecodeError, KeyError, TypeError)):
+            return TaskStatus.MALFORMED_INPUT, reason
+        return TaskStatus.RUNTIME_IO_FAILURE, reason
+
+    if _MalformedTextError is not None and isinstance(error, _MalformedTextError):
+        return TaskStatus.MALFORMED_INPUT, reason
+    if _TextLayoutError is not None and isinstance(error, _TextLayoutError):
+        return TaskStatus.INFEASIBLE_LAYOUT, reason
+    return TaskStatus.RUNTIME_IO_FAILURE, reason
 
 
 def main() -> int:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    task_files = sorted(INPUT_DIR.glob("*.json"))
+    try:
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        task_files = sorted(INPUT_DIR.glob("*.json"))
+    except Exception as error:
+        print(
+            f"[runner] {TaskStatus.RUNTIME_IO_FAILURE.value} "
+            f"({type(error).__name__}): {error}",
+            file=sys.stderr,
+        )
+        return 1
+
     if not task_files:
-        print(f"No task files found in {INPUT_DIR}", file=sys.stderr)
+        print(
+            f"[runner] {TaskStatus.RUNTIME_IO_FAILURE.value} (NO_TASK_FILES): "
+            f"No task files found in {INPUT_DIR}",
+            file=sys.stderr,
+        )
         return 1
 
     exit_code = 0
     for task_path in task_files:
         stem = task_path.stem
         try:
+            phase = "input"
             _cleanup_task_paths(stem)
             task = _load_task(task_path)
             source, target_canvas = task["source"], task["target_canvas"]
             validate_source(source)
 
             t0 = time.monotonic()
+            phase = "resize"
             output = resize(source, target_canvas)
             elapsed = time.monotonic() - t0
             problems = self_check(source, output)
+            phase = "publish"
             render_warnings = _publish_pair(source, target_canvas, output, stem)
         except Exception as error:
             exit_code = 1
@@ -258,24 +308,28 @@ def main() -> int:
                 cleanup_error = cleanup_exception
             if cleanup_error is not None:
                 print(
-                    f"[{task_path.name}] {InfeasibleReasonCode.RUNTIME_IO_FAILURE.value}: "
+                    f"[{task_path.name}] {TaskStatus.RUNTIME_IO_FAILURE.value} "
+                    f"({type(cleanup_error).__name__}): "
                     f"{error}; cleanup failed: {cleanup_error}",
                     file=sys.stderr,
                 )
             else:
-                code = _failure_code(error)
+                status, reason = _classify_failure(error, phase)
                 print(
-                    f"[{task_path.name}] {code.value}: {error}",
+                    f"[{task_path.name}] {status.value} ({reason}): {error}",
                     file=sys.stderr,
                 )
             continue
 
         if problems:
-            status = f"{len(problems)} self-check warning(s)"
+            success_detail = f"{len(problems)} self-check warning(s)"
         elif render_warnings:
-            status = f"{len(render_warnings)} renderer warning(s)"
+            success_detail = f"{len(render_warnings)} renderer warning(s)"
         else:
-            status = "OK"
+            success_detail = ""
+        status = TaskStatus.SUCCESS.value
+        if success_detail:
+            status = f"{status} ({success_detail})"
         print(
             f"[{task_path.name}] {status} in {elapsed:.2f}s "
             f"-> {stem}_output.json, {stem}_output.png"

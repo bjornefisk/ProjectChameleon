@@ -37,6 +37,27 @@ class CommittedOutputTests(unittest.TestCase):
             self.assertEqual(result, 1)
             self.assertIn("Uncommitted or invalid output pair", stderr.getvalue())
 
+    def test_marker_without_both_final_files_is_not_inspectable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            json_path = output_dir / "task_output.json"
+            marker_path = output_dir / ".task_output.commit"
+            json_path.write_text("{}", encoding="utf-8")
+            marker_path.write_text(
+                json.dumps(
+                    {
+                        "json": json_path.name,
+                        "png": "task_output.png",
+                        "json_sha256": hashlib.sha256(json_path.read_bytes()).hexdigest(),
+                        "png_sha256": "not-yet-installed",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(committed_json_files(output_dir), [])
+
+
     def test_marker_hashes_authorize_matching_pair_only(self):
         with tempfile.TemporaryDirectory() as directory:
             output_dir = Path(directory)

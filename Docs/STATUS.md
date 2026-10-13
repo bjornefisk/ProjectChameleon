@@ -56,8 +56,8 @@ These are intentionally visible; none is silently promoted to contract behavior:
 
 1. `engine/resize.py` is the documented uniform-stretch baseline and violates image-ratio, group, overlap, rotation, and typography rules.
 2. `engine/main.py` has a warning-only self-check that checks unrotated rectangles and ID sets; it is not the contract validator.
-3. The renderer adapter's renderer goldens and native-amd64 qualification remain; ticket 02 closes style-run end handling, Unicode-safe wrapping, letter-spacing/style-width measurement, mandatory/non-space line-map handling, actual positioned glyph-bound rejection, explicit line/max-lines/height enforcement, and rectangle/ellipse stroke rasterization.
-4. `engine/main.py` parses finite JSON decimals exactly, validates serialized response identity/geometry/text rules and decodable PNGs before publication, writes a hash-bearing hidden commit marker last, cleans stale/failed artifacts, emits renderer warnings, continues later tasks, and maps malformed/text-layout failures to typed log codes; accepted cutoff semantics and the complete status protocol remain pending.
+3. The renderer adapter's renderer goldens and native-amd64 qualification remain; ticket 02 closes style-run end handling, Unicode-safe wrapping (including regional-indicator flag-pair breaks), letter-spacing/style-width measurement, mandatory/non-space line-map handling, actual positioned glyph-bound rejection, explicit line/max-lines/height enforcement, and rectangle/ellipse stroke rasterization.
+4. `engine/main.py` parses finite JSON decimals exactly, validates serialized response identity/geometry/text rules and decodable PNGs before publication, installs a hash-bearing hidden commit marker as the pair manifest before final artifact renames, cleans stale/failed artifacts, emits renderer warnings, continues later tasks, and maps failures to accepted top-level statuses with detailed reasons; accepted cutoff semantics and the complete search/status protocol remain pending.
 5. The deterministic role-inference, four-topology candidate search, renderer-in-loop ranking, and held-out evaluation path have not been implemented.
 6. The Docker build has no project-owned hash-locked wheelhouse or apt-version lock; the direct compatibility pins are an initial baseline.
 
@@ -83,20 +83,22 @@ These are not unresolved internal design choices. They require external facts or
 
 ## Ticket 02 verification record
 
-- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests/renderer -p 'test_*.py' -v` — 21 tests passed, including exact-font and asset-containment regressions.
-- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 16 tests passed, including warning propagation and commit-marker filtering.
-- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 65 tests passed.
-- `cd chameleon && /tmp/chameleon-venv312/bin/python -m engine.main` — exit 1 as required for the nonconforming baseline; all three sample tasks logged `MALFORMED_INPUT: serialized response x must be a finite integer`, and no task artifacts were produced beyond `output/.gitkeep`.
-- Docker `linux/amd64`, native-amd64, renderer-golden, and native-library parity checks remain pending.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/renderer -p 'test_*.py' -v` — 22 tests passed, including the regional-indicator flag-pair wrapping regression, exact-font, and asset-containment regressions.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 21 tests passed, including accepted status mapping, setup-failure handling, warning propagation, interruption cleanup, and commit-marker filtering.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 71 tests passed.
+- `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1 as required for the nonconforming baseline; all three sample tasks logged `MALFORMED_INPUT (MALFORMED_INPUT): serialized response x must be a finite integer`, and no task artifacts were produced beyond `output/.gitkeep`.
+- Docker `linux/amd64` image build — passed with the documented constant-platform warning; offline container smoke exited 1 for the same nonconforming baseline and left only `output/.gitkeep`. The run used arm64-host emulation and is not native-amd64 qualification.
 
 ## PR 7 review-fix verification
 
-The hidden `.<stem>_output.commit` marker is pair-commit authority. It records both final filenames and SHA-256 hashes, and is written only after both final artifact renames succeed; the layout inspector now ignores unmarked or hash-mismatched artifacts.
+The hidden `.<stem>_output.commit` marker is the pair manifest and commit authority. It records both final filenames and SHA-256 hashes and is installed before the final JSON/PNG renames; the layout inspector authorizes output only when the marker and both final files exist with matching hashes. Per-task cleanup removes staged, final, and marker paths after ordinary failures and on the next run after an abrupt interruption.
 
 - `make verify` — passed.
 - `git diff --check` — passed.
-- `python3 -m py_compile chameleon/engine/main.py chameleon/renderer/converter/assets.py chameleon/renderer/converter/brand_fonts.py chameleon/renderer/converter/wrap.py chameleon/renderer/converter/convert.py scripts/inspect_layout.py chameleon/tests/runner/test_main.py chameleon/tests/runner/test_inspect_layout.py chameleon/tests/renderer/test_assets.py chameleon/tests/renderer/test_renderer_conformance.py` — passed.
-- `make test` — blocked by missing `jsonschema`, `cr_renderer`, and `PIL` in the project `.venv`; the fallback Python 3.12 environment passed all 65 tests above.
+- `.venv/bin/python -m py_compile chameleon/engine/errors.py chameleon/engine/main.py chameleon/renderer/converter/assets.py chameleon/renderer/converter/brand_fonts.py chameleon/renderer/converter/wrap.py chameleon/renderer/converter/convert.py scripts/inspect_layout.py chameleon/tests/runner/test_main.py chameleon/tests/runner/test_inspect_layout.py chameleon/tests/renderer/test_assets.py chameleon/tests/renderer/test_renderer_conformance.py` — passed.
+- `make test` — 71 tests passed in the project `.venv`.
+- `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — passed with the documented `FromPlatformFlagConstDisallowed` warning.
+- `cd chameleon && docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — exit 1 for the nonconforming baseline; no task artifacts beyond `output/.gitkeep`. Docker reported arm64-host emulation, so native-amd64 qualification remains pending.
 
 ## Remaining Gate 1 qualification
 
@@ -112,4 +114,4 @@ docker run --rm --network none \
   chameleon-stage1
 ```
 
-The warning-only baseline self-check remains non-authoritative; accepted cutoff/status protocol, renderer goldens/native-library parity, clean native amd64 run, and solver remain outside this PR.
+The warning-only baseline self-check remains non-authoritative; accepted cutoff/search-status integration, renderer goldens/native-library parity, clean native amd64 run, and solver remain outside this PR.

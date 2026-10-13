@@ -176,6 +176,18 @@ class RendererConformanceTests(unittest.TestCase):
         self.assertEqual(len(wrapped), len(text))
         self.assertNotIn("\n", wrapped[:3])
 
+    def test_regional_indicator_pairs_break_between_flags(self):
+        text = "\U0001f1e6\U0001f1e7\U0001f1e8\U0001f1e9"
+        wrapped, line_indices, line_count = wrap_text_with_line_map(
+            text,
+            [4.0] * len(text),
+            8.0,
+        )
+
+        self.assertEqual(wrapped, text)
+        self.assertEqual(line_indices, [0, 0, 1, 1])
+        self.assertEqual(line_count, 2)
+
     def test_explicit_newlines_and_max_lines_are_hard_limits(self):
         accepted = self.convert_text(content="A\nB", max_lines=2, height=60)
         self.assertEqual(accepted["text_line"][0], [0, 1, 1])

@@ -379,7 +379,9 @@ def _line_break_allowed(
         regional_count = 0
         index = boundary - 1
         while index >= 0 and classes[index] == "RI":
-            regional_count += 1
+            regional_count += sum(
+                _is_regional_indicator(char) for char in cluster_texts[index]
+            )
             index -= 1
         return regional_count % 2 == 0
     if current_class == "EM" and (
