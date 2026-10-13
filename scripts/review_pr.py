@@ -674,6 +674,11 @@ def fetch_pr_refs(
     namespace: str | None = None,
     base_sha: str | None = None,
 ) -> tuple[str, str]:
+    if base_sha is not None and (
+        len(base_sha) != 40
+        or any(character not in "0123456789abcdefABCDEF" for character in base_sha)
+    ):
+        raise ReviewError("invalid base revision SHA")
     remote_url = f"https://github.com/{repository}.git"
     namespace = namespace or f"pr-{pr}-{uuid.uuid4().hex}"
     head_ref = f"refs/review-capsule/{namespace}/head"

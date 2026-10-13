@@ -375,14 +375,30 @@ class ReviewCapsuleTests(unittest.TestCase):
                 "pr/8",
                 "owner/repo",
                 namespace="run-1",
-                base_sha="base-sha",
+                base_sha="a" * 40,
             )
 
         self.assertEqual(head_ref, "refs/review-capsule/run-1/head")
         self.assertEqual(base_ref, "refs/review-capsule/run-1/base")
         commands = [call.args[0] for call in run.call_args_list]
         self.assertIn("refs/review-capsule/run-1/head", commands[0][-1])
-        self.assertIn("+base-sha:refs/review-capsule/run-1/base", commands[1][-1])
+        self.assertIn(
+            f"+{'a' * 40}:refs/review-capsule/run-1/base",
+            commands[1][-1],
+        )
+
+    def test_fetch_pr_refs_rejects_invalid_base_sha(self):
+        with self.assertRaisesRegex(
+            review_pr.ReviewError,
+            "invalid base revision SHA",
+        ):
+            review_pr.fetch_pr_refs(
+                8,
+                "main",
+                "owner/repo",
+                base_sha="not-a-sha",
+            )
+
 
     def test_delete_review_refs_surfaces_cleanup_failure(self):
         with patch.object(
