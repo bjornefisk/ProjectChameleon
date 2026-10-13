@@ -60,8 +60,8 @@ Use [`../templates/review.md`](../templates/review.md) and [`../checklists/revie
 
 Run `python3 scripts/review_pr.py --pr <number>` before manual review. Use its
 compact summary, changed-file list, diff statistics, and check logs as the
-initial evidence packet; open the full diff only for affected paths and
-findings.
+initial evidence packet; inspect the complete diff before narrowing to affected
+paths and findings.
 
 Default mode captures exact base/head revisions and runs only safe diff checks.
 Use `--run-checks` only for trusted pull requests: the extracted checkout is

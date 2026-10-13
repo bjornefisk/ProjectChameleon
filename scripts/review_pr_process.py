@@ -1,0 +1,178 @@
+"""Bounded process execution primitives for the review evidence capsule."""
+
+from __future__ import annotations
+
+import os
+import signal
+import subprocess
+import threading
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Mapping, Sequence
+
+
+@dataclass(frozen=True)
+class ProcessResult:
+    returncode: int | None
+    stdout: bytes
+    stderr: bytes
+    timed_out: bool = False
+    output_limited: bool = False
+    reader_error: BaseException | None = None
+    capture_incomplete: bool = False
+
+
+def _terminate_process(process: subprocess.Popen) -> None:
+    if process.poll() is not None:
+        return
+    try:
+        if os.name == "posix":
+            os.killpg(process.pid, signal.SIGTERM)
+        else:
+            process.terminate()
+        process.wait(timeout=5)
+        return
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    try:
+        if os.name == "posix":
+            os.killpg(process.pid, signal.SIGKILL)
+        else:
+            process.kill()
+    except OSError:
+        pass
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        pass
+
+
+def execute_process(
+    command: Sequence[str],
+    cwd: Path,
+    timeout: int,
+    max_output_bytes: int,
+    *,
+    env: Mapping[str, str] | None = None,
+    stdin_bytes: bytes | None = None,
+    merge_stderr: bool = False,
+    stdout_path: Path | None = None,
+    terminate_on_output_limit: bool = True,
+) -> ProcessResult:
+    """Run one process with bounded capture, timeout, and process-group cleanup."""
+    output_file = stdout_path.open("wb") if stdout_path is not None else None
+    try:
+        process = subprocess.Popen(
+            list(command),
+            cwd=cwd,
+            env=dict(env) if env is not None else None,
+            stdin=subprocess.PIPE if stdin_bytes is not None else subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT if merge_stderr else subprocess.PIPE,
+            start_new_session=os.name == "posix",
+        )
+    except OSError:
+        if output_file is not None:
+            output_file.close()
+        raise
+
+    captured = {"stdout": bytearray(), "stderr": bytearray()}
+    total = 0
+    lock = threading.Lock()
+    output_limited = threading.Event()
+    reader_errors: list[BaseException] = []
+
+    def drain(name: str, stream: object) -> None:
+        nonlocal total
+        if stream is None:
+            return
+        try:
+            while True:
+                chunk = stream.read(65536)  # type: ignore[union-attr]
+                if not chunk:
+                    return
+                with lock:
+                    remaining = max_output_bytes - total
+                    accepted = chunk[: max(0, remaining)]
+                    if accepted:
+                        if name == "stdout" and output_file is not None:
+                            output_file.write(accepted)
+                        else:
+                            captured[name].extend(accepted)
+                        total += len(accepted)
+                    if len(chunk) > remaining:
+                        output_limited.set()
+                        if terminate_on_output_limit:
+                            return
+        except (OSError, ValueError) as error:
+            reader_errors.append(error)
+
+    streams = [("stdout", process.stdout)]
+    if not merge_stderr:
+        streams.append(("stderr", process.stderr))
+    readers = [
+        threading.Thread(target=drain, args=(name, stream), daemon=True)
+        for name, stream in streams
+    ]
+    for reader in readers:
+        reader.start()
+
+    writer: threading.Thread | None = None
+    if stdin_bytes is not None and process.stdin is not None:
+        def write_input() -> None:
+            try:
+                process.stdin.write(stdin_bytes)
+                process.stdin.close()
+            except (BrokenPipeError, OSError, ValueError):
+                pass
+
+        writer = threading.Thread(target=write_input, daemon=True)
+        writer.start()
+
+    deadline = time.monotonic() + timeout
+    timed_out = False
+    while process.poll() is None:
+        if terminate_on_output_limit and output_limited.is_set():
+            _terminate_process(process)
+            break
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            timed_out = True
+            _terminate_process(process)
+            break
+        time.sleep(min(0.05, remaining))
+
+    if writer is not None:
+        writer.join(timeout=1)
+        if writer.is_alive() and process.stdin is not None:
+            process.stdin.close()
+        if process.stdin is not None and not process.stdin.closed:
+            process.stdin.close()
+    for reader in readers:
+        reader.join(timeout=5)
+    capture_incomplete = any(reader.is_alive() for reader in readers)
+    if capture_incomplete:
+        if process.stdout is not None:
+            process.stdout.close()
+        if process.stderr is not None:
+            process.stderr.close()
+        for reader in readers:
+            reader.join(timeout=1)
+    if process.stdout is not None and not process.stdout.closed:
+        process.stdout.close()
+    if process.stderr is not None and not process.stderr.closed:
+        process.stderr.close()
+    if output_file is not None:
+        output_file.flush()
+        output_file.close()
+
+    return ProcessResult(
+        returncode=process.returncode,
+        stdout=bytes(captured["stdout"]),
+        stderr=bytes(captured["stderr"]),
+        timed_out=timed_out,
+        output_limited=output_limited.is_set(),
+        reader_error=reader_errors[0] if reader_errors else None,
+        capture_incomplete=capture_incomplete,
+    )

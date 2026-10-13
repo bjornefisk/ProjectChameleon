@@ -1,4 +1,5 @@
 import os
+import json
 import sys
 import tempfile
 import unittest
@@ -14,6 +15,241 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReviewCapsuleTests(unittest.TestCase):
+
+    @staticmethod
+    def _review_repository(directory: Path) -> tuple[Path, str, str]:
+        repository = directory / "repository"
+        repository.mkdir()
+
+        def run_git(*args: str) -> None:
+            review_pr.subprocess.run(
+                ["git", *args],
+                cwd=repository,
+                stdout=review_pr.subprocess.PIPE,
+                stderr=review_pr.subprocess.PIPE,
+                check=True,
+            )
+
+        def git_output(*args: str) -> str:
+            result = review_pr.subprocess.run(
+                ["git", *args],
+                cwd=repository,
+                stdout=review_pr.subprocess.PIPE,
+                stderr=review_pr.subprocess.PIPE,
+                check=True,
+            )
+            return result.stdout.decode("utf-8").strip()
+
+        run_git("init", "--quiet")
+        run_git("config", "user.email", "test@example.invalid")
+        run_git("config", "user.name", "Test")
+        (repository / "README.md").write_text("base\n", encoding="utf-8")
+        run_git("add", "README.md")
+        run_git("commit", "--quiet", "-m", "base")
+        run_git("branch", "base")
+        base_sha = git_output("rev-parse", "HEAD")
+        (repository / "changed.txt").write_text("head\n", encoding="utf-8")
+        run_git("add", "changed.txt")
+        run_git("commit", "--quiet", "-m", "head")
+        run_git("branch", "pr-head")
+        return repository, base_sha, git_output("rev-parse", "HEAD")
+
+    def test_main_publishes_default_report_from_temp_repository(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repository, base_sha, head_sha = self._review_repository(root)
+            report_dir = root / "report"
+            metadata = {
+                "baseRefName": "base",
+                "baseRefOid": base_sha,
+                "headRefOid": head_sha,
+                "state": "OPEN",
+                "url": "https://example.test/pr/1",
+            }
+            argv = [
+                "review_pr.py",
+                "--pr",
+                "1",
+                "--repo",
+                "owner/repo",
+                "--report-dir",
+                str(report_dir),
+            ]
+            with patch.object(review_pr, "ROOT", repository), patch.object(
+                review_pr, "run_gh_json", return_value=metadata
+            ), patch.object(
+                review_pr,
+                "fetch_pr_refs",
+                return_value=("refs/heads/pr-head", "refs/heads/base"),
+            ), patch.object(review_pr.sys, "argv", argv):
+                result = review_pr.main()
+
+            self.assertEqual(result, 2)
+            self.assertEqual(
+                {
+                    path.name
+                    for path in report_dir.iterdir()
+                },
+                {
+                    "00-diff-check.log",
+                    "changed-files.txt",
+                    "checks.json",
+                    "commits.txt",
+                    "diff-stat.txt",
+                    "diff.patch",
+                    "summary.md",
+                },
+            )
+            checks = json.loads(
+                (report_dir / "checks.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(checks[0]["name"], "contract-sources")
+            self.assertEqual(checks[0]["status"], "SKIP")
+
+    def test_main_blocks_submission_when_checks_are_incomplete(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repository, base_sha, head_sha = self._review_repository(root)
+            report_dir = root / "report"
+            body_file = root / "review.md"
+            body_file.write_text("review body\n", encoding="utf-8")
+            metadata = {
+                "baseRefName": "base",
+                "baseRefOid": base_sha,
+                "headRefOid": head_sha,
+                "state": "OPEN",
+                "url": "https://example.test/pr/1",
+            }
+            argv = [
+                "review_pr.py",
+                "--pr",
+                "1",
+                "--repo",
+                "owner/repo",
+                "--report-dir",
+                str(report_dir),
+                "--run-checks",
+                "--submit",
+                "comment",
+                "--body-file",
+                str(body_file),
+            ]
+            with patch.object(review_pr, "ROOT", repository), patch.object(
+                review_pr, "run_gh_json", return_value=metadata
+            ), patch.object(
+                review_pr,
+                "fetch_pr_refs",
+                return_value=("refs/heads/pr-head", "refs/heads/base"),
+            ), patch.object(
+                review_pr, "resolve_runner_python", return_value=None
+            ), patch.object(
+                review_pr, "submit_review"
+            ) as submit, patch.object(review_pr.sys, "argv", argv):
+                result = review_pr.main()
+
+            self.assertEqual(result, 2)
+            submit.assert_not_called()
+            checks = json.loads(
+                (report_dir / "checks.json").read_text(encoding="utf-8")
+            )
+            submission = next(
+                check for check in checks if check["name"] == "submit-review"
+            )
+            self.assertEqual(submission["status"], "SKIP")
+
+    def test_main_rejects_nonempty_report_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            report_dir = Path(directory) / "report"
+            report_dir.mkdir()
+            stale = report_dir / "stale.txt"
+            stale.write_text("old\n", encoding="utf-8")
+            argv = [
+                "review_pr.py",
+                "--pr",
+                "1",
+                "--repo",
+                "owner/repo",
+                "--report-dir",
+                str(report_dir),
+            ]
+            with patch.object(review_pr.sys, "argv", argv):
+                result = review_pr.main()
+
+            self.assertEqual(result, 2)
+            self.assertEqual(stale.read_text(encoding="utf-8"), "old\n")
+            self.assertFalse((report_dir / "error.txt").exists())
+
+    def test_main_rejects_symlinked_report_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "target"
+            target.mkdir()
+            link = root / "report"
+            link.symlink_to(target, target_is_directory=True)
+            argv = [
+                "review_pr.py",
+                "--pr",
+                "1",
+                "--repo",
+                "owner/repo",
+                "--report-dir",
+                str(link),
+            ]
+            with patch.object(review_pr.sys, "argv", argv):
+                result = review_pr.main()
+
+            self.assertEqual(result, 2)
+            self.assertEqual(list(target.iterdir()), [])
+
+    def test_main_cleans_partial_report_on_publication_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repository, base_sha, head_sha = self._review_repository(root)
+            report_dir = root / "report"
+            metadata = {
+                "baseRefName": "base",
+                "baseRefOid": base_sha,
+                "headRefOid": head_sha,
+                "state": "OPEN",
+                "url": "https://example.test/pr/1",
+            }
+            argv = [
+                "review_pr.py",
+                "--pr",
+                "1",
+                "--repo",
+                "owner/repo",
+                "--report-dir",
+                str(report_dir),
+            ]
+            real_write = review_pr.write_evidence_bytes
+            calls = 0
+
+            def fail_on_second_write(path, content, directory_fd=None):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise OSError("simulated evidence failure")
+                return real_write(path, content, directory_fd)
+
+            with patch.object(review_pr, "ROOT", repository), patch.object(
+                review_pr, "run_gh_json", return_value=metadata
+            ), patch.object(
+                review_pr,
+                "fetch_pr_refs",
+                return_value=("refs/heads/pr-head", "refs/heads/base"),
+            ), patch.object(
+                review_pr,
+                "write_evidence_bytes",
+                side_effect=fail_on_second_write,
+            ), patch.object(review_pr.sys, "argv", argv):
+                result = review_pr.main()
+
+            self.assertEqual(result, 2)
+            self.assertEqual(
+                {path.name for path in report_dir.iterdir()},
+                {"error.txt"},
+            )
     def test_contract_sources_are_canonical_and_present(self):
         self.assertNotIn("Docs/AGENTS/PR_REVIEW_AGENT.md", review_pr.CONTRACT_SOURCES)
         for source in review_pr.CONTRACT_SOURCES:
@@ -23,6 +259,7 @@ class ReviewCapsuleTests(unittest.TestCase):
                 f"Docs/DECISIONS/ADR-{suffix:03d}-",
                 "\n".join(review_pr.CONTRACT_SOURCES),
             )
+        self.assertIn(".agents/policies/artifacts.md", review_pr.CONTRACT_SOURCES)
 
     def test_changed_authority_sources_require_trusted_comparison(self):
         sources = review_pr.changed_contract_sources([".agents/roles/reviewer.md"])
@@ -81,6 +318,23 @@ class ReviewCapsuleTests(unittest.TestCase):
         commands = [call.args[0] for call in run.call_args_list]
         self.assertIn("refs/review-capsule/run-1/head", commands[0][-1])
         self.assertIn("refs/review-capsule/run-1/base", commands[1][-1])
+
+    def test_delete_review_refs_surfaces_cleanup_failure(self):
+        with patch.object(
+            review_pr,
+            "git_output",
+            side_effect=review_pr.ReviewError("ref deletion failed"),
+        ):
+            with self.assertRaisesRegex(
+                review_pr.ReviewError,
+                "review ref cleanup failed.*refs/review-capsule/run-1/head",
+            ):
+                review_pr.delete_review_refs(
+                    (
+                        "refs/review-capsule/run-1/head",
+                        "refs/review-capsule/run-1/base",
+                    )
+                )
 
     def test_timeout_submission_stays_failed_and_indeterminate(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -469,8 +723,29 @@ class ReviewCapsuleTests(unittest.TestCase):
             )
             content = summary.read_text(encoding="utf-8")
 
-        self.assertIn("bad\\`\\|name\\nline", content)
+        self.assertIn("``bad`|name\\nline``", content)
         self.assertIn("bad\\|reason\\nnext", content)
+        self.assertIn("&lt;tag&gt;", review_pr.markdown_cell("<tag>"))
+
+    def test_markdown_code_uses_fence_longer_than_embedded_backticks(self):
+        self.assertEqual(review_pr.markdown_code("a``b"), "```a``b```")
+
+    def test_run_process_closes_stdin_by_default(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = review_pr.run_process(
+                [
+                    sys.executable,
+                    "-c",
+                    "import sys; print('closed' if sys.stdin.read(1) == '' else 'open')",
+                ],
+                ROOT,
+                Path(directory) / "check.log",
+                10,
+            )
+            content = Path(result.log).read_text(encoding="utf-8")
+
+        self.assertEqual(result.status, "PASS")
+        self.assertEqual(content, "closed\n")
 
 
 if __name__ == "__main__":
