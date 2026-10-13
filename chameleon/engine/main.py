@@ -1,30 +1,66 @@
-"""
-Orchestrator — the starter path for batch execution. Conformance work MAY
-change this file as required by the ratified contract. It:
-  1. Reads every *.json task file from /app/input (source + target_canvas)
-  2. Calls resize(source, target_canvas)
-  3. Runs a development self-check (NOT the official semantic validator)
-  4. Writes task artifacts through the runner publication path
-
-The accepted contract requires typed failure statuses, stale-output cleanup,
-and atomic JSON/PNG publication. The current baseline does not implement all
-of those rules; see Docs/PROJECT_CONTRACT.md and the implementation tickets.
-"""
+"""Batch runner for independent fail-closed Stage 1 tasks."""
 
 import json
 import sys
 import time
+from decimal import Decimal
 from pathlib import Path
+from typing import Any, Mapping
 
+from engine.contract import validate_source
+from engine.errors import InfeasibleLayoutError
 from engine.resize import resize
+from engine.staging import cleanup_task_artifacts, publish_task
 
-# Relative to the current working directory, which is /app both inside the
-# Docker image (WORKDIR /app) and when run locally from this repo's root -
-# so this works identically in both "python -m engine.main" (no Docker) and
-# the containerized entrypoint.
+# Relative to the current working directory, which is /app inside Docker and
+# the chameleon project directory for local execution.
 INPUT_DIR = Path("input")
 OUTPUT_DIR = Path("output")
 ASSETS_DIR = Path("brand_kit/assets")
+
+_MALFORMED_CODES = {"INVALID_SOURCE", "INVALID_TARGET", "MALFORMED_INPUT"}
+
+
+def _reject_constant(value: str) -> None:
+    raise ValueError(f"non-finite JSON constant is not allowed: {value}")
+
+
+def _load_task(path: Path) -> Mapping[str, Any]:
+    task = json.loads(
+        path.read_text(encoding="utf-8"),
+        parse_int=int,
+        parse_float=Decimal,
+        parse_constant=_reject_constant,
+    )
+    if not isinstance(task, Mapping):
+        raise ValueError("task envelope must be a JSON object")
+    if "source" not in task or "target_canvas" not in task:
+        raise ValueError("task envelope requires source and target_canvas")
+    source, target = task["source"], task["target_canvas"]
+    if not isinstance(source, Mapping) or not isinstance(target, Mapping):
+        raise ValueError("source and target_canvas must be JSON objects")
+    validate_source(source)
+    for field in ("width", "height"):
+        value = target.get(field)
+        if isinstance(value, bool) or not isinstance(value, (int, Decimal)):
+            raise ValueError(f"target_canvas.{field} must be an integer")
+        if isinstance(value, Decimal) and (
+            not value.is_finite() or value != value.to_integral_value()
+        ):
+            raise ValueError(f"target_canvas.{field} must be an integer")
+        if value <= 0:
+            raise ValueError(f"target_canvas.{field} must be positive")
+    return task
+
+
+def _error_status(error: InfeasibleLayoutError) -> str:
+    if error.code in _MALFORMED_CODES:
+        return "MALFORMED_INPUT"
+    if error.code == "INCOMPLETE_SEARCH":
+        return "INCOMPLETE_SEARCH"
+    if error.code == "RUNTIME_IO_FAILURE":
+        return "RUNTIME_IO_FAILURE"
+    return "INFEASIBLE_LAYOUT"
 
 REQUIRED_COMMON = ["id", "type", "x", "y", "width", "height"]
 REQUIRED_BY_TYPE = {
@@ -102,7 +138,7 @@ def _fallback_render(design: dict, png_path: Path) -> None:
         color = palette.get(el["type"], "#555555")
         draw.rectangle([x0, y0, x1, y1], outline=color, width=3)
         draw.text((x0 + 4, y0 + 4), el["id"], fill=color)
-    img.save(png_path)
+    img.save(png_path, format="PNG")
 
 
 def main() -> int:
@@ -112,27 +148,79 @@ def main() -> int:
         print(f"No task files found in {INPUT_DIR}", file=sys.stderr)
         return 1
 
-    exit_code = 0
+    all_succeeded = True
     for task_path in task_files:
-        task = json.loads(task_path.read_text())
-        source, target_canvas = task["source"], task["target_canvas"]
-
-        t0 = time.time()
-        output = resize(source, target_canvas)
-        elapsed = time.time() - t0
-
-        problems = self_check(source, output)
         stem = task_path.stem
-        (OUTPUT_DIR / f"{stem}_output.json").write_text(json.dumps(output, indent=2))
-        render_to_png(output, ASSETS_DIR, OUTPUT_DIR / f"{stem}_output.png")
+        try:
+            cleanup_task_artifacts(OUTPUT_DIR, stem)
+        except Exception as error:
+            all_succeeded = False
+            print(
+                f"[{task_path.name}] status=RUNTIME_IO_FAILURE "
+                f"reason=RUNTIME_IO_FAILURE: {error}",
+                file=sys.stderr,
+            )
+            continue
+        started = time.time()
+        try:
+            task = _load_task(task_path)
+        except InfeasibleLayoutError as error:
+            all_succeeded = False
+            print(
+                f"[{task_path.name}] status={_error_status(error)} "
+                f"reason={error.code}: {error}",
+                file=sys.stderr,
+            )
+            cleanup_task_artifacts(OUTPUT_DIR, stem)
+            continue
+        except Exception as error:
+            all_succeeded = False
+            print(
+                f"[{task_path.name}] status=MALFORMED_INPUT "
+                f"reason=MALFORMED_INPUT: {error}",
+                file=sys.stderr,
+            )
+            cleanup_task_artifacts(OUTPUT_DIR, stem)
+            continue
 
-        status = "OK" if not problems else f"{len(problems)} self-check warning(s)"
-        print(f"[{task_path.name}] {status} in {elapsed:.2f}s "
-              f"-> {stem}_output.json, {stem}_output.png")
-        for p in problems:
-            print(f"    - {p}")
+        try:
+            source, target_canvas = task["source"], task["target_canvas"]
+            output = resize(source, target_canvas)
+            publish_task(
+                output_dir=OUTPUT_DIR,
+                task_name=stem,
+                source=source,
+                target_canvas=target_canvas,
+                response=output,
+                assets_dir=ASSETS_DIR,
+                render_to_png=render_to_png,
+            )
+        except InfeasibleLayoutError as error:
+            all_succeeded = False
+            print(
+                f"[{task_path.name}] status={_error_status(error)} "
+                f"reason={error.code}: {error}",
+                file=sys.stderr,
+            )
+            cleanup_task_artifacts(OUTPUT_DIR, stem)
+            continue
+        except Exception as error:
+            all_succeeded = False
+            print(
+                f"[{task_path.name}] status=RUNTIME_IO_FAILURE "
+                f"reason=RUNTIME_IO_FAILURE: {error}",
+                file=sys.stderr,
+            )
+            cleanup_task_artifacts(OUTPUT_DIR, stem)
+            continue
 
-    return exit_code
+        elapsed = time.time() - started
+        print(
+            f"[{task_path.name}] status=SUCCESS in {elapsed:.2f}s "
+            f"-> {stem}_output.json, {stem}_output.png"
+        )
+
+    return 0 if all_succeeded else 1
 
 
 if __name__ == "__main__":

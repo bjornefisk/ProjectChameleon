@@ -1,9 +1,9 @@
 # Project Chameleon status
 
-**Date:** 2026-10-09
+**Date:** 2026-10-13
 
-**Phase:** Ticket 01 implementation complete; ticket 02 remains not started; Gate 1 qualification remains pending.
-**Decision status:** Ticket 01 semantic validation has local contract evidence. Renderer, runner, solver, and runtime qualification remain outside this PR.
+**Phase:** Tickets 01 and 03 implementation complete; ticket 02 remains not started; Gate 1 qualification remains pending.
+**Decision status:** Ticket 01 semantic validation and Ticket 03 runner behavior have local evidence. Renderer, solver, and full runtime qualification remain pending.
 
 ## Ground truth now recorded
 
@@ -48,7 +48,7 @@ These are contract artifacts, not solver or renderer implementation:
 - `chameleon/chameleon_design_schema_v0.9.json` is no longer provisional, accepts empty designs, and records structural ranges/defaults.
 - Contract fixtures live under `chameleon/tests/fixtures/contract/`.
 - The Level 2 public sample's style range is corrected to valid end-exclusive `[6, 15)` semantics; this is fixture/source-data correction, not solver implementation.
-- Ticket 01's semantic validator and contract tests are implemented at `engine.contract`; the renderer adapter, runner, solver, and full Gate 1 qualification remain pending in later tickets.
+- Ticket 01's semantic validator and contract tests are implemented at `engine.contract`; Ticket 03's fail-closed runner and staging path have focused integration evidence; the renderer adapter, solver, and full Gate 1 qualification remain pending in later tickets.
 
 ## Known implementation gaps before the solver
 
@@ -57,7 +57,7 @@ These are intentionally visible; none is silently promoted to contract behavior:
 1. `engine/resize.py` is the documented uniform-stretch baseline and violates image-ratio, group, overlap, rotation, and typography rules.
 2. `engine/main.py` has a warning-only self-check that checks unrotated rectangles and ID sets; it is not the contract validator.
 3. The renderer adapter's style-run end handling, Unicode-safe wrapping, letter-spacing/style-width measurement, explicit line/max-lines/height enforcement, glyph-bound validation, and rectangle/ellipse stroke behavior need conformance work.
-4. The batch runner has no accepted typed-status, cutoff, stale-output, or logical-pair publication path yet, and its default JSON decoding does not preserve numeric tokens for exact ingress.
+4. The runner's typed-status, stale-output, logical-pair publication, aggregate exit, and exact numeric-ingress path are implemented and focused-tested; deterministic cutoff semantics and full runtime qualification remain pending.
 5. The deterministic role-inference, four-topology candidate search, renderer-in-loop ranking, and held-out evaluation path have not been implemented.
 6. The Docker build has no project-owned hash-locked wheelhouse or apt-version lock; the direct compatibility pins are an initial baseline.
 
@@ -80,9 +80,19 @@ These are not unresolved internal design choices. They require external facts or
 - The suite covers schema/source validation, identity and immutable-field preservation, exact numeric ingress, serialized integer geometry, rotated containment and bleed, image ratios, rigid groups, source-separated collision, text line-box checks, empty/degenerate designs, and typed reason codes.
 - The ticket-01 PR tree contains no ticket-02 renderer/wrapping implementation, tests, fixtures, or Unicode data. Ticket 02 remains pending human review and approval.
 
+## Ticket 03 verification record
+
+- `cd chameleon && ../.venv/bin/python -m unittest tests.engine.test_runner -v` — 7 tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 35 tests passed.
+- `python3 scripts/verify_repository.py` — passed.
+- `../.venv/bin/python -m engine.main` — failed closed for all three sample tasks because the current uniform-stretch `resize.py` baseline emits non-integer geometry; no JSON/PNG pair was published.
+- `docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — completed with the existing `FROM --platform` warning.
+- `docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — failed closed for all three sample tasks with the same known resize-baseline geometry issue.
+
+
 ## Remaining Gate 1 qualification
 
-The following sequence is required for later Gate 1 qualification and is not ticket-01 evidence:
+The following sequence is required for later Gate 1 qualification and is not complete ticket-01 or ticket-03 evidence:
 
 ```bash
 cd chameleon
