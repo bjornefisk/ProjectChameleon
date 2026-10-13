@@ -204,9 +204,9 @@ def _publish_pair(
             ),
             encoding="utf-8",
         )
-        os.replace(commit_tmp, commit_path)
         os.replace(json_tmp, json_path)
         os.replace(png_tmp, png_path)
+        os.replace(commit_tmp, commit_path)
     except BaseException:
         try:
             _cleanup_task_paths(stem)

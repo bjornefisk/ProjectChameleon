@@ -202,6 +202,30 @@ class RunnerPublicationTests(unittest.TestCase):
                 commit["png_sha256"], hashlib.sha256(png_path.read_bytes()).hexdigest()
             )
 
+
+    def test_publish_pair_installs_marker_after_both_artifacts(self):
+        source, target = self._empty_request()
+        output = {"canvas": target, "elements": []}
+        replace_destinations = []
+        real_replace = main.os.replace
+
+        def record_replace(source_path, destination):
+            replace_destinations.append(Path(destination).name)
+            return real_replace(source_path, destination)
+
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
+                main,
+                "render_to_png",
+                side_effect=lambda _design, _assets, path: self._write_png(path),
+            ), patch.object(main.os, "replace", side_effect=record_replace):
+                main._publish_pair(source, target, output, "task")
+
+        self.assertEqual(
+            replace_destinations,
+            ["task_output.json", "task_output.png", ".task_output.commit"],
+        )
     def test_publish_pair_returns_renderer_warnings(self):
         source, target = self._empty_request()
         output = {"canvas": target, "elements": []}
