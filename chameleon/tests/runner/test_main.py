@@ -225,6 +225,50 @@ class RunnerPublicationTests(unittest.TestCase):
             )
             self.assertEqual(published["elements"][0]["font_size"], 10)
 
+    def test_nontext_font_size_remains_immutable_during_serialization(self):
+        source = {
+            "canvas": {"width": 20, "height": 20},
+            "elements": [
+                {
+                    "id": "shape",
+                    "type": "shape",
+                    "x": 0,
+                    "y": 0,
+                    "width": 20,
+                    "height": 20,
+                    "font_size": Decimal("10.5"),
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(0,0,0,1)",
+                }
+            ],
+        }
+        target = {"width": 20, "height": 20}
+        rendered = {}
+
+        def renderer(design, _assets_dir, png_path):
+            rendered["design"] = design
+            self._write_png(png_path)
+
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            staging.publish_task(
+                output_dir=output_dir,
+                task_name="shape",
+                source=source,
+                target_canvas=target,
+                response={"canvas": dict(target), "elements": [dict(source["elements"][0])]},
+                assets_dir=output_dir / "assets",
+                render_to_png=renderer,
+            )
+
+            published = json.loads(
+                (output_dir / "shape_output.json").read_text(encoding="utf-8"),
+                parse_float=Decimal,
+            )
+
+        self.assertEqual(published["elements"][0]["font_size"], Decimal("10.5"))
+        self.assertEqual(rendered["design"]["elements"][0]["font_size"], Decimal("10.5"))
+
     def test_main_reports_malformed_source_status(self):
         element = {
             "id": "same",

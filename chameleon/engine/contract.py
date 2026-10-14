@@ -19,6 +19,18 @@ from typing import Any
 from jsonschema import Draft202012Validator
 
 from .errors import InfeasibleLayoutError, InfeasibleReasonCode
+from .geometry.bounds import (
+    AABB,
+    clipped_sides,
+    intersects_canvas,
+    is_contained_in_canvas,
+    positive_aabb_intersection,
+    rotated_aabb,
+    source_bleed_sides,
+)
+from .geometry.groups import derive_common_transform
+from .geometry.math_util import to_fraction
+from .geometry.ratios import preserves_source_ratio
 
 _SCHEMA_PATH = Path(__file__).resolve().parents[1] / "chameleon_design_schema_v0.9.json"
 with _SCHEMA_PATH.open(encoding="utf-8") as _schema_file:
@@ -28,10 +40,6 @@ _DESIGN_VALIDATOR = Draft202012Validator(_SCHEMA)
 _CANVAS_VALIDATOR = Draft202012Validator(_SCHEMA["$defs"]["canvas"])
 
 _GEOMETRY_FIELDS = ("x", "y", "width", "height")
-
-# AABB tuple: min_x, min_y, max_x, max_y. Coordinate arithmetic stays exact.
-# Pinned math.sin/cos coefficients use exact fractions of their float results.
-AABB = tuple[Fraction, Fraction, Fraction, Fraction]
 
 
 def validate_source(source: Mapping[str, Any]) -> None:
@@ -425,7 +433,7 @@ def _validate_serialized_geometry(
                 {"index": index, "id": response_element["id"]},
             )
 
-        if "font_size" in response_element and type(response_element["font_size"]) is not int:
+        if response_element["type"] == "text" and type(response_element["font_size"]) is not int:
             _fail(
                 InfeasibleReasonCode.MALFORMED_INPUT,
                 "serialized response font_size must be a finite integer",
@@ -476,7 +484,12 @@ def _validate_image_ratios(
         source_height = _as_fraction(source_element["height"])
         if source_width <= 0 or source_height <= 0:
             continue
-        if response_element["width"] * source_height != response_element["height"] * source_width:
+        if not preserves_source_ratio(
+            response_element["width"],
+            response_element["height"],
+            source_width,
+            source_height,
+        ):
             _fail(
                 InfeasibleReasonCode.IMAGE_RATIO_VIOLATION,
                 "foreground image dimensions do not preserve the source ratio",
@@ -502,87 +515,12 @@ def _validate_groups(
             groups.setdefault(group_id, []).append(index)
 
     for group_id, indices in groups.items():
-        scale: Fraction | None = None
-        translation: tuple[Fraction, Fraction] | None = None
-        for index in indices:
-            source_element = source_elements[index]
-            response_element = response_elements[index]
-
-            source_width = _as_fraction(source_element["width"])
-            source_height = _as_fraction(source_element["height"])
-            response_width = Fraction(response_element["width"])
-            response_height = Fraction(response_element["height"])
-
-            if source_width == 0:
-                if response_width != 0:
-                    _group_fail(group_id, index, "zero source width changed inside a rigid group")
-            else:
-                candidate_scale = response_width / source_width
-                scale = _merge_group_scale(scale, candidate_scale, group_id, index)
-
-            if source_height == 0:
-                if response_height != 0:
-                    _group_fail(group_id, index, "zero source height changed inside a rigid group")
-            else:
-                candidate_scale = response_height / source_height
-                scale = _merge_group_scale(scale, candidate_scale, group_id, index)
-
-        if scale is None:
-            source_anchor_center = _element_center(source_elements[indices[0]])
-            response_anchor_center = _element_center(response_elements[indices[0]])
-            for index in indices[1:]:
-                source_center = _element_center(source_elements[index])
-                response_center = _element_center(response_elements[index])
-                for axis in (0, 1):
-                    source_delta = source_center[axis] - source_anchor_center[axis]
-                    response_delta = response_center[axis] - response_anchor_center[axis]
-                    if source_delta == 0:
-                        if response_delta != 0:
-                            _group_fail(
-                                group_id,
-                                index,
-                                "group children do not share one scale",
-                            )
-                    else:
-                        scale = _merge_group_scale(
-                            scale,
-                            response_delta / source_delta,
-                            group_id,
-                            index,
-                        )
-            if scale is None:
-                scale = Fraction(1)
-        if scale <= 0:
-            _group_fail(group_id, indices[0], "rigid group scale must be positive")
-
-        for index in indices:
-            source_element = source_elements[index]
-            response_element = response_elements[index]
-            source_center = _element_center(source_element)
-            response_center = _element_center(response_element)
-            candidate_translation = (
-                response_center[0] - scale * source_center[0],
-                response_center[1] - scale * source_center[1],
-            )
-            if translation is None:
-                translation = candidate_translation
-            elif candidate_translation != translation:
-                _group_fail(group_id, index, "group children do not share one translation")
-
-
-def _merge_group_scale(
-    current: Fraction | None,
-    candidate: Fraction,
-    group_id: Any,
-    index: int,
-) -> Fraction:
-    if candidate <= 0:
-        _group_fail(group_id, index, "rigid group scale must be positive")
-    if current is None:
-        return candidate
-    if candidate != current:
-        _group_fail(group_id, index, "group children do not share one scale")
-    return current
+        source_group = [source_elements[index] for index in indices]
+        response_group = [response_elements[index] for index in indices]
+        try:
+            derive_common_transform(source_group, response_group)
+        except (KeyError, TypeError, ValueError) as error:
+            _group_fail(group_id, indices[0], str(error))
 
 
 def _group_fail(group_id: Any, index: int, message: str) -> None:
@@ -675,48 +613,21 @@ def _background_index(source: Mapping[str, Any], source_aabbs: Sequence[AABB]) -
 def _source_bleed_sides(
     element: Mapping[str, Any], aabb: AABB, canvas: Mapping[str, int]
 ) -> frozenset[str] | None:
-    if element["type"] != "shape":
-        return None
-    if element.get("group_id") is not None:
-        return None
-    if _as_fraction(element.get("opacity", 1)) >= 1:
-        return None
-    sides = _clipped_sides(aabb, canvas)
-    if not sides or not _positive_intersection_with_canvas(aabb, canvas):
-        return None
-    return frozenset(sides)
+    return source_bleed_sides(element, aabb, canvas)
 
 
 def _clipped_sides(aabb: AABB, canvas: Mapping[str, int]) -> frozenset[str]:
-    sides: set[str] = set()
-    if aabb[0] < 0:
-        sides.add("left")
-    if aabb[1] < 0:
-        sides.add("top")
-    if aabb[2] > canvas["width"]:
-        sides.add("right")
-    if aabb[3] > canvas["height"]:
-        sides.add("bottom")
-    return frozenset(sides)
+    return clipped_sides(aabb, canvas)
 
 
-def _positive_intersection_with_canvas(aabb: AABB, canvas: Mapping[str, int]) -> bool:
-    canvas_aabb = (
-        Fraction(0),
-        Fraction(0),
-        Fraction(canvas["width"]),
-        Fraction(canvas["height"]),
-    )
-    return _positive_aabb_intersection(aabb, canvas_aabb)
+def _positive_intersection_with_canvas(
+    aabb: AABB, canvas: Mapping[str, int]
+) -> bool:
+    return intersects_canvas(aabb, canvas)
 
 
 def _contained_in_canvas(aabb: AABB, canvas: Mapping[str, int]) -> bool:
-    return (
-        aabb[0] >= 0
-        and aabb[1] >= 0
-        and aabb[2] <= canvas["width"]
-        and aabb[3] <= canvas["height"]
-    )
+    return is_contained_in_canvas(aabb, canvas)
 
 
 def _contained_canvas_in_aabb(aabb: AABB, canvas: Mapping[str, int]) -> bool:
@@ -729,39 +640,7 @@ def _contained_canvas_in_aabb(aabb: AABB, canvas: Mapping[str, int]) -> bool:
 
 
 def _rotated_aabb(element: Mapping[str, Any]) -> AABB:
-    x = _as_fraction(element["x"])
-    y = _as_fraction(element["y"])
-    width = _as_fraction(element["width"])
-    height = _as_fraction(element["height"])
-    center_x = x + width / 2
-    center_y = y + height / 2
-    sine, cosine = _sin_cos_degrees(element.get("rotation", 0))
-    sine = Fraction.from_float(sine)
-    cosine = Fraction.from_float(cosine)
-    extent_x = abs(width * cosine) + abs(height * sine)
-    extent_y = abs(width * sine) + abs(height * cosine)
-    return (
-        center_x - extent_x / 2,
-        center_y - extent_y / 2,
-        center_x + extent_x / 2,
-        center_y + extent_y / 2,
-    )
-
-
-def _sin_cos_degrees(value: Any) -> tuple[float, float]:
-    degrees = _as_fraction(value)
-    if degrees.denominator == 1 and degrees % 90 == 0:
-        quarter_turn = (degrees.numerator // 90) % 4
-        return ((0.0, 1.0), (1.0, 0.0), (0.0, -1.0), (-1.0, 0.0))[quarter_turn]
-    radians = math.radians(_as_float(value))
-    return math.sin(radians), math.cos(radians)
-
-
-def _element_center(element: Mapping[str, Any]) -> tuple[Fraction, Fraction]:
-    return (
-        _as_fraction(element["x"]) + _as_fraction(element["width"]) / 2,
-        _as_fraction(element["y"]) + _as_fraction(element["height"]) / 2,
-    )
+    return rotated_aabb(element)
 
 
 def _positive_element(element: Mapping[str, Any]) -> bool:
@@ -769,9 +648,7 @@ def _positive_element(element: Mapping[str, Any]) -> bool:
 
 
 def _positive_aabb_intersection(left: AABB, right: AABB) -> bool:
-    overlap_x = min(left[2], right[2]) - max(left[0], right[0])
-    overlap_y = min(left[3], right[3]) - max(left[1], right[1])
-    return overlap_x > 0 and overlap_y > 0
+    return positive_aabb_intersection(left, right)
 
 
 def _is_numeric(value: Any) -> bool:
@@ -787,28 +664,7 @@ def _is_finite_number(value: Any) -> bool:
 
 
 def _as_fraction(value: Any) -> Fraction:
-    if isinstance(value, bool):
-        raise TypeError("boolean is not a contract number")
-    if isinstance(value, Fraction):
-        return value
-    if isinstance(value, Decimal):
-        return Fraction(value)
-    if isinstance(value, int):
-        return Fraction(value, 1)
-    if isinstance(value, float):
-        if not math.isfinite(value):
-            raise ValueError("non-finite contract number")
-        return Fraction(str(value))
-    if isinstance(value, Number):
-        return Fraction(str(value))
-    raise TypeError(f"not a contract number: {value!r}")
-
-
-def _as_float(value: Any) -> float:
-    result = float(_as_fraction(value))
-    if not math.isfinite(result):
-        raise ValueError("contract number is outside the runtime float range")
-    return result
+    return to_fraction(value)
 
 
 def _strict_equal(left: Any, right: Any) -> bool:
