@@ -102,6 +102,7 @@ def publish_staging_directory(
     lock_fd: int | None = None
     target_moved = False
     target_identity: os.stat_result | None = None
+    expected_identity: os.stat_result | None = None
     staging_fd = directory_fd
     owns_staging_fd = False
     lock_acquired = False
@@ -137,6 +138,7 @@ def publish_staging_directory(
             )
             owns_staging_fd = True
         expected = os.fstat(staging_fd)
+        expected_identity = expected
         actual = os.stat(
             staging_name,
             dir_fd=parent_fd,
@@ -193,10 +195,8 @@ def publish_staging_directory(
         if (
             target_moved
             and not publication_succeeded
-            and target_identity is not None
+            and expected_identity is not None
             and parent_fd is not None
-            and (target_identity.st_dev, target_identity.st_ino)
-            == (expected.st_dev, expected.st_ino)
         ):
             try:
                 current_target = os.stat(
@@ -206,7 +206,7 @@ def publish_staging_directory(
                 )
                 if (
                     (current_target.st_dev, current_target.st_ino)
-                    == (target_identity.st_dev, target_identity.st_ino)
+                    == (expected_identity.st_dev, expected_identity.st_ino)
                 ):
                     if not shutil.rmtree.avoids_symlink_attacks:
                         raise OSError("safe publication rollback unavailable")

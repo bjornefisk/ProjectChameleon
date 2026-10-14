@@ -762,6 +762,7 @@ def fetch_pr_refs(
             "git",
             "fetch",
             "--no-tags",
+            "--no-write-fetch-head",
             remote_url,
             f"+refs/pull/{pr}/head:{head_ref}",
         ],
@@ -769,6 +770,7 @@ def fetch_pr_refs(
             "git",
             "fetch",
             "--no-tags",
+            "--no-write-fetch-head",
             remote_url,
             f"+{base_source}:{base_ref}",
         ],
@@ -1074,14 +1076,27 @@ def main() -> int:
         diff_patch = git_output_bytes(
             "diff",
             "--no-ext-diff",
+            "--no-textconv",
+            "--no-color",
             diff_range,
             strip=False,
             max_output_bytes=MAX_DIFF_BYTES,
         )
-        diff_stat = git_output_bytes("diff", "--stat", diff_range, strip=False)
+        diff_stat = git_output_bytes(
+            "diff",
+            "--stat",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--no-color",
+            diff_range,
+            strip=False,
+        )
         changed_files_blob = git_output_bytes(
             "diff",
             "--name-only",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--no-color",
             diff_range,
             strip=False,
         )
@@ -1137,7 +1152,21 @@ def main() -> int:
         if not args.run_checks:
             reason = "not requested; PR code execution is disabled by default"
             checks.append(
-                run_check("diff-check", ["git", "diff", "--check", diff_range], ROOT, report_dir, args.timeout)
+                run_check(
+                    "diff-check",
+                    [
+                        "git",
+                        "diff",
+                        "--check",
+                        "--no-ext-diff",
+                        "--no-textconv",
+                        "--no-color",
+                        diff_range,
+                    ],
+                    ROOT,
+                    report_dir,
+                    args.timeout,
+                )
             )
             checks.extend(
                 [
@@ -1152,7 +1181,21 @@ def main() -> int:
                 raise ReviewError("check execution directory was not created")
             check_env = isolated_environment(execution_dir)
             checks.append(
-                run_check("diff-check", ["git", "diff", "--check", diff_range], ROOT, report_dir, args.timeout)
+                run_check(
+                    "diff-check",
+                    [
+                        "git",
+                        "diff",
+                        "--check",
+                        "--no-ext-diff",
+                        "--no-textconv",
+                        "--no-color",
+                        diff_range,
+                    ],
+                    ROOT,
+                    report_dir,
+                    args.timeout,
+                )
             )
             engine_available = (checkout / "chameleon" / "engine").is_dir()
             python_path = resolve_runner_python(args.python_path)

@@ -458,6 +458,29 @@ class ReviewCapsuleTests(unittest.TestCase):
             self.assertFalse(target.exists())
             self.assertFalse(staging.exists())
 
+    def test_publish_staging_directory_rolls_back_when_target_open_fails(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            staging = root / "staging"
+            target = root / "report"
+            staging.mkdir()
+            real_open = review_pr.os.open
+            failed = False
+
+            def fail_target_open(path, flags, *args, **kwargs):
+                nonlocal failed
+                if path == target.name and kwargs.get("dir_fd") is not None and not failed:
+                    failed = True
+                    raise OSError("target open failed")
+                return real_open(path, flags, *args, **kwargs)
+
+            with patch.object(review_pr.os, "open", side_effect=fail_target_open):
+                with self.assertRaisesRegex(OSError, "target open failed"):
+                    review_pr.publish_staging_directory(staging, target)
+
+            self.assertFalse(target.exists())
+            self.assertFalse(staging.exists())
+
     def test_publish_staging_directory_leaves_reusable_lock(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -554,6 +577,9 @@ class ReviewCapsuleTests(unittest.TestCase):
         self.assertEqual(head_ref, "refs/review-capsule/run-1/head")
         self.assertEqual(base_ref, "refs/review-capsule/run-1/base")
         commands = [call.args[0] for call in run.call_args_list]
+        self.assertEqual(len(commands), 2)
+        for command in commands:
+            self.assertIn("--no-write-fetch-head", command)
         self.assertIn("refs/review-capsule/run-1/head", commands[0][-1])
         self.assertIn(
             f"+{'a' * 40}:refs/review-capsule/run-1/base",
