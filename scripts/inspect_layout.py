@@ -371,9 +371,14 @@ def _uncommitted_artifacts(target_path: Path) -> list[Path]:
     candidates = sorted(
         set(target_path.glob("*_output.json"))
         | set(target_path.glob("*_output.png"))
+        | set(target_path.glob("*_output.json.tmp"))
+        | set(target_path.glob("*_output.png.tmp"))
     )
     uncommitted = []
     for path in candidates:
+        if path.name.endswith(("_output.json.tmp", "_output.png.tmp")):
+            uncommitted.append(path)
+            continue
         if path.name.endswith("_output.json"):
             stem = path.name[: -len("_output.json")]
         else:
@@ -416,7 +421,13 @@ def main() -> int:
         target_path = Path(sys.argv[1])
 
     if target_path.is_file():
-        if target_path.name.endswith("_output.json") and not _is_committed_pair(target_path):
+        if (
+            target_path.name.endswith(("_output.json.tmp", "_output.png.tmp"))
+            or (
+                target_path.name.endswith("_output.json")
+                and not _is_committed_pair(target_path)
+            )
+        ):
             print(
                 _escape_diagnostic(
                     f"Uncommitted or invalid output pair: {target_path}"

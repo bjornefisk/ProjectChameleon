@@ -107,8 +107,12 @@ def _generated_stem(name: str) -> str | None:
 
 def reconcile_output_artifacts(
     output_dir: Path, current_task_names: set[str] | frozenset[str]
-) -> None:
-    """Remove stale generated artifacts while preserving unrelated output files."""
+) -> list[str]:
+    """Remove stale generated artifacts while preserving unrelated output files.
+
+    Return cleanup warnings when quarantine removed stale paths after cleanup
+    failed. Raise only when stale paths remain unquarantined.
+    """
 
     current = set(current_task_names)
     for task_name in current:
@@ -116,14 +120,15 @@ def reconcile_output_artifacts(
     try:
         entries = list(output_dir.iterdir())
     except FileNotFoundError:
-        return
+        return []
 
     stale_names = {
         stem
         for path in entries
         if (stem := _generated_stem(path.name)) is not None and stem not in current
     }
-    failures: list[str] = []
+    warnings: list[str] = []
+    quarantine_failures: list[str] = []
     for task_name in sorted(stale_names):
         try:
             cleanup_task_artifacts(output_dir, task_name)
@@ -131,18 +136,21 @@ def reconcile_output_artifacts(
             try:
                 quarantine_task_artifacts(output_dir, task_name)
             except BaseException as quarantine_error:
-                failures.append(
+                quarantine_failures.append(
                     f"{task_name!r}: {type(error).__name__}: {error}; "
                     f"quarantine failed: {type(quarantine_error).__name__}: "
                     f"{quarantine_error}"
                 )
             else:
-                failures.append(
+                warnings.append(
                     f"{task_name!r}: {type(error).__name__}: {error}; "
                     "stale paths quarantined"
                 )
-    if failures:
-        raise RuntimeError("output reconciliation failed: " + "; ".join(failures))
+    if quarantine_failures:
+        raise RuntimeError(
+            "output reconciliation failed: " + "; ".join(quarantine_failures)
+        )
+    return warnings
 
 
 def _validate_artifact_stem(task_name: str) -> None:
@@ -276,11 +284,23 @@ def _reject_constant(value: str) -> None:
     raise ValueError(f"non-finite JSON constant is not allowed: {value}")
 
 
+def _decimal_json_number(value: Decimal) -> str:
+    sign, digits, exponent = value.as_tuple()
+    coefficient = "".join(str(digit) for digit in digits) or "0"
+    if len(coefficient) == 1:
+        mantissa = coefficient
+    else:
+        mantissa = coefficient[0] + "." + coefficient[1:]
+    scientific_exponent = exponent + len(coefficient) - 1
+    prefix = "-" if sign else ""
+    return f"{prefix}{mantissa}e{scientific_exponent}"
+
+
 def _json_number(value: Any) -> str:
     if isinstance(value, Decimal):
         if not value.is_finite():
             raise ValueError("non-finite Decimal cannot be serialized")
-        return str(value)
+        return _decimal_json_number(value)
     if isinstance(value, float):
         if value != value or value in (float("inf"), float("-inf")):
             raise ValueError("non-finite float cannot be serialized")
@@ -421,6 +441,17 @@ def validate_png(path: Path) -> None:
             image.load()
 
 
+def _validate_output_directory(output_dir: Path) -> None:
+    try:
+        metadata = output_dir.lstat()
+    except FileNotFoundError:
+        return
+    if stat.S_ISLNK(metadata.st_mode):
+        raise OSError(f"refusing symlink output directory: {output_dir}")
+    if not stat.S_ISDIR(metadata.st_mode):
+        raise OSError(f"output path is not a directory: {output_dir}")
+
+
 def publish_task(
     *,
     output_dir: Path,
@@ -435,7 +466,9 @@ def publish_task(
 ) -> TaskArtifactPaths:
     """Stage, validate, and marker-publish one JSON/PNG task pair."""
 
+    _validate_output_directory(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    _validate_output_directory(output_dir)
     public_paths = artifact_paths(output_dir, task_name)
     try:
         cleanup_task_artifacts(output_dir, task_name)
