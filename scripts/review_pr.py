@@ -240,7 +240,7 @@ def run_process(
             env=env,
             stdin_bytes=input_bytes,
             merge_stderr=True,
-            terminate_on_output_limit=False,
+            terminate_on_output_limit=True,
         )
     except OSError as error:
         content = f"{type(error).__name__}: {error}\n".encode()
@@ -269,6 +269,18 @@ def run_process(
         status = "FAIL"
         returncode = None
         reason = f"timeout after {timeout}s"
+    elif result.output_limited:
+        status = "FAIL"
+        returncode = None
+        reason = f"output exceeded {MAX_LOG_BYTES} bytes"
+    elif result.capture_incomplete:
+        status = "FAIL"
+        returncode = None
+        reason = "output capture incomplete"
+    elif result.reader_error is not None:
+        status = "FAIL"
+        returncode = None
+        reason = f"output capture failed: {result.reader_error}"
     else:
         status = "PASS" if result.returncode == 0 else "FAIL"
         returncode = result.returncode

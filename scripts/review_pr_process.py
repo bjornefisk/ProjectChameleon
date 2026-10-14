@@ -133,7 +133,8 @@ def execute_process(
                 return
             try:
                 while True:
-                    chunk = stream.read(65536)  # type: ignore[union-attr]
+                    reader = getattr(stream, "read1", stream.read)
+                    chunk = reader(65536)  # type: ignore[operator]
                     if not chunk:
                         return
                     with lock:

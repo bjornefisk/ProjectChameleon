@@ -793,13 +793,37 @@ class ReviewCapsuleTests(unittest.TestCase):
                     10,
                 )
 
-            self.assertEqual(result.status, "PASS")
+            self.assertEqual(result.status, "FAIL")
             content = log_path.read_bytes()
             self.assertIn(review_pr.LOG_TRUNCATION_MARKER, content)
             self.assertLessEqual(
                 len(content),
                 32 + len(review_pr.LOG_TRUNCATION_MARKER),
             )
+
+    def test_run_process_stops_on_output_limit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log_path = Path(directory) / "check.log"
+            with patch.object(review_pr, "MAX_LOG_BYTES", 32):
+                result = review_pr.run_process(
+                    [
+                        sys.executable,
+                        "-c",
+                        (
+                            "import sys, time; "
+                            "sys.stdout.write('x' * 256); "
+                            "sys.stdout.flush(); "
+                            "time.sleep(30)"
+                        ),
+                    ],
+                    ROOT,
+                    log_path,
+                    10,
+                )
+
+            self.assertEqual(result.status, "FAIL")
+            self.assertEqual(result.reason, "output exceeded 32 bytes")
+            self.assertLess(result.duration_seconds, 5.0)
 
     def test_run_check_defers_report_log_until_flush(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -58,10 +58,11 @@ Use [`../templates/review.md`](../templates/review.md) and [`../checklists/revie
 
 ## Review evidence capsule
 
-Run `python3 scripts/review_pr.py --pr <number>` before manual review. Use its
-compact summary, changed-file list, diff statistics, and check logs as the
-initial evidence packet; inspect the complete diff before narrowing to affected
-paths and findings.
+After inspecting the complete diff, run a trusted copy of
+`python3 scripts/review_pr.py --pr <number>`. Do not execute the PR-head copy
+before that inspection: default mode avoids executing the extracted PR checkout,
+but the capsule source itself still runs with reviewer privileges and is not a
+security sandbox.
 
 Default mode captures exact base/head revisions and runs only safe diff checks.
 Use `--run-checks` only for trusted pull requests: the extracted checkout is
