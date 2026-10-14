@@ -113,11 +113,11 @@ The hidden `.<stem>_output.commit` marker is the pair manifest and commit author
 
 ## Ticket 04 verification record
 
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/geometry -p 'test_*.py' -v` — 11 geometry tests passed.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 125 tests passed, including contract, runner, and geometry coverage through the staging/validator integration.
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests/geometry -p 'test_*.py' -v` — 11 geometry tests passed.
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 130 tests passed, including contract, runner, and geometry coverage through the staging/validator integration.
 - `python3 scripts/verify_repository.py`, `make verify`, `git diff --check`, and changed-file `py_compile` — passed.
-- `cd chameleon && python -m engine.main` — the system interpreter failed before application startup because `jsonschema` is not installed; the project `.venv` equivalent was used for the observable runner smoke.
-- `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1 as required for the nonconforming baseline; Level 1/2 failed with `IMAGE_RATIO_VIOLATION`, Level 3 with `CONTAINMENT_VIOLATION`, and no artifacts were produced beyond `output/.gitkeep`.
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -m engine.main` — exit 1 as required for the nonconforming baseline; Level 1/2 failed with `IMAGE_RATIO_VIOLATION`, Level 3 with `CONTAINMENT_VIOLATION`, and no artifacts were produced beyond `output/.gitkeep`.
+- The integrated PR9 runner fixes preserve Decimal exponent tokens, reject direct symlinked output roots and temporary inspector inputs, and continue valid tasks after quarantine warnings.
 - `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — passed with the existing `FromPlatformFlagConstDisallowed` warning.
 - `cd chameleon && docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — exit 1 with the same typed baseline failures and no artifacts beyond `output/.gitkeep`; Docker used amd64-on-arm64 emulation, so native-amd64 qualification remains unverified.
 - Geometry predicates are now reused by `engine.contract`; `engine.staging` delegates mutable serialization to `engine.geometry.math_util.quantize_to_int`.
