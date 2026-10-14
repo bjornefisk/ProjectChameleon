@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import stat
 import tempfile
 import uuid
@@ -11,6 +12,11 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Mapping
+
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
 
 
 @dataclass
@@ -31,11 +37,36 @@ def open_evidence_directory(path: Path) -> int:
     return os.open(path, flags)
 
 
-def verify_evidence_directory(path: Path, descriptor: int) -> None:
+def validate_publication_parent(path: Path) -> None:
+    parent = os.stat(path, follow_symlinks=False)
+    if not stat.S_ISDIR(parent.st_mode):
+        raise ValueError(f"report parent is not a directory: {path}")
+    if parent.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+        raise ValueError(f"report parent must not be group/world writable: {path}")
+
+
+def verify_evidence_directory(
+    path: Path,
+    descriptor: int,
+    expected_names: Iterable[str] | None = None,
+) -> None:
     expected = os.fstat(descriptor)
     actual = os.stat(path, follow_symlinks=False)
     if (actual.st_dev, actual.st_ino) != (expected.st_dev, expected.st_ino):
         raise ValueError("evidence directory changed during PR checks")
+    if expected_names is None:
+        return
+    expected_entries = set(expected_names)
+    actual_entries = set(os.listdir(descriptor))
+    if actual_entries != expected_entries:
+        raise ValueError(
+            "evidence directory contains unexpected artifacts: "
+            + ", ".join(sorted(actual_entries ^ expected_entries))
+        )
+    for name in expected_entries:
+        entry = os.stat(name, dir_fd=descriptor, follow_symlinks=False)
+        if not stat.S_ISREG(entry.st_mode):
+            raise ValueError(f"evidence artifact is not a regular file: {name}")
 
 
 def evidence_directory_entries(descriptor: int) -> list[str]:
@@ -54,44 +85,177 @@ def create_staging_directory(target: Path) -> Path:
             raise ValueError(f"report path is not a directory: {target}")
         raise ValueError(f"report directory must not already exist: {target}")
     target.parent.mkdir(parents=True, exist_ok=True)
+    validate_publication_parent(target.parent)
     return Path(tempfile.mkdtemp(prefix=f".{target.name}.", dir=target.parent))
 
 
-def publish_staging_directory(staging: Path, target: Path) -> None:
-    lock_path = target.parent / f".{target.name}.publish.lock"
+def publish_staging_directory(
+    staging: Path,
+    target: Path,
+    directory_fd: int | None = None,
+    expected_names: Iterable[str] | None = None,
+) -> None:
+    if staging.parent.absolute() != target.parent.absolute():
+        raise ValueError("staging and target directories must share a parent")
+    parent_fd: int | None = None
+    target_fd: int | None = None
     lock_fd: int | None = None
-    owns_lock = False
+    target_moved = False
+    target_identity: os.stat_result | None = None
+    staging_fd = directory_fd
+    owns_staging_fd = False
+    lock_acquired = False
+    publication_succeeded = False
+    lock_name = f".{target.name}.publish.lock"
+    staging_name = staging.name
+    target_name = target.name
     try:
+        validate_publication_parent(target.parent)
+        parent_fd = open_evidence_directory(target.parent)
+        if fcntl is None:
+            raise OSError("publication locks require POSIX advisory locking")
+        lock_fd = os.open(
+            lock_name,
+            os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+            dir_fd=parent_fd,
+        )
         try:
-            lock_fd = os.open(
-                lock_path,
-                os.O_WRONLY
-                | os.O_CREAT
-                | os.O_EXCL
-                | getattr(os, "O_NOFOLLOW", 0),
-                0o600,
-            )
-            owns_lock = True
-        except FileExistsError as error:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
             raise ValueError(
                 f"report publication already in progress: {target}"
             ) from error
-        os.write(lock_fd, f"{os.getpid()}\n".encode("ascii"))
+        lock_acquired = True
+        if staging_fd is None:
+            staging_fd = os.open(
+                staging_name,
+                os.O_RDONLY
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=parent_fd,
+            )
+            owns_staging_fd = True
+        expected = os.fstat(staging_fd)
+        actual = os.stat(
+            staging_name,
+            dir_fd=parent_fd,
+            follow_symlinks=False,
+        )
+        if (actual.st_dev, actual.st_ino) != (expected.st_dev, expected.st_ino):
+            raise ValueError("staging directory changed before publication")
         try:
-            os.lstat(target)
+            os.stat(target_name, dir_fd=parent_fd, follow_symlinks=False)
         except FileNotFoundError:
             pass
         else:
             raise ValueError(f"report directory appeared during checks: {target}")
-        os.replace(staging, target)
+        os.replace(
+            staging_name,
+            target_name,
+            src_dir_fd=parent_fd,
+            dst_dir_fd=parent_fd,
+        )
+        target_moved = True
+        target_fd = os.open(
+            target_name,
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0),
+            dir_fd=parent_fd,
+        )
+        target_identity = os.fstat(target_fd)
+        if (target_identity.st_dev, target_identity.st_ino) != (
+            expected.st_dev,
+            expected.st_ino,
+        ):
+            raise ValueError("published directory changed before validation")
+        if expected_names is not None:
+            expected_entries = set(expected_names)
+            actual_entries = set(os.listdir(target_fd))
+            if actual_entries != expected_entries:
+                raise ValueError(
+                    "published directory contains unexpected artifacts: "
+                    + ", ".join(sorted(actual_entries ^ expected_entries))
+                )
+            for name in expected_entries:
+                entry = os.stat(
+                    name,
+                    dir_fd=target_fd,
+                    follow_symlinks=False,
+                )
+                if not stat.S_ISREG(entry.st_mode):
+                    raise ValueError(
+                        f"published artifact is not a regular file: {name}"
+                    )
+        publication_succeeded = True
     finally:
-        if lock_fd is not None:
-            os.close(lock_fd)
-        if owns_lock:
+        if (
+            target_moved
+            and not publication_succeeded
+            and target_identity is not None
+            and parent_fd is not None
+            and (target_identity.st_dev, target_identity.st_ino)
+            == (expected.st_dev, expected.st_ino)
+        ):
             try:
-                os.unlink(lock_path)
+                current_target = os.stat(
+                    target_name,
+                    dir_fd=parent_fd,
+                    follow_symlinks=False,
+                )
+                if (
+                    (current_target.st_dev, current_target.st_ino)
+                    == (target_identity.st_dev, target_identity.st_ino)
+                ):
+                    if not shutil.rmtree.avoids_symlink_attacks:
+                        raise OSError("safe publication rollback unavailable")
+                    shutil.rmtree(target_name, dir_fd=parent_fd)
             except FileNotFoundError:
                 pass
+        if owns_staging_fd and staging_fd is not None:
+            os.close(staging_fd)
+        if target_fd is not None:
+            os.close(target_fd)
+        if lock_fd is not None:
+            if lock_acquired:
+                try:
+                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                except OSError:
+                    if not publication_succeeded:
+                        raise
+            os.close(lock_fd)
+        if parent_fd is not None:
+            os.close(parent_fd)
+
+
+def discard_staging_directory(
+    staging: Path,
+    directory_fd: int | None = None,
+) -> bool:
+    parent_fd = open_evidence_directory(staging.parent)
+    try:
+        expected = os.fstat(directory_fd) if directory_fd is not None else None
+        try:
+            actual = os.stat(
+                staging.name,
+                dir_fd=parent_fd,
+                follow_symlinks=False,
+            )
+        except FileNotFoundError:
+            return True
+        if expected is not None and (
+            (actual.st_dev, actual.st_ino) != (expected.st_dev, expected.st_ino)
+        ):
+            return False
+        if not stat.S_ISDIR(actual.st_mode):
+            return False
+        if not shutil.rmtree.avoids_symlink_attacks:
+            raise OSError("safe staging cleanup unavailable")
+        shutil.rmtree(staging.name, dir_fd=parent_fd)
+        return True
+    finally:
+        os.close(parent_fd)
 
 
 def _write_descriptor(descriptor: int, content: bytes) -> None:

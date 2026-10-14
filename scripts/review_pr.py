@@ -15,6 +15,8 @@ import os
 import platform
 import shlex
 import shutil
+import signal
+import stat
 import subprocess
 import sys
 import tarfile
@@ -34,6 +36,7 @@ try:
     from .review_pr_evidence import (
         CheckResult,
         create_staging_directory,
+        discard_staging_directory,
         publish_staging_directory,
         cleanup_evidence_files,
         evidence_directory_entries,
@@ -54,6 +57,7 @@ except ImportError:
     from review_pr_evidence import (
         CheckResult,
         create_staging_directory,
+        discard_staging_directory,
         publish_staging_directory,
         cleanup_evidence_files,
         evidence_directory_entries,
@@ -140,6 +144,14 @@ CONTRACT_SOURCES = (
 class ReviewError(RuntimeError):
     """Raised when review capsule setup cannot continue safely."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        cleanup_refs: Iterable[str] = (),
+    ) -> None:
+        super().__init__(message)
+        self.cleanup_refs = tuple(cleanup_refs)
 
 
 @dataclass(frozen=True)
@@ -158,6 +170,7 @@ def run_bounded_command(
     max_output_bytes: int = MAX_COMMAND_OUTPUT_BYTES,
     env: Mapping[str, str] | None = None,
     stdout_path: Path | None = None,
+    stdout_fd: int | None = None,
 ) -> CommandResult:
     """Run a command with bounded output, timeout, and process cleanup."""
     try:
@@ -168,12 +181,15 @@ def run_bounded_command(
             max_output_bytes,
             env=env,
             stdout_path=stdout_path,
+            stdout_fd=stdout_fd,
             terminate_on_output_limit=True,
         )
     except OSError as error:
         raise ReviewError(f"cannot run {shlex.join(command)}: {error}") from error
     if result.reader_error and not result.timed_out and not result.output_limited:
         raise ReviewError(f"command output capture failed: {result.reader_error}")
+    if result.capture_incomplete and not result.timed_out and not result.output_limited:
+        raise ReviewError("command output capture incomplete")
     return CommandResult(
         returncode=result.returncode,
         stdout=result.stdout,
@@ -360,13 +376,27 @@ def ensure_file(path: Path) -> None:
 
 
 def snapshot_file(source: Path, max_bytes: int = MAX_BODY_BYTES) -> bytes:
-    size = source.stat().st_size
-    if size > max_bytes:
-        raise ReviewError(f"file exceeds {max_bytes} bytes: {source}")
-    content = source.read_bytes()
-    if len(content) > max_bytes:
-        raise ReviewError(f"file exceeds {max_bytes} bytes: {source}")
-    return content
+    descriptor = os.open(
+        source,
+        os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+    )
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise ReviewError(f"body file must be a regular file: {source}")
+        if metadata.st_size > max_bytes:
+            raise ReviewError(f"file exceeds {max_bytes} bytes: {source}")
+        content = bytearray()
+        while len(content) <= max_bytes:
+            chunk = os.read(descriptor, min(64 * 1024, max_bytes + 1 - len(content)))
+            if not chunk:
+                break
+            content.extend(chunk)
+        if len(content) > max_bytes:
+            raise ReviewError(f"file exceeds {max_bytes} bytes: {source}")
+        return bytes(content)
+    finally:
+        os.close(descriptor)
 
 
 def changed_contract_sources(changed_files: Iterable[str]) -> list[str]:
@@ -426,14 +456,9 @@ def create_checkout(head_sha: str, checkout: Path) -> None:
     if checkout.exists():
         raise ReviewError(f"checkout path already exists: {checkout}")
     checkout.mkdir(parents=True)
-    archive_fd, archive_name = tempfile.mkstemp(
-        prefix=".source-",
-        suffix=".tar",
-        dir=checkout.parent,
-    )
-    os.close(archive_fd)
-    archive_path = Path(archive_name)
     checkout_root = checkout.resolve()
+    archive_fd: int | None = None
+    archive_path: Path | None = None
     try:
         expected_paths = {
             os.fsdecode(path)
@@ -447,14 +472,25 @@ def create_checkout(head_sha: str, checkout: Path) -> None:
             ).split(b"\0")
             if path
         }
-        archive_command = ["git", "archive", "--format=tar", head_sha]
-        archive_result = run_bounded_command(
-            archive_command,
-            ROOT,
-            COMMAND_TIMEOUT,
-            max_output_bytes=MAX_ARCHIVE_BYTES,
-            stdout_path=archive_path,
+        archive_fd, archive_name = tempfile.mkstemp(
+            prefix=".source-",
+            suffix=".tar",
+            dir=checkout.parent,
         )
+        archive_path = Path(archive_name)
+        archive_command = ["git", "archive", "--format=tar", head_sha]
+        try:
+            archive_result = run_bounded_command(
+                archive_command,
+                ROOT,
+                COMMAND_TIMEOUT,
+                max_output_bytes=MAX_ARCHIVE_BYTES,
+                stdout_fd=archive_fd,
+            )
+        finally:
+            descriptor = archive_fd
+            archive_fd = None
+            os.close(descriptor)
         require_command_success(
             archive_command,
             archive_result,
@@ -507,11 +543,33 @@ def create_checkout(head_sha: str, checkout: Path) -> None:
                     archive.extract(member, checkout, filter="data")
                 else:
                     archive.extract(member, checkout)
+        actual_paths = set()
+        for root, directories, files in os.walk(checkout, followlinks=False):
+            for name in directories:
+                path = Path(root) / name
+                if path.is_symlink():
+                    raise ReviewError(f"refusing extracted link: {path}")
+            for name in files:
+                path = Path(root) / name
+                metadata = os.lstat(path)
+                if not stat.S_ISREG(metadata.st_mode):
+                    raise ReviewError(f"refusing extracted special file: {path}")
+                actual_paths.add(path.relative_to(checkout).as_posix())
+        if actual_paths != expected_paths:
+            missing = sorted(expected_paths - actual_paths)[:5]
+            extra = sorted(actual_paths - expected_paths)[:5]
+            raise ReviewError(
+                "extracted checkout manifest mismatch; "
+                f"missing={missing!r}, extra={extra!r}"
+            )
     except BaseException:
         shutil.rmtree(checkout, ignore_errors=True)
         raise
     finally:
-        archive_path.unlink(missing_ok=True)
+        if archive_fd is not None:
+            os.close(archive_fd)
+        if archive_path is not None:
+            archive_path.unlink(missing_ok=True)
 
     try:
         init_command = ["git", "init", "--quiet"]
@@ -593,7 +651,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--report-dir",
         type=Path,
-        help="New directory for the capsule; defaults to a temporary directory",
+        help=(
+            "New capsule directory; parent must not be group/world writable; "
+            "defaults to a private temporary directory"
+        ),
     )
     parser.add_argument(
         "--run-checks",
@@ -716,11 +777,16 @@ def fetch_pr_refs(
                 GH_TIMEOUT,
                 MAX_COMMAND_OUTPUT_BYTES,
             )
-    except ReviewError as error:
+    except BaseException as error:
         try:
             delete_review_refs((head_ref, base_ref))
         except ReviewError as cleanup_error:
-            raise ReviewError(f"{error}; {cleanup_error}") from error
+            if isinstance(error, ReviewError):
+                raise ReviewError(
+                    f"{error}; {cleanup_error}",
+                    cleanup_refs=(head_ref, base_ref),
+                ) from error
+            error.add_note(f"review ref cleanup failed: {cleanup_error}")
         raise
     return head_ref, base_ref
 
@@ -892,18 +958,32 @@ def submit_review(
 
 def main() -> int:
     args = parse_args()
-    body_source = args.body_file.resolve() if args.body_file else None
+    body_source = args.body_file.absolute() if args.body_file else None
     if body_source is not None:
         ensure_file(body_source)
+    previous_sigterm = signal.getsignal(signal.SIGTERM)
+
+    def handle_sigterm(signum: int, frame: object) -> None:
+        raise ReviewError("received SIGTERM; review capsule generation interrupted")
+
+    signal.signal(signal.SIGTERM, handle_sigterm)
 
     run_id = f"pr-{args.pr}-{uuid.uuid4().hex}"
+    namespace = run_id
+    review_refs: tuple[str, ...] = (
+        f"refs/review-capsule/{namespace}/head",
+        f"refs/review-capsule/{namespace}/base",
+    )
     environment = (
         f"{platform.python_implementation()} {platform.python_version()} "
         f"on {platform.platform()}"
     )
-    target_report_dir = args.report_dir.absolute() if args.report_dir else (
-        Path(tempfile.mkdtemp(prefix=f"chameleon-pr-{args.pr}-")) / "report"
-    )
+    report_root: Path | None = None
+    if args.report_dir is not None:
+        target_report_dir = args.report_dir.absolute()
+    else:
+        report_root = Path(tempfile.mkdtemp(prefix=f"chameleon-pr-{args.pr}-"))
+        target_report_dir = report_root / "report"
     report_dir: Path | None = None
     checks: list[CheckResult] = []
     checkout: Path | None = None
@@ -911,14 +991,17 @@ def main() -> int:
     body_content: bytes | None = None
     report_fd: int | None = None
     report_directory_validated = False
-    review_refs: tuple[str, ...] = ()
     metadata: dict
     repository = args.repo or "unresolved"
     capsule_revision = "unavailable"
-    contract_issues: list[str] = []
+    base_sha = "unavailable"
+    head_sha = "unavailable"
     summary_path: Path | None = None
     publish_ready = False
+    cleanup_errors: list[str] = []
+    pending_exception: BaseException | None = None
     published = False
+    publication_artifacts: set[str] | None = None
     try:
         report_dir = create_staging_directory(target_report_dir)
         report_fd = open_evidence_directory(report_dir)
@@ -947,12 +1030,26 @@ def main() -> int:
         )
         metadata["number"] = args.pr
         metadata["repository"] = repository
-        base_sha = str(metadata["baseRefOid"])
-        head_sha = str(metadata["headRefOid"])
+        try:
+            base_ref_name = metadata["baseRefName"]
+            base_sha = metadata["baseRefOid"]
+            head_sha = metadata["headRefOid"]
+        except KeyError as missing:
+            raise ReviewError(
+                f"GitHub PR metadata missing {missing.args[0]}"
+            ) from missing
+        if not all(
+            isinstance(value, str) and value
+            for value in (base_ref_name, base_sha, head_sha)
+        ):
+            raise ReviewError(
+                "GitHub PR metadata revisions and base ref must be non-empty strings"
+            )
         head_ref, base_ref = fetch_pr_refs(
             args.pr,
-            str(metadata["baseRefName"]),
+            base_ref_name,
             repository,
+            namespace=namespace,
             base_sha=base_sha,
         )
         review_refs = (head_ref, base_ref)
@@ -1218,28 +1315,53 @@ def main() -> int:
             provenance,
             directory_fd=report_fd,
         )
+        expected_artifacts = set(EVIDENCE_FILE_NAMES) - {"error.txt"}
+        expected_artifacts.update(
+            Path(check.log).name for check in checks if check.log is not None
+        )
+        publication_artifacts = expected_artifacts
+        verify_evidence_directory(
+            report_dir,
+            report_fd,
+            expected_artifacts,
+        )
         if any(check.status == "FAIL" for check in checks):
             exit_code = 1
         elif any(check.status == "SKIP" for check in checks):
             exit_code = 2
         else:
             exit_code = 0
-    except (
-        ReviewError,
-        OSError,
-        ValueError,
-        subprocess.CalledProcessError,
-        tarfile.TarError,
-    ) as error:
-        if report_directory_validated and report_fd is not None:
+    except BaseException as error:
+        if not isinstance(
+            error,
+            (
+                ReviewError,
+                OSError,
+                ValueError,
+                subprocess.CalledProcessError,
+                tarfile.TarError,
+            ),
+        ):
+            pending_exception = error
+        publish_ready = False
+        cleanup_refs = getattr(error, "cleanup_refs", ())
+        if cleanup_refs:
+            review_refs = tuple(
+                dict.fromkeys((*review_refs, *cleanup_refs))
+            )
+        error_messages = [str(error)]
+        summary_path = None
+        publication_safe = report_directory_validated and report_fd is not None
+        if publication_safe:
             names = set(EVIDENCE_FILE_NAMES)
             names.update(
                 Path(check.log).name for check in checks if check.log is not None
             )
             try:
                 cleanup_evidence_files(report_fd, names)
-            except OSError:
-                pass
+            except OSError as cleanup_error:
+                publication_safe = False
+                error_messages.append(f"evidence cleanup failed: {cleanup_error}")
             error_checks = []
             for check in checks:
                 serialized = serialize_check(check)
@@ -1254,6 +1376,11 @@ def main() -> int:
                 "repository": repository,
                 "run_id": run_id,
                 "capsule_revision": capsule_revision,
+                "base_sha": base_sha,
+                "head_sha": head_sha,
+                "role": ".agents/roles/reviewer.md",
+                "workflow": ".agents/workflows/06-review.md; .agents/workflows/07-github-pr.md",
+                "gate": "Gate 1: renderer and validator qualification before solver",
                 "environment": environment,
                 "validation": (
                     "capsule generation failed before complete evidence publication"
@@ -1267,35 +1394,175 @@ def main() -> int:
                     json.dumps(error_record, indent=2),
                     report_fd,
                 )
-            except OSError:
-                pass
-        print(f"error: {error}", file=sys.stderr)
+            except (OSError, TypeError, ValueError) as record_error:
+                publication_safe = False
+                error_messages.append(f"error record write failed: {record_error}")
+            else:
+                try:
+                    verify_evidence_directory(
+                        report_dir,
+                        report_fd,
+                        {"error.txt"},
+                    )
+                except (OSError, ValueError) as verify_error:
+                    publication_safe = False
+                    error_messages.append(
+                        f"error record validation failed: {verify_error}"
+                    )
+                else:
+                    publication_artifacts = {"error.txt"}
+        publish_ready = publication_safe
+        print(f"error: {'; '.join(error_messages)}", file=sys.stderr)
         exit_code = 2
     finally:
         try:
             delete_review_refs(review_refs)
         except ReviewError as cleanup_error:
-            print(f"error: {cleanup_error}", file=sys.stderr)
+            cleanup_errors.append(str(cleanup_error))
+            if summary_path is not None:
+                publish_ready = False
             exit_code = 2
         if execution_dir is not None:
-            shutil.rmtree(execution_dir, ignore_errors=True)
-        if report_fd is not None:
-            os.close(report_fd)
+            try:
+                shutil.rmtree(execution_dir)
+            except FileNotFoundError:
+                pass
+            except OSError as cleanup_error:
+                cleanup_errors.append(
+                    f"execution directory cleanup failed: {cleanup_error}"
+                )
+                if summary_path is not None:
+                    publish_ready = False
+                exit_code = 2
+        for cleanup_error in cleanup_errors:
+            print(f"error: {cleanup_error}", file=sys.stderr)
     if report_dir is not None:
         if not publish_ready:
-            shutil.rmtree(report_dir, ignore_errors=True)
+            if report_fd is not None:
+                try:
+                    if not discard_staging_directory(report_dir, report_fd):
+                        print(
+                            "error: staging directory changed before cleanup",
+                            file=sys.stderr,
+                        )
+                        exit_code = 2
+                except OSError as cleanup_error:
+                    print(
+                        f"error: staging cleanup failed: {cleanup_error}",
+                        file=sys.stderr,
+                    )
+                    exit_code = 2
+                except BaseException as finalization_error:
+                    pending_exception = finalization_error
+                    publish_ready = False
+                    exit_code = 2
+                    print(
+                        f"error: staging cleanup interrupted: {finalization_error}",
+                        file=sys.stderr,
+                    )
+                finally:
+                    os.close(report_fd)
+                    report_fd = None
+            else:
+                try:
+                    if not discard_staging_directory(report_dir):
+                        print(
+                            "error: staging directory changed before cleanup",
+                            file=sys.stderr,
+                        )
+                        exit_code = 2
+                except OSError as cleanup_error:
+                    print(
+                        f"error: staging cleanup failed: {cleanup_error}",
+                        file=sys.stderr,
+                    )
+                    exit_code = 2
+                except BaseException as finalization_error:
+                    pending_exception = finalization_error
+                    publish_ready = False
+                    exit_code = 2
+                    print(
+                        f"error: staging cleanup interrupted: {finalization_error}",
+                        file=sys.stderr,
+                    )
         else:
             try:
-                publish_staging_directory(report_dir, target_report_dir)
+                publish_staging_directory(
+                    report_dir,
+                    target_report_dir,
+                    directory_fd=report_fd,
+                    expected_names=publication_artifacts,
+                )
             except (OSError, ValueError) as publication_error:
-                shutil.rmtree(report_dir, ignore_errors=True)
+                try:
+                    if not discard_staging_directory(report_dir, report_fd):
+                        print(
+                            "error: staging directory changed before cleanup",
+                            file=sys.stderr,
+                        )
+                except OSError as cleanup_error:
+                    publication_error = RuntimeError(
+                        f"{publication_error}; staging cleanup failed: {cleanup_error}"
+                    )
                 print(
                     f"error: report publication failed: {publication_error}",
                     file=sys.stderr,
                 )
                 exit_code = 2
+            except BaseException as finalization_error:
+                pending_exception = finalization_error
+                publish_ready = False
+                try:
+                    if report_fd is not None:
+                        discard_staging_directory(report_dir, report_fd)
+                except OSError as cleanup_error:
+                    print(
+                        f"error: interrupted publication cleanup failed: {cleanup_error}",
+                        file=sys.stderr,
+                    )
+                print(
+                    f"error: report publication interrupted: {finalization_error}",
+                    file=sys.stderr,
+                )
+                exit_code = 2
             else:
                 published = True
+            finally:
+                if report_fd is not None:
+                    os.close(report_fd)
+                    report_fd = None
+    elif report_fd is not None:
+        os.close(report_fd)
+        report_fd = None
+    if report_root is not None and not published:
+        try:
+            shutil.rmtree(report_root)
+        except FileNotFoundError:
+            pass
+        except OSError as cleanup_error:
+            cleanup_errors.append(
+                f"report root cleanup failed: {cleanup_error}"
+            )
+            exit_code = 2
+            print(f"error: {cleanup_errors[-1]}", file=sys.stderr)
+        except BaseException as cleanup_error:
+            pending_exception = cleanup_error
+            exit_code = 2
+            print(
+                f"error: report root cleanup interrupted: {cleanup_error}",
+                file=sys.stderr,
+            )
+    if pending_exception is not None and report_dir is not None and not published:
+        try:
+            discard_staging_directory(report_dir)
+        except OSError as cleanup_error:
+            print(
+                f"error: interrupted staging cleanup failed: {cleanup_error}",
+                file=sys.stderr,
+            )
+    signal.signal(signal.SIGTERM, previous_sigterm)
+    if pending_exception is not None:
+        raise pending_exception
     if published:
         if summary_path is not None:
             print(f"report: {target_report_dir / 'summary.md'}")

@@ -1,3 +1,4 @@
+import fcntl
 import json
 import os
 import shutil
@@ -118,6 +119,39 @@ class ReviewCapsuleTests(unittest.TestCase):
                 )
             finally:
                 shutil.rmtree(report_dir.parent)
+
+    def test_main_publishes_typed_error_for_missing_pr_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            report_dir = Path(directory) / "report"
+            argv = [
+                "review_pr.py",
+                "--pr",
+                "1",
+                "--repo",
+                "owner/repo",
+                "--report-dir",
+                str(report_dir),
+            ]
+            error_output = StringIO()
+            with patch.object(
+                review_pr, "run_gh_json", return_value={}
+            ), patch.object(
+                review_pr.sys, "argv", argv
+            ), redirect_stderr(error_output):
+                result = review_pr.main()
+
+            self.assertEqual(result, 2)
+            error_record = json.loads(
+                (report_dir / "error.txt").read_text(encoding="utf-8")
+            )
+            self.assertIn("GitHub PR metadata missing baseRefName", error_record["error"])
+            self.assertEqual(error_record["base_sha"], "unavailable")
+            self.assertEqual(error_record["head_sha"], "unavailable")
+            self.assertIn("role", error_record)
+            self.assertIn("workflow", error_record)
+            self.assertIn("gate", error_record)
+            self.assertIn("error:", error_output.getvalue())
+
 
     def test_main_blocks_submission_when_checks_are_incomplete(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -279,6 +313,43 @@ class ReviewCapsuleTests(unittest.TestCase):
             )
             self.assertEqual(error_record["next_owner"], "reviewer/maintainer")
 
+    def test_main_discards_staging_when_error_record_write_fails(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repository, base_sha, head_sha = self._review_repository(root)
+            report_dir = root / "report"
+            metadata = {
+                "baseRefName": "base",
+                "baseRefOid": base_sha,
+                "headRefOid": head_sha,
+                "state": "OPEN",
+                "url": "https://example.test/pr/1",
+            }
+            argv = [
+                "review_pr.py",
+                "--pr",
+                "1",
+                "--repo",
+                "owner/repo",
+                "--report-dir",
+                str(report_dir),
+            ]
+            with patch.object(review_pr, "ROOT", repository), patch.object(
+                review_pr, "run_gh_json", return_value=metadata
+            ), patch.object(
+                review_pr,
+                "fetch_pr_refs",
+                return_value=("refs/heads/pr-head", "refs/heads/base"),
+            ), patch.object(
+                review_pr,
+                "write_text",
+                side_effect=OSError("simulated error record failure"),
+            ), patch.object(review_pr.sys, "argv", argv):
+                result = review_pr.main()
+
+            self.assertEqual(result, 2)
+            self.assertFalse(report_dir.exists())
+
     def test_publish_staging_directory_rejects_target_collision(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -295,6 +366,57 @@ class ReviewCapsuleTests(unittest.TestCase):
 
             self.assertTrue(staging.exists())
 
+
+    def test_verify_evidence_directory_rejects_nonregular_artifact(self):
+        with tempfile.TemporaryDirectory() as directory:
+            report_dir = Path(directory) / "report"
+            report_dir.mkdir()
+            (report_dir / "outside").write_text("outside\n", encoding="utf-8")
+            (report_dir / "artifact").symlink_to(
+                report_dir / "outside",
+                target_is_directory=False,
+            )
+            descriptor = review_pr.open_evidence_directory(report_dir)
+            try:
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "evidence artifact is not a regular file",
+                ):
+                    review_pr.verify_evidence_directory(
+                        report_dir,
+                        descriptor,
+                        {"artifact", "outside"},
+                    )
+            finally:
+                os.close(descriptor)
+
+    def test_publish_staging_directory_rejects_staging_swap(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            staging = root / "staging"
+            moved = root / "moved"
+            target = root / "report"
+            staging.mkdir()
+            descriptor = review_pr.open_evidence_directory(staging)
+            try:
+                staging.rename(moved)
+                staging.symlink_to(moved, target_is_directory=True)
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "staging directory changed before publication",
+                ):
+                    review_pr.publish_staging_directory(
+                        staging,
+                        target,
+                        directory_fd=descriptor,
+                    )
+            finally:
+                os.close(descriptor)
+
+            self.assertFalse(target.exists())
+            self.assertTrue(moved.exists())
+
+
     def test_publish_staging_directory_rejects_publication_lock(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -302,16 +424,67 @@ class ReviewCapsuleTests(unittest.TestCase):
             target = root / "report"
             staging.mkdir()
             lock = root / ".report.publish.lock"
-            lock.touch()
+            lock_fd = os.open(lock, os.O_RDWR | os.O_CREAT, 0o600)
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            try:
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "report publication already in progress",
+                ):
+                    review_pr.publish_staging_directory(staging, target)
+            finally:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                os.close(lock_fd)
+            self.assertTrue(staging.exists())
+            self.assertTrue(lock.exists())
+
+    def test_publish_staging_directory_rolls_back_failed_target_validation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            staging = root / "staging"
+            target = root / "report"
+            staging.mkdir()
 
             with self.assertRaisesRegex(
                 ValueError,
-                "report publication already in progress",
+                "published directory contains unexpected artifacts",
             ):
-                review_pr.publish_staging_directory(staging, target)
+                review_pr.publish_staging_directory(
+                    staging,
+                    target,
+                    expected_names={"expected.txt"},
+                )
 
-            self.assertTrue(staging.exists())
-            self.assertTrue(lock.exists())
+            self.assertFalse(target.exists())
+            self.assertFalse(staging.exists())
+
+    def test_publish_staging_directory_leaves_reusable_lock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            staging = root / "staging"
+            target = root / "report"
+            staging.mkdir()
+
+            review_pr.publish_staging_directory(staging, target)
+
+            self.assertTrue(target.exists())
+            self.assertTrue((root / ".report.publish.lock").exists())
+
+    def test_snapshot_file_reads_pinned_regular_file_with_limit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "review.md"
+            source.write_bytes(b"body\n")
+            self.assertEqual(review_pr.snapshot_file(source, max_bytes=8), b"body\n")
+            with self.assertRaisesRegex(
+                review_pr.ReviewError,
+                "file exceeds 3 bytes",
+            ):
+                review_pr.snapshot_file(source, max_bytes=3)
+            link = root / "link.md"
+            link.symlink_to(source)
+            with self.assertRaises(OSError):
+                review_pr.snapshot_file(link)
 
 
     def test_contract_sources_are_canonical_and_present(self):
@@ -398,6 +571,36 @@ class ReviewCapsuleTests(unittest.TestCase):
                 "owner/repo",
                 base_sha="not-a-sha",
             )
+
+    def test_fetch_pr_refs_preserves_failed_cleanup_refs(self):
+        with patch.object(
+            review_pr,
+            "run_bounded_command",
+            side_effect=review_pr.ReviewError("fetch failed"),
+        ), patch.object(
+            review_pr,
+            "delete_review_refs",
+            side_effect=review_pr.ReviewError("cleanup failed"),
+        ):
+            with self.assertRaisesRegex(
+                review_pr.ReviewError,
+                "fetch failed; cleanup failed",
+            ) as raised:
+                review_pr.fetch_pr_refs(
+                    8,
+                    "main",
+                    "owner/repo",
+                    namespace="run-1",
+                    base_sha="a" * 40,
+                )
+
+        self.assertEqual(
+            raised.exception.cleanup_refs,
+            (
+                "refs/review-capsule/run-1/head",
+                "refs/review-capsule/run-1/base",
+            ),
+        )
 
 
     def test_delete_review_refs_surfaces_cleanup_failure(self):
@@ -655,11 +858,13 @@ class ReviewCapsuleTests(unittest.TestCase):
             marker = Path(directory) / "child-alive"
             child_code = (
                 "import pathlib, sys, time; "
-                "time.sleep(0.4); pathlib.Path(sys.argv[1]).write_text('alive')"
+                "time.sleep(2.0); pathlib.Path(sys.argv[1]).write_text('alive')"
             )
             parent_code = (
                 "import subprocess, sys; "
-                "subprocess.Popen([sys.executable, '-c', sys.argv[2], sys.argv[1]])"
+                "subprocess.Popen([sys.executable, '-c', sys.argv[2], sys.argv[1]], "
+                "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, "
+                "stderr=subprocess.DEVNULL)"
             )
             result = review_pr.run_bounded_command(
                 [
@@ -674,7 +879,7 @@ class ReviewCapsuleTests(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0)
-            time.sleep(0.7)
+            time.sleep(2.2)
             self.assertFalse(marker.exists())
 
     def test_create_checkout_rejects_export_ignored_file(self):
