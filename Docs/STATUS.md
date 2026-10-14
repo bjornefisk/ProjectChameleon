@@ -2,8 +2,8 @@
 
 **Date:** 2026-10-13
 
-**Phase:** Tickets 01 and 03 implementation complete; ticket 02 remains not started; Gate 1 qualification remains pending.
-**Decision status:** Ticket 01 semantic validation and Ticket 03 runner behavior have local evidence. Renderer, solver, and full runtime qualification remain pending.
+**Phase:** Tickets 01, 02, and 03 implementation complete; Gate 1 qualification remains pending.
+**Decision status:** Ticket 01 semantic validation, ticket 02 renderer conformance, and ticket 03 runner behavior have local evidence. Deterministic cutoff/search semantics, solver, and full runtime qualification remain pending.
 
 ## Ground truth now recorded
 
@@ -48,7 +48,7 @@ These are contract artifacts, not solver or renderer implementation:
 - `chameleon/chameleon_design_schema_v0.9.json` is no longer provisional, accepts empty designs, and records structural ranges/defaults.
 - Contract fixtures live under `chameleon/tests/fixtures/contract/`.
 - The Level 2 public sample's style range is corrected to valid end-exclusive `[6, 15)` semantics; this is fixture/source-data correction, not solver implementation.
-- Ticket 01's semantic validator and contract tests are implemented at `engine.contract`; Ticket 03's fail-closed runner now uses marker-gated JSON/PNG publication and focused failure evidence; the renderer adapter, solver, and full Gate 1 qualification remain pending in later tickets.
+- Ticket 01's semantic validator and contract tests, ticket 02's renderer adapter/tests, and ticket 03's fail-closed runner are implemented; the renderer adapter, runner, solver, and full Gate 1 qualification remain pending only where the verification records below identify evidence gaps.
 
 ## Known implementation gaps before the solver
 
@@ -56,7 +56,7 @@ These are intentionally visible; none is silently promoted to contract behavior:
 
 1. `engine/resize.py` is the documented uniform-stretch baseline and violates image-ratio, group, overlap, rotation, and typography rules.
 2. `engine/main.py` has a warning-only self-check that checks unrotated rectangles and ID sets; it is not the contract validator.
-3. The renderer adapter's style-run end handling, Unicode-safe wrapping, letter-spacing/style-width measurement, explicit line/max-lines/height enforcement, glyph-bound validation, and rectangle/ellipse stroke behavior need conformance work.
+3. Renderer goldens and native-amd64 qualification remain; ticket 02 closes style-run end handling, Unicode-safe wrapping, letter-spacing/style-width measurement, mandatory/non-space line-map handling, positioned glyph-bound rejection, explicit line/max-lines/height enforcement, and rectangle/ellipse stroke rasterization.
 4. The runner's typed-status, private staging, marker-gated pair publication, stale-path quarantine, aggregate exit, exact target validation, exact numeric ingress, and half-even serialization paths are implemented and focused-tested; deterministic cutoff semantics and full runtime qualification remain pending.
 5. The deterministic role-inference, four-topology candidate search, renderer-in-loop ranking, and held-out evaluation path have not been implemented.
 6. The Docker build has no project-owned hash-locked wheelhouse or apt-version lock; the direct compatibility pins are an initial baseline.
@@ -75,24 +75,47 @@ These are not unresolved internal design choices. They require external facts or
 
 ## Ticket 01 verification record
 
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/contract -p 'test_*.py' -v` — 27 tests passed.
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests/contract -p 'test_*.py' -v` — 28 tests passed.
 - `python3 scripts/verify_repository.py` — passed.
 - The suite covers schema/source validation, identity and immutable-field preservation, exact numeric ingress, serialized integer geometry, rotated containment and bleed, image ratios, rigid groups, source-separated collision, text line-box checks, empty/degenerate designs, and typed reason codes.
-- The ticket-01 PR tree contains no ticket-02 renderer/wrapping implementation, tests, fixtures, or Unicode data. Ticket 02 remains pending human review and approval.
+- The ticket-01 PR tree contains no ticket-02 renderer/wrapping implementation, tests, fixtures, or Unicode data; this was true before ticket 02 and is retained as the ticket-01 boundary record.
+
+
+## Ticket 02 verification record
+
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/renderer -p 'test_*.py' -v` — 22 tests passed, including the regional-indicator flag-pair wrapping regression, exact-font, and asset-containment regressions.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 21 tests passed, including accepted status mapping, setup-failure handling, warning propagation, interruption cleanup, and commit-marker filtering.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 71 tests passed.
+- `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1 as required for the nonconforming baseline; all three sample tasks logged `MALFORMED_INPUT (MALFORMED_INPUT): serialized response x must be a finite integer`, and no task artifacts were produced beyond `output/.gitkeep`.
+- Docker `linux/amd64` image build — passed with the documented constant-platform warning; offline container smoke exited 1 for the same nonconforming baseline and left only `output/.gitkeep`. The run used arm64-host emulation and is not native-amd64 qualification.
+
+## PR 7 review-fix verification
+
+The hidden `.<stem>_output.commit` marker is the pair manifest and commit authority. It records both final filenames and SHA-256 hashes and is installed after the final JSON/PNG renames; the layout inspector authorizes output only when the marker and both final files exist with matching hashes. Per-task cleanup removes staged, final, and marker paths after ordinary failures and on the next run after an abrupt interruption.
+
+- `make verify` — passed.
+- `git diff --check` — passed.
+- `.venv/bin/python -m py_compile chameleon/engine/errors.py chameleon/engine/main.py chameleon/renderer/converter/assets.py chameleon/renderer/converter/brand_fonts.py chameleon/renderer/converter/wrap.py chameleon/renderer/converter/convert.py scripts/inspect_layout.py chameleon/tests/runner/test_main.py chameleon/tests/runner/test_inspect_layout.py chameleon/tests/renderer/test_assets.py chameleon/tests/renderer/test_renderer_conformance.py` — passed.
+- `make test` — 71 tests passed in the project `.venv`.
+- `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — passed with the documented `FromPlatformFlagConstDisallowed` warning.
+- `cd chameleon && docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — exit 1 for the nonconforming baseline; no task artifacts beyond `output/.gitkeep`. Docker reported arm64-host emulation, so native-amd64 qualification remains pending.
 
 ## Ticket 03 verification record
 
-- `make PYTHON=/tmp/chameleon-venv312/bin/python test` — 54 tests passed.
-- `make verify` — passed.
-- The runner suite covers marker-gated JSON/PNG publication, post-publish manifest verification, interrupted-commit cleanup, stale final/temp/marker cleanup and quarantine, cleanup-error reporting and continuation, renderer import and PNG failures, typed infeasibility, malformed/non-finite input, exact target validation, Decimal decimal/exponent ingress, half-even serialization, asset-root containment, source-qualified background inspection, positive-area collision inspection, orphan-artifact rejection, and aggregate exit status.
-- `../.venv/bin/python -m engine.main` — failed closed for all three sample tasks: Level 1 and Level 2 reported `IMAGE_RATIO_VIOLATION`; Level 3 reported `CONTAINMENT_VIOLATION`; no JSON/PNG pair was published.
-- `docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — completed with the existing `FROM --platform` warning.
-- `docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — failed closed with the same three typed baseline failures; Docker also reported the expected amd64-image-on-arm64-host warning, so native-amd64 qualification remains unverified.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 46 tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 95 tests passed.
+- `python3 scripts/verify_repository.py`, `make verify`, and `git diff --check` — passed.
+- `.venv/bin/python -m py_compile chameleon/engine/errors.py chameleon/engine/main.py chameleon/engine/staging.py chameleon/renderer/converter/assets.py chameleon/renderer/converter/brand_fonts.py chameleon/renderer/converter/convert.py chameleon/renderer/converter/shapes.py chameleon/renderer/converter/wrap.py scripts/inspect_layout.py chameleon/tests/runner/test_main.py chameleon/tests/runner/test_runner.py chameleon/tests/runner/test_inspect_layout.py chameleon/tests/renderer/test_assets.py chameleon/tests/renderer/test_renderer_conformance.py` — passed.
+- `cd chameleon && python -m engine.main` — not runnable with the workstation's system Python: `ModuleNotFoundError: No module named 'jsonschema'`; this is not qualification evidence.
+- `cd chameleon && python -m unittest discover -s tests -p 'test_*.py' -v` — not runnable with the workstation's system Python because the pinned dependencies are absent (`jsonschema`, `cr_renderer`, and `Pillow`); the `.venv` suite above is the exercised result.
+- `cd chameleon && ../.venv/bin/python -m engine.main` — failed closed for all three sample tasks: Level 1 and Level 2 reported `IMAGE_RATIO_VIOLATION`; Level 3 reported `CONTAINMENT_VIOLATION`; no JSON/PNG pair was published.
+- `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — completed with the existing `FROM --platform` warning.
+- `cd chameleon && docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — failed closed with the same three typed baseline failures; Docker also reported the expected amd64-image-on-arm64-host warning, so native-amd64 qualification remains unverified.
 
 
 ## Remaining Gate 1 qualification
 
-The following sequence is required for later Gate 1 qualification and is not complete ticket-01 or ticket-03 evidence:
+The following sequence is required for later Gate 1 qualification and is not complete ticket-01, ticket-02, or ticket-03 evidence:
 
 ```bash
 cd chameleon
@@ -104,4 +127,4 @@ docker run --rm --network none \
   chameleon-stage1
 ```
 
-The warning-only baseline self-check, renderer goldens/native-library parity, clean native amd64 run, and solver remain outside this PR.
+The warning-only baseline self-check remains non-authoritative; accepted cutoff/search-status integration, renderer goldens/native-library parity, clean native amd64 run, and solver remain outside this PR.

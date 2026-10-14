@@ -79,6 +79,8 @@ Read the warning; decide whether it identifies a real problem or, like the
 Level 2 sample's intentionally corner-bleeding decorative circle, an expected
 fixture case.
 
+The hidden `.<stem>_output.commit` marker is written last with both artifact hashes; only marked pairs are committed results.
+
 ## The renderer
 
 `main.py` calls `renderer/converter/convert.py`'s `render_design_to_png()`

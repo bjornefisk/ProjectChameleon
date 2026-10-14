@@ -7,13 +7,13 @@ Renderer adapter fixes that bring text measurement, wrapping, and shape rasteriz
 None (can start immediately).
 
 **Status:**  
-ready-for-agent
+implemented with local renderer-conformance evidence
 
-- [ ] Update `chameleon/renderer/converter/wrap.py` to use Unicode UAX #29 extended grapheme clusters as atomic units intersected with UAX #14 line-break opportunities. A break must never split an extended grapheme cluster.
-- [ ] Measure text widths per span using the effective typeface (accounting for bold/italic overrides in `style_runs`) and span-local `letter_spacing`, matching Skia and upstream `cr-renderer` rendering behavior.
-- [ ] Update greedy wrapping in `wrap.py` to preserve character indices exactly, turning spaces into `\n` in place without modifying external text content. Raise a deterministic error if an unbreakable word exceeds the slot width.
-- [ ] Enforce visual line count against `max_lines` and check total line-box height (`lines * font_size * line_height <= height`). Explicit newlines and forced empty lines must count as visual lines.
-- [ ] Update `chameleon/renderer/converter/convert.py` to interpret external `style_runs` as $[start, end)$ 0-based code-point intervals, converting them to inclusive ranges only when building upstream `TextMapItem` records.
-- [ ] Implement overlapping style run resolution: for overlapping spans, the later input run wins per property specified.
-- [ ] Update `chameleon/renderer/converter/shapes.py` to rasterize declared `stroke_color` and `stroke_width` for rectangles and ellipses completely inside the declared bounding box without expanding outside.
-- [ ] Add unit tests under `chameleon/tests/renderer/test_renderer_conformance.py` covering multi-color style boundaries, letter-spaced wrapping, explicit newlines, max_lines rejection, and in-box stroke rasterization.
+- [x] Update `chameleon/renderer/converter/wrap.py` to use Unicode UAX #29 extended grapheme clusters as atomic units intersected with UAX #14 line-break opportunities, including Indic_Conjunct_Break, emoji tag sequences, and regional-indicator flag pairs. A break must never split an extended grapheme cluster and must remain available between adjacent flag pairs.
+- [x] Measure text widths per span using the effective typeface (accounting for bold/italic overrides in `style_runs`) and span-local `letter_spacing`, matching Skia and upstream `cr-renderer` rendering behavior.
+- [x] Update greedy wrapping in `wrap.py` to preserve character indices exactly, turning breakable spaces into `\n` in place while retaining non-space UAX #14 breaks in the adapter-owned line map. Raise a deterministic error if an unbreakable word exceeds the slot width.
+- [x] Enforce visual line count against `max_lines` and check total line-box height (`lines * font_size * line_height <= height`). Explicit newlines, CRLF, Unicode mandatory separators, and forced empty lines count as visual lines.
+- [x] Update `chameleon/renderer/converter/convert.py` to interpret external `style_runs` as $[start, end)$ 0-based code-point intervals, converting them to inclusive ranges only when building upstream `TextMapItem` records.
+- [x] Implement overlapping style run resolution: for overlapping spans, the later input run wins per property specified.
+- [x] Update `chameleon/renderer/converter/shapes.py` to rasterize declared `stroke_color` and `stroke_width` for rectangles and ellipses completely inside the declared bounding box without expanding outside; every positive width remains at least one pixel.
+- [x] Add unit tests under `chameleon/tests/renderer/test_renderer_conformance.py` covering multi-color style boundaries, letter-spaced wrapping, explicit and mandatory Unicode newlines, non-space line maps, exact Unicode 17.0.0 grapheme and line-break properties, GL/WJ non-breaking classes, Indic/emoji graphemes, regional-indicator flag-pair wrapping, malformed style ranges, max_lines rejection, actual italic glyph bounds, and in-box stroke rasterization.

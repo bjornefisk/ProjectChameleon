@@ -9,13 +9,16 @@ import tempfile
 import unittest
 from decimal import Decimal
 from pathlib import Path
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / "chameleon"))
 from unittest.mock import Mock, patch
 
 from PIL import Image
 
 from engine import main, staging
 from engine.errors import InfeasibleLayoutError
-from renderer.converter.assets import asset_path
+from chameleon.renderer.converter.assets import asset_path
 
 
 def _test_renderer(design, assets_dir, png_path):

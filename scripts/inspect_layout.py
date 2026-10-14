@@ -274,7 +274,9 @@ def _is_committed_pair(json_path: Path) -> bool:
         return False
 
 
-def _committed_json_files(target_path: Path) -> list[Path]:
+def committed_json_files(target_path: Path) -> list[Path]:
+    """Return only JSON files authorized by a matching pair commit marker."""
+
     return [
         json_path
         for json_path in sorted(target_path.glob("*_output.json"))
@@ -323,7 +325,6 @@ def _design_and_source_context(
     )
     return doc, source_context
 
-
 def main() -> int:
     if len(sys.argv) < 2:
         target_path = Path("chameleon/output")
@@ -355,7 +356,7 @@ def main() -> int:
                     file=sys.stderr,
                 )
             return 1
-        json_files = _committed_json_files(target_path)
+        json_files = committed_json_files(target_path)
         if not json_files:
             print(f"No committed *_output.json files found in {target_path}")
             return 1

@@ -20,7 +20,7 @@ implemented — focused runner integration evidence recorded below
 
 **Verification evidence:**
 
-- `cd chameleon && ../.venv/bin/python -m unittest tests.runner.test_runner -v` — 23 tests passed.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 54 tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 46 tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 95 tests passed.
 - `python3 scripts/verify_repository.py` — passed.
 - Coverage includes marker-gated JSON/PNG publication, post-publish manifest verification, interrupted-commit cleanup, stale final/temp/marker cleanup and quarantine, cleanup-error reporting and continuation, renderer import and PNG failures, typed infeasibility, malformed/non-finite input, exact target validation, Decimal decimal/exponent ingress, half-even serialization, asset-root containment, source-qualified background inspection, positive-area collision inspection, orphan-artifact rejection, and aggregate exit status.

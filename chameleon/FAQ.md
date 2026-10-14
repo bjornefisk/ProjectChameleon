@@ -90,9 +90,10 @@ One deliberate exception: the Level 3 sample's `holiday_watermark` element refer
 4. Use the contract fixtures and the renderer conformance plan before claiming a behavior is supported. The current `resize.py` is intentionally nonconforming uniform stretch; failure behavior is defined by `../Docs/PROJECT_CONTRACT.md` and must not be inferred from starter output.
 5. Qualify the actual Stage 1 image for Python 3.11 on `linux/amd64` with:
    ```
-   docker buildx build --platform linux/amd64 -t my-chameleon-engine .
+   cd chameleon
+   docker buildx build --platform linux/amd64 --load -t my-chameleon-engine .
    docker run --rm --network none \
-     -v $(pwd)/input:/app/input -v $(pwd)/output:/app/output \
+     -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" \
      my-chameleon-engine
    ```
    `--network none` is part of the Stage 1 runtime contract.

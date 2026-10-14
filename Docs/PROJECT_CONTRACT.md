@@ -117,13 +117,13 @@ The external schema has no public line-map field. The project adapter creates th
 - Upstream line origins advance by `line_index * font_size * line_height`; glyph advances include letter spacing. The check includes forced empty lines and occurs after final integer serialization.
 - When `stroke_color` and positive `stroke_width` are present, the adapter MUST rasterize rectangle and ellipse strokes inside their declared boxes without expanding public geometry or creating pixels outside those boxes. The source fields remain unchanged.
 
-The current adapter is known not to meet every rule above: its style-run application is inclusive, wrapping omits letter spacing and style-run face widths, `max_lines`/height are not enforced, and rectangle/ellipse strokes have no raster effect. Those are renderer-conformance blockers recorded in `STATUS.md`; they are not permission to weaken this contract.
+The adapter implements the renderer-conformance rules above. Renderer golden comparisons, native-library parity, and native-amd64 qualification remain evidence gates; they do not weaken the contract.
 
 ### Images, shapes, and missing assets
 
 - A source image with `fit=contain` is isotropically resized and letterboxed; `cover` is isotropically resized and center-cropped; `fill` is stretched to the element box by the project adapter before the upstream renderer draws it.
 - Only a classified full-canvas background may use target-shape cover cropping. Foreground JSON box ratios remain source-invariant even when `fit=fill` or `fit=cover`.
-- Shapes are rasterized by the project adapter because `cr-renderer` has no native shape primitive. The current pinned adapter renders rectangles, rounded rectangles, ellipses, and horizontal lines; rectangle/ellipse stroke fields are retained but currently have no raster effect. This behavior is covered as an implementation gap, not an invitation to change source records.
+- Shapes are rasterized by the project adapter because `cr-renderer` has no native shape primitive. The pinned adapter renders rectangles, rounded rectangles, ellipses, and horizontal lines, including declared rectangle/ellipse strokes inside their boxes; renderer golden and platform qualification remain pending evidence.
 - A missing asset keeps its original `asset_id` and element record. The renderer MAY emit the deterministic labeled placeholder used by `assets.py` for a diagnostic PNG and MUST emit a warning. The engine never writes the placeholder into the response JSON or treats it as a replacement asset.
 - Renderer import failure is a `RUNTIME_IO_FAILURE`; the engine MUST publish no JSON/PNG pair. Missing-asset placeholders remain permitted only as diagnostic render output after a successful adapter import.
 
