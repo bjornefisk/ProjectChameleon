@@ -327,6 +327,22 @@ class RunnerIntegrationTests(unittest.TestCase):
             hashlib.sha256(paths.png_final.read_bytes()).hexdigest(),
         )
 
+    def test_manifest_mismatch_after_publish_rolls_back_pair(self):
+        self.write_task("tampered", self.task())
+        paths = staging.artifact_paths(self.output_dir, "tampered")
+        real_replace = staging.os.replace
+
+        def tamper_json(source, destination):
+            real_replace(source, destination)
+            if destination == paths.json_final:
+                paths.json_final.write_text("{}", encoding="utf-8")
+
+        with patch.object(staging.os, "replace", side_effect=tamper_json):
+            self.assertNotEqual(main.main(), 0)
+        self.assertFalse(paths.json_final.exists())
+        self.assertFalse(paths.png_final.exists())
+        self.assertFalse(paths.commit_marker.exists())
+
 
     def test_interrupted_commit_cleans_pair(self):
         self.write_task("interrupted", self.task())

@@ -49,9 +49,9 @@ python -m engine.main
 This processes every `*.json` file in `input/` (the 3 sample designs are
 already there — one per difficulty level). Successful tasks write an
 `_output.json` and `_output.png` pair plus a hidden hash commit manifest
-(`.<task>_output.commit`) into `output/`; from the repository root,
-`make inspect` treats the manifest as the local pair-publication gate. See the
-contract for typed failure statuses and failed-task artifact behavior.
+(`.<task>_output.commit`) into `output/`. The manifest is the pair-publication
+gate: final files without a matching marker are uncommitted and consumers
+must reject them. From the repository root, `make inspect` enforces this gate.
 
 The included baseline is a **uniform stretch** — deliberately the wrong
 approach (see the main brief: "a naive program stretches the picture; a

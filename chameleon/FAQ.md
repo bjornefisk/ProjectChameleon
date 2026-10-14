@@ -53,10 +53,11 @@ python -m engine.main
 
 This processes each task in `input/`, writes `<task>_output.json` and
 `<task>_output.png` through the local adapter for successful tasks, and
-records a matching hidden `.<task>_output.commit` manifest. From the
-repository root, `make inspect` uses that manifest to reject partial or stale
-pairs; failed tasks follow the typed failure/artifact behavior in
-`../Docs/PROJECT_CONTRACT.md`. The adapter reads fonts/assets from `brand_kit/`.
+records a matching hidden `.<task>_output.commit` manifest. The manifest is
+the pair-publication gate: final files without a matching marker are
+uncommitted, and consumers must reject them. From the repository root,
+`make inspect` enforces this gate; failed tasks follow the typed
+failure/artifact behavior in `../Docs/PROJECT_CONTRACT.md`. The adapter reads fonts/assets from `brand_kit/`.
 
 The upstream renderer consumes explicit internal line information, rotates around each element's local center, and maps the prepared image rectangle into the destination rectangle. The project adapter performs its own deterministic text preprocessing and `contain`/`cover`/`fill` handling. See `../Docs/PROJECT_CONTRACT.md` and `../Docs/DEPENDENCY_EVIDENCE.md` for the ratified behavior and known conformance gaps.
 

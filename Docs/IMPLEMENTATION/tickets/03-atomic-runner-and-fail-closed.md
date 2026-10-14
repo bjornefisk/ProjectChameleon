@@ -9,7 +9,7 @@ A resilient batch orchestrator and task execution harness in `chameleon/engine/m
 **Status:**  
 implemented — focused runner integration evidence recorded below
 
-- [x] Create `chameleon/engine/staging.py` providing task-private staging primitives, JSON/PNG validation, and a hidden commit manifest with both staged-file hashes; expose final paths only after the manifest authorizes both files.
+- [x] Create `chameleon/engine/staging.py` providing task-private staging primitives, JSON/PNG validation, and a hidden commit manifest with both staged-file hashes; publish the marker last, and treat final files without a matching marker as uncommitted.
 - [x] Implement stale artifact cleanup and quarantine in `staging.py`: if a task fails or raises an error, remove or move pre-existing final, temporary, commit-manifest, and private staging paths so stale outputs are never scored.
 - [x] Update `chameleon/engine/main.py` to use `staging.py` for all task processing.
 - [x] Configure task JSON decoding with `parse_int=int`, `parse_float=Decimal`, and a rejecting `parse_constant` hook (or an equivalent decoder) before any binary-float conversion; add runner-seam regression cases for finite decimal, exponent, and non-finite-constant values.
@@ -20,7 +20,7 @@ implemented — focused runner integration evidence recorded below
 
 **Verification evidence:**
 
-- `cd chameleon && ../.venv/bin/python -m unittest tests.runner.test_runner -v` — 22 tests passed.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 50 tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest tests.runner.test_runner -v` — 23 tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 54 tests passed.
 - `python3 scripts/verify_repository.py` — passed.
-- Coverage includes marker-gated JSON/PNG publication, interrupted-commit cleanup, stale final/temp/marker cleanup and quarantine, cleanup-error reporting and continuation, renderer import and PNG failures, typed infeasibility, malformed/non-finite input, exact target validation, Decimal decimal/exponent ingress, half-even serialization, asset-root containment, and aggregate exit status.
+- Coverage includes marker-gated JSON/PNG publication, post-publish manifest verification, interrupted-commit cleanup, stale final/temp/marker cleanup and quarantine, cleanup-error reporting and continuation, renderer import and PNG failures, typed infeasibility, malformed/non-finite input, exact target validation, Decimal decimal/exponent ingress, half-even serialization, asset-root containment, source-qualified background inspection, positive-area collision inspection, orphan-artifact rejection, and aggregate exit status.

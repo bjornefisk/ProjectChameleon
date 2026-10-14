@@ -32,39 +32,58 @@ def calculate_aabb(el: Dict[str, Any]) -> Tuple[float, float, float, float]:
     b = abs(w * math.sin(rad)) + abs(h * math.cos(rad))
     return cx - a / 2.0, cy - b / 2.0, cx + a / 2.0, cy + b / 2.0
 
-def _is_target_cover_background(
-    element: Dict[str, Any], canvas: Dict[str, Any] | None
-) -> bool:
-    if not (
-        element.get("type") == "image"
-        and element.get("fit") == "cover"
-        and canvas
-    ):
-        return False
-    min_x, min_y, max_x, max_y = calculate_aabb(element)
+def _background_ids(source: Dict[str, Any] | None) -> set[str]:
+    """Return the contract-qualified source background, if source context exists."""
+
+    if not isinstance(source, dict):
+        return set()
+    canvas = source.get("canvas")
+    elements = source.get("elements")
+    if not isinstance(canvas, dict) or not isinstance(elements, list):
+        return set()
+
     width = float(canvas.get("width", 0))
     height = float(canvas.get("height", 0))
-    return min_x <= 0 and min_y <= 0 and max_x >= width and max_y >= height
+    candidates = []
+    for index, element in enumerate(elements):
+        if not isinstance(element, dict):
+            continue
+        if element.get("type") != "image" or element.get("fit") != "cover":
+            continue
+        min_x, min_y, max_x, max_y = calculate_aabb(element)
+        if min_x > 0 or min_y > 0 or max_x < width or max_y < height:
+            continue
+        area = (max_x - min_x) * (max_y - min_y)
+        candidates.append(
+            (
+                element.get("z_index", 0),
+                -area,
+                index,
+                element.get("id"),
+            )
+        )
+    if not candidates:
+        return set()
+    return {min(candidates)[3]}
 
 
 def _foreground_elements(
-    elements: List[Dict[str, Any]], canvas: Dict[str, Any] | None
+    elements: List[Dict[str, Any]], background_ids: set[str] | None = None
 ) -> List[Dict[str, Any]]:
+    background_ids = background_ids or set()
     return [
         element
         for element in elements
-        if not _is_target_cover_background(element, canvas)
+        if element.get("id") not in background_ids
     ]
 
 
-
-
 def check_collisions(
-    elements: List[Dict[str, Any]], canvas: Dict[str, Any] | None = None
+    elements: List[Dict[str, Any]], background_ids: set[str] | None = None
 ) -> List[str]:
     """Check for positive-area collisions between non-background elements."""
     warnings = []
-    foreground = _foreground_elements(elements, canvas)
+    foreground = _foreground_elements(elements, background_ids)
 
     for i in range(len(foreground)):
         for j in range(i + 1, len(foreground)):
@@ -84,7 +103,7 @@ def check_collisions(
 
             if ix1 > ix0 and iy1 > iy0:
                 overlap_area = (ix1 - ix0) * (iy1 - iy0)
-                if overlap_area > 1.0:  # More than 1 square pixel
+                if overlap_area > 0.0:
                     warnings.append(
                         f"COLLISION: '{e1['id']}' and '{e2['id']}' overlap by {overlap_area:.0f}px² "
                         f"at [{ix0:.0f}, {iy0:.0f}, {ix1:.0f}, {iy1:.0f}]"
@@ -92,7 +111,13 @@ def check_collisions(
     return warnings
 
 
-def render_ascii_canvas(canvas: Dict[str, Any], elements: List[Dict[str, Any]], cols: int = 60, rows: int = 24) -> str:
+def render_ascii_canvas(
+    canvas: Dict[str, Any],
+    elements: List[Dict[str, Any]],
+    cols: int = 60,
+    rows: int = 24,
+    background_ids: set[str] | None = None,
+) -> str:
     """Render an ASCII grid representing the canvas and elements."""
     cw = float(canvas.get("width", 100))
     ch = float(canvas.get("height", 100))
@@ -124,8 +149,8 @@ def render_ascii_canvas(canvas: Dict[str, Any], elements: List[Dict[str, Any]], 
     sorted_els = sorted(elements, key=lambda e: e.get("z_index", 0))
 
     for el in sorted_els:
-        # Skip only a target-covering background.
-        if _is_target_cover_background(el, canvas):
+        # Skip only the source-qualified background.
+        if el.get("id") in (background_ids or set()):
             continue
 
         min_x, min_y, max_x, max_y = calculate_aabb(el)
@@ -153,10 +178,15 @@ def render_ascii_canvas(canvas: Dict[str, Any], elements: List[Dict[str, Any]], 
     return "\n".join("".join(row) for row in grid)
 
 
-def inspect_design(doc: Dict[str, Any], title: str = "Design") -> None:
+def inspect_design(
+    doc: Dict[str, Any],
+    title: str = "Design",
+    source_context: Dict[str, Any] | None = None,
+) -> None:
     """Print complete diagnostic layout inspection for a design document."""
     canvas = doc.get("canvas", {})
     elements = doc.get("elements", [])
+    background_ids = _background_ids(source_context)
     cw, ch = canvas.get("width", 0), canvas.get("height", 0)
 
     print(f"\n========================================================")
@@ -165,7 +195,7 @@ def inspect_design(doc: Dict[str, Any], title: str = "Design") -> None:
     print(f"========================================================")
 
     # ASCII Canvas
-    print(render_ascii_canvas(canvas, elements))
+    print(render_ascii_canvas(canvas, elements, background_ids=background_ids))
     print("Legend: # = boundary, T = text, I = image, S = shape, · = canvas area")
 
     # Element Table
@@ -197,7 +227,7 @@ def inspect_design(doc: Dict[str, Any], title: str = "Design") -> None:
     # Off-canvas checks
     off_canvas = []
     for el in elements:
-        if _is_target_cover_background(el, canvas):
+        if el.get("id") in background_ids:
             continue
         min_x, min_y, max_x, max_y = calculate_aabb(el)
         if min_x < -0.5 or min_y < -0.5 or max_x > cw + 0.5 or max_y > ch + 0.5:
@@ -209,7 +239,7 @@ def inspect_design(doc: Dict[str, Any], title: str = "Design") -> None:
             print(f"    - {w}")
 
     # Collisions
-    collisions = check_collisions(elements, canvas)
+    collisions = check_collisions(elements, background_ids)
     if collisions:
         print("\n[!] COLLISION WARNINGS:")
         for c in collisions:
@@ -251,13 +281,47 @@ def _committed_json_files(target_path: Path) -> list[Path]:
         if _is_committed_pair(json_path)
     ]
 
-def _uncommitted_json_files(target_path: Path) -> list[Path]:
-    return [
-        json_path
-        for json_path in sorted(target_path.glob("*_output.json"))
-        if not _is_committed_pair(json_path)
-    ]
+def _uncommitted_artifacts(target_path: Path) -> list[Path]:
+    candidates = sorted(
+        set(target_path.glob("*_output.json"))
+        | set(target_path.glob("*_output.png"))
+    )
+    uncommitted = []
+    for path in candidates:
+        if path.name.endswith("_output.json"):
+            stem = path.name[: -len("_output.json")]
+        else:
+            stem = path.name[: -len("_output.png")]
+        json_path = path.with_name(f"{stem}_output.json")
+        if not _is_committed_pair(json_path):
+            uncommitted.append(path)
+    return uncommitted
 
+
+
+def _source_context_for_output(json_path: Path) -> Dict[str, Any] | None:
+    """Load matching source context when output sits beside the input directory."""
+
+    stem = json_path.name[: -len("_output.json")]
+    input_path = json_path.parent.parent / "input" / f"{stem}.json"
+    try:
+        task = json.loads(input_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    source = task.get("source") if isinstance(task, dict) else None
+    return source if isinstance(source, dict) else None
+
+
+def _design_and_source_context(
+    doc: Dict[str, Any], json_path: Path | None = None
+) -> tuple[Dict[str, Any], Dict[str, Any] | None]:
+    inline_source = doc.get("source") if isinstance(doc, dict) else None
+    if isinstance(inline_source, dict):
+        return inline_source, inline_source
+    source_context = (
+        _source_context_for_output(json_path) if json_path is not None else None
+    )
+    return doc, source_context
 
 
 def main() -> int:
@@ -278,16 +342,16 @@ def main() -> int:
                 file=sys.stderr,
             )
             return 1
-        design = doc.get("source", doc)
-        inspect_design(design, target_path.name)
+        design, source_context = _design_and_source_context(doc, target_path)
+        inspect_design(design, target_path.name, source_context)
         return 0
 
     if target_path.is_dir():
-        uncommitted = _uncommitted_json_files(target_path)
+        uncommitted = _uncommitted_artifacts(target_path)
         if uncommitted:
-            for json_path in uncommitted:
+            for artifact_path in uncommitted:
                 print(
-                    f"Uncommitted or invalid output pair: {json_path}",
+                    f"Uncommitted or invalid output pair: {artifact_path}",
                     file=sys.stderr,
                 )
             return 1
@@ -304,7 +368,8 @@ def main() -> int:
                     file=sys.stderr,
                 )
                 return 1
-            inspect_design(doc, f.name)
+            design, source_context = _design_and_source_context(doc, f)
+            inspect_design(design, f.name, source_context)
         return 0
 
     print(f"Path does not exist: {target_path}", file=sys.stderr)

@@ -1,8 +1,8 @@
 """Task-local staging and logical JSON/PNG publication.
 
-A task is observable only after both its design document and render have been
-validated.  Temporary paths are deliberately task-specific and are never used
-as submission artifacts.
+A task is committed only after both its design document and render have been
+validated and the final commit marker exists. Temporary paths and final files
+without a matching marker are not submission artifacts.
 """
 
 from __future__ import annotations
@@ -231,6 +231,24 @@ def _write_commit_marker(paths: TaskArtifactPaths) -> None:
         encoding="utf-8",
     )
 
+def _verify_published_pair(paths: TaskArtifactPaths) -> None:
+    """Require the final files to match the committed manifest."""
+
+    marker = json.loads(paths.commit_marker.read_text(encoding="utf-8"))
+    if (
+        marker.get("committed") is not True
+        or marker.get("json") != paths.json_final.name
+        or marker.get("png") != paths.png_final.name
+    ):
+        raise ValueError("commit marker does not authorize this artifact pair")
+    if (
+        marker.get("json_sha256")
+        != hashlib.sha256(paths.json_final.read_bytes()).hexdigest()
+        or marker.get("png_sha256")
+        != hashlib.sha256(paths.png_final.read_bytes()).hexdigest()
+    ):
+        raise ValueError("published artifact pair does not match commit marker")
+
 
 def _canonicalize_response_mutables(response: Mapping[str, Any]) -> Mapping[str, Any]:
     """Round mutable values once using the contract's half-even rule.
@@ -306,9 +324,12 @@ def publish_task(
         validate_png(paths.png_tmp)
         _write_commit_marker(paths)
 
+        # POSIX cannot rename two root files as one operation. The marker is
+        # written last and is the sole committed-pair visibility gate.
         os.replace(paths.json_tmp, paths.json_final)
         os.replace(paths.png_tmp, paths.png_final)
         os.replace(paths.commit_marker_tmp, paths.commit_marker)
+        _verify_published_pair(public_paths)
         return public_paths
     except BaseException as error:
         cleanup_error: OSError | None = None

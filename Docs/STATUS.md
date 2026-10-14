@@ -82,9 +82,9 @@ These are not unresolved internal design choices. They require external facts or
 
 ## Ticket 03 verification record
 
-- `cd chameleon && ../.venv/bin/python -m unittest tests.runner.test_runner -v` — 22 tests passed.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 50 tests passed.
-- `python3 scripts/verify_repository.py` — passed.
+- `make PYTHON=/tmp/chameleon-venv312/bin/python test` — 54 tests passed.
+- `make verify` — passed.
+- The runner suite covers marker-gated JSON/PNG publication, post-publish manifest verification, interrupted-commit cleanup, stale final/temp/marker cleanup and quarantine, cleanup-error reporting and continuation, renderer import and PNG failures, typed infeasibility, malformed/non-finite input, exact target validation, Decimal decimal/exponent ingress, half-even serialization, asset-root containment, source-qualified background inspection, positive-area collision inspection, orphan-artifact rejection, and aggregate exit status.
 - `../.venv/bin/python -m engine.main` — failed closed for all three sample tasks: Level 1 and Level 2 reported `IMAGE_RATIO_VIOLATION`; Level 3 reported `CONTAINMENT_VIOLATION`; no JSON/PNG pair was published.
 - `docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — completed with the existing `FROM --platform` warning.
 - `docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — failed closed with the same three typed baseline failures; Docker also reported the expected amd64-image-on-arm64-host warning, so native-amd64 qualification remains unverified.
