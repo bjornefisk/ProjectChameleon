@@ -76,7 +76,7 @@ class RunnerPublicationTests(unittest.TestCase):
         status, reason = self._classify(
             TextOverflowError("text overflow"), "publish"
         )
-        self.assertEqual(status, TaskStatus.INFEASIBLE_LAYOUT)
+        self.assertEqual(status, TaskStatus.RUNTIME_IO_FAILURE)
         self.assertEqual(reason, InfeasibleReasonCode.TEXT_OVERFLOW.value)
 
         for error in (TypeError("renderer failure"), KeyError("renderer field")):
@@ -108,7 +108,8 @@ class RunnerPublicationTests(unittest.TestCase):
                 '"target_canvas":{"width":1.25e+3,"height":2}}',
                 encoding="utf-8",
             )
-            task = main._load_task(task_path)
+            with patch.object(main, "INPUT_DIR", task_path.parent):
+                task = main._load_task(task_path)
             self.assertEqual(task["target_canvas"]["width"], Decimal("1.25e+3"))
 
             task_path.write_text(
@@ -117,7 +118,112 @@ class RunnerPublicationTests(unittest.TestCase):
                 encoding="utf-8",
             )
             with self.assertRaises(main._MalformedInputError):
-                main._load_task(task_path)
+                with patch.object(main, "INPUT_DIR", task_path.parent):
+                    main._load_task(task_path)
+
+            for constant in ("Infinity", "-Infinity"):
+                task_path.write_text(
+                    '{"source":{"canvas":{"width":1,"height":1},"elements":[]},'
+                    f'"target_canvas":{{"width":{constant},"height":2}}}}',
+                    encoding="utf-8",
+                )
+                with self.assertRaises(main._MalformedInputError):
+                    with patch.object(main, "INPUT_DIR", task_path.parent):
+                        main._load_task(task_path)
+
+    def test_publish_renders_the_reparsed_private_staged_design(self):
+        source = {
+            "canvas": {"width": 20, "height": 20},
+            "elements": [
+                {
+                    "id": "shape",
+                    "type": "shape",
+                    "x": 0,
+                    "y": 0,
+                    "width": 10,
+                    "height": 10,
+                    "opacity": Decimal("0.1234567890123456789"),
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(0,0,0,1)",
+                }
+            ],
+        }
+        target = {"width": 20, "height": 20}
+        response = {
+            "canvas": dict(target),
+            "elements": [
+                {
+                    **source["elements"][0],
+                    "x": Decimal("10.5"),
+                }
+            ],
+        }
+        rendered = {}
+
+        def renderer(design, _assets_dir, png_path):
+            rendered["design"] = design
+            rendered["png_path"] = Path(png_path)
+            self._write_png(png_path)
+
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            with patch.object(main, "OUTPUT_DIR", output_dir):
+                staging.publish_task(
+                    output_dir=output_dir,
+                    task_name="task",
+                    source=source,
+                    target_canvas=target,
+                    response=response,
+                    assets_dir=Path(directory) / "assets",
+                    render_to_png=renderer,
+                )
+
+            self.assertEqual(rendered["design"]["elements"][0]["x"], 10)
+            self.assertIs(type(rendered["design"]["elements"][0]["x"]), int)
+            self.assertEqual(
+                rendered["design"]["elements"][0]["opacity"],
+                source["elements"][0]["opacity"],
+            )
+            self.assertIsInstance(rendered["design"]["elements"][0]["opacity"], Decimal)
+            self.assertNotEqual(rendered["png_path"].parent, output_dir)
+            self.assertTrue(rendered["png_path"].parent.name.startswith(".task.stage-"))
+
+    def test_half_even_serialization_applies_to_text_font_size(self):
+        source = {
+            "canvas": {"width": 20, "height": 20},
+            "elements": [
+                {
+                    "id": "label",
+                    "type": "text",
+                    "x": 0,
+                    "y": 0,
+                    "width": 20,
+                    "height": 20,
+                    "content": "Label",
+                    "font_family": "Solstice Sans",
+                    "font_size": 10,
+                    "color": "rgba(0,0,0,1)",
+                }
+            ],
+        }
+        target = {"width": 20, "height": 20}
+        response = {
+            "canvas": dict(target),
+            "elements": [{**source["elements"][0], "font_size": Decimal("10.5")}],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
+                main,
+                "render_to_png",
+                side_effect=lambda _design, _assets, path: self._write_png(path),
+            ):
+                self._publish_pair(source, target, response, "text")
+
+            published = json.loads(
+                (output_dir / "text_output.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(published["elements"][0]["font_size"], 10)
 
     def test_main_reports_malformed_source_status(self):
         element = {
@@ -225,6 +331,89 @@ class RunnerPublicationTests(unittest.TestCase):
             )
 
 
+    def test_task_name_traversal_is_rejected_at_staging_boundary(self):
+        source, target = self._empty_request()
+        output = {"canvas": target, "elements": []}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output_dir = root / "output"
+            escaped_json = root / "escape_output.json"
+            escaped_png = root / "escape_output.png"
+            with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
+                main,
+                "render_to_png",
+                side_effect=lambda _design, _assets, path: self._write_png(path),
+            ):
+                with self.assertRaises(ValueError):
+                    self._publish_pair(source, target, output, "../escape")
+
+            self.assertFalse(escaped_json.exists())
+            self.assertFalse(escaped_png.exists())
+            self.assertFalse((output_dir / ".escape_output.commit").exists())
+
+    def test_task_name_control_characters_are_rejected_at_staging_boundary(self):
+        with self.assertRaises(ValueError):
+            staging.validate_task_name("odd\nname")
+
+    def test_symlinked_final_artifact_is_rejected_by_publication(self):
+        source, target = self._empty_request()
+        output = {"canvas": target, "elements": []}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output_dir = root / "output"
+            outside = root / "outside.json"
+
+            real_replace = staging.os.replace
+
+            def symlink_json(source_path, destination):
+                real_replace(source_path, destination)
+                if Path(destination).name == "task_output.json":
+                    outside.write_bytes(Path(destination).read_bytes())
+                    Path(destination).unlink()
+                    Path(destination).symlink_to(outside)
+
+            with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
+                main,
+                "render_to_png",
+                side_effect=lambda _design, _assets, path: self._write_png(path),
+            ), patch.object(staging.os, "replace", side_effect=symlink_json):
+                with self.assertRaises((OSError, ValueError)):
+                    self._publish_pair(source, target, output, "task")
+
+            self.assertTrue(outside.is_file())
+            self.assertFalse((output_dir / "task_output.json").exists())
+            self.assertFalse((output_dir / "task_output.json").is_symlink())
+
+    def test_symlinked_commit_marker_is_rejected_by_publication(self):
+        source, target = self._empty_request()
+        output = {"canvas": target, "elements": []}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output_dir = root / "output"
+            outside = root / "outside-marker.json"
+
+            real_replace = staging.os.replace
+
+            def symlink_marker(source_path, destination):
+                real_replace(source_path, destination)
+                if Path(destination).name == ".task_output.commit":
+                    outside.write_bytes(Path(destination).read_bytes())
+                    Path(destination).unlink()
+                    Path(destination).symlink_to(outside)
+
+            with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
+                main,
+                "render_to_png",
+                side_effect=lambda _design, _assets, path: self._write_png(path),
+            ), patch.object(staging.os, "replace", side_effect=symlink_marker):
+                with self.assertRaises((OSError, ValueError)):
+                    self._publish_pair(source, target, output, "task")
+
+            self.assertTrue(outside.is_file())
+            self.assertFalse((output_dir / ".task_output.commit").exists())
+            self.assertFalse((output_dir / ".task_output.commit").is_symlink())
+
+
     def test_publish_pair_installs_marker_after_both_artifacts(self):
         source, target = self._empty_request()
         output = {"canvas": target, "elements": []}
@@ -248,6 +437,53 @@ class RunnerPublicationTests(unittest.TestCase):
             replace_destinations,
             ["task_output.json", "task_output.png", ".task_output.commit"],
         )
+
+    def test_tampered_commit_marker_removes_pair(self):
+        source, target = self._empty_request()
+        output = {"canvas": target, "elements": []}
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            real_replace = staging.os.replace
+
+            def tamper_marker(source_path, destination):
+                real_replace(source_path, destination)
+                if Path(destination).name == ".task_output.commit":
+                    Path(destination).write_text("{}", encoding="utf-8")
+
+            with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
+                main,
+                "render_to_png",
+                side_effect=lambda _design, _assets, path: self._write_png(path),
+            ), patch.object(staging.os, "replace", side_effect=tamper_marker):
+                with self.assertRaises((ValueError, KeyError)):
+                    self._publish_pair(source, target, output, "task")
+
+            self.assertFalse((output_dir / "task_output.json").exists())
+            self.assertFalse((output_dir / "task_output.png").exists())
+            self.assertFalse((output_dir / ".task_output.commit").exists())
+
+    def test_initial_stale_cleanup_failure_is_quarantined(self):
+        source, target = self._empty_request()
+        output = {"canvas": target, "elements": []}
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            stale_json = output_dir / "task_output.json"
+            stale_json.mkdir()
+            with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
+                main,
+                "render_to_png",
+                side_effect=lambda _design, _assets, path: self._write_png(path),
+            ):
+                with self.assertRaises(OSError):
+                    self._publish_pair(source, target, output, "task")
+
+            self.assertFalse(stale_json.exists())
+            self.assertTrue(
+                any(
+                    path.name.startswith(".chameleon-quarantine-")
+                    for path in output_dir.iterdir()
+                )
+            )
 
 
     def test_decimal_immutable_tokens_survive_pair_serialization(self):

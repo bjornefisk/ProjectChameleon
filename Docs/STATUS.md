@@ -102,15 +102,14 @@ The hidden `.<stem>_output.commit` marker is the pair manifest and commit author
 
 ## Ticket 03 verification record
 
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 46 tests passed.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 95 tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 63 tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 113 tests passed.
 - `python3 scripts/verify_repository.py`, `make verify`, and `git diff --check` — passed.
-- `.venv/bin/python -m py_compile chameleon/engine/errors.py chameleon/engine/main.py chameleon/engine/staging.py chameleon/renderer/converter/assets.py chameleon/renderer/converter/brand_fonts.py chameleon/renderer/converter/convert.py chameleon/renderer/converter/shapes.py chameleon/renderer/converter/wrap.py scripts/inspect_layout.py chameleon/tests/runner/test_main.py chameleon/tests/runner/test_runner.py chameleon/tests/runner/test_inspect_layout.py chameleon/tests/renderer/test_assets.py chameleon/tests/renderer/test_renderer_conformance.py` — passed.
-- `cd chameleon && python -m engine.main` — not runnable with the workstation's system Python: `ModuleNotFoundError: No module named 'jsonschema'`; this is not qualification evidence.
-- `cd chameleon && python -m unittest discover -s tests -p 'test_*.py' -v` — not runnable with the workstation's system Python because the pinned dependencies are absent (`jsonschema`, `cr_renderer`, and `Pillow`); the `.venv` suite above is the exercised result.
-- `cd chameleon && ../.venv/bin/python -m engine.main` — failed closed for all three sample tasks: Level 1 and Level 2 reported `IMAGE_RATIO_VIOLATION`; Level 3 reported `CONTAINMENT_VIOLATION`; no JSON/PNG pair was published.
-- `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — completed with the existing `FROM --platform` warning.
-- `cd chameleon && docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — failed closed with the same three typed baseline failures; Docker also reported the expected amd64-image-on-arm64-host warning, so native-amd64 qualification remains unverified.
+- `cd chameleon && ../.venv/bin/python -m py_compile engine/main.py engine/staging.py ../scripts/inspect_layout.py tests/runner/test_main.py tests/runner/test_runner.py tests/runner/test_inspect_layout.py` — passed.
+- `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1; all three sample tasks failed closed (`IMAGE_RATIO_VIOLATION` for Levels 1–2 and `CONTAINMENT_VIOLATION` for Level 3), with no JSON/PNG pair beyond `output/.gitkeep`.
+- `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — passed with the existing `FromPlatformFlagConstDisallowed` warning.
+- `cd chameleon && docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — exit 1 with the same typed baseline failures and no task artifacts beyond `output/.gitkeep`. Docker reported amd64-image-on-arm64-host emulation; native-amd64 qualification remains unverified.
+- The exercised regressions cover marker-gated publication, stale reconciliation/quarantine including invalid stems, invalid-filename continuation, aggregate exit, exact numeric ingress and half-even serialization, malformed/non-finite inputs, input/output/final-artifact symlink rejection, task-name boundaries, safe diagnostics, and inspector authorization.
 
 
 ## Remaining Gate 1 qualification

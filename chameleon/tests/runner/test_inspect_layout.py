@@ -161,5 +161,60 @@ class CommittedOutputTests(unittest.TestCase):
             marker_path.write_text("[]", encoding="utf-8")
             self.assertEqual(inspect_layout.committed_json_files(output_dir), [])
 
+    def test_symlinked_final_artifact_is_not_inspectable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output_dir = root / "output"
+            output_dir.mkdir()
+            outside_json = root / "outside.json"
+            outside_json.write_text("{}", encoding="utf-8")
+            json_path = output_dir / "task_output.json"
+            png_path = output_dir / "task_output.png"
+            marker_path = output_dir / ".task_output.commit"
+            json_path.symlink_to(outside_json)
+            png_path.write_bytes(b"png")
+            marker_path.write_text(
+                json.dumps(
+                    {
+                        "committed": True,
+                        "json": json_path.name,
+                        "png": png_path.name,
+                        "json_sha256": hashlib.sha256(json_path.read_bytes()).hexdigest(),
+                        "png_sha256": hashlib.sha256(png_path.read_bytes()).hexdigest(),
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            self.assertEqual(inspect_layout.committed_json_files(output_dir), [])
+
+    def test_symlinked_commit_marker_is_not_inspectable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output_dir = root / "output"
+            output_dir.mkdir()
+            json_path = output_dir / "task_output.json"
+            png_path = output_dir / "task_output.png"
+            marker_path = output_dir / ".task_output.commit"
+            outside_marker = root / "outside-marker.json"
+            json_path.write_text("{}", encoding="utf-8")
+            png_path.write_bytes(b"png")
+            outside_marker.write_text(
+                json.dumps(
+                    {
+                        "committed": True,
+                        "json": json_path.name,
+                        "png": png_path.name,
+                        "json_sha256": hashlib.sha256(json_path.read_bytes()).hexdigest(),
+                        "png_sha256": hashlib.sha256(png_path.read_bytes()).hexdigest(),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            marker_path.symlink_to(outside_marker)
+
+            self.assertEqual(inspect_layout.committed_json_files(output_dir), [])
+
+
 if __name__ == "__main__":
     unittest.main()

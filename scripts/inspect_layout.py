@@ -7,9 +7,69 @@ boundaries, and collisions directly in terminal output.
 
 import hashlib
 import json
+import os
+import stat
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
+
+
+def _escape_diagnostic(value: object) -> str:
+    """Render untrusted diagnostic text without terminal control effects."""
+
+    escaped: list[str] = []
+    for character in str(value):
+        if unicodedata.category(character) != "Cc":
+            escaped.append(character)
+        elif character == "\n":
+            escaped.append(r"\n")
+        elif character == "\r":
+            escaped.append(r"\r")
+        elif character == "\t":
+            escaped.append(r"\t")
+        else:
+            escaped.append(f"\\u{ord(character):04x}")
+    return "".join(escaped)
+
+
+def _open_regular_file(path: Path):
+    initial = path.lstat()
+    if stat.S_ISLNK(initial.st_mode):
+        raise OSError(f"refusing symlink artifact: {path}")
+    if not stat.S_ISREG(initial.st_mode):
+        raise OSError(f"refusing non-regular artifact: {path}")
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    if nofollow:
+        flags |= nofollow
+    fd = os.open(path, flags)
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise OSError(f"refusing non-regular artifact: {path}")
+        return os.fdopen(fd, "rb")
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def _read_regular_bytes(path: Path) -> bytes:
+    with _open_regular_file(path) as stream:
+        return stream.read()
+
+
+def _read_regular_text(path: Path) -> str:
+    return _read_regular_bytes(path).decode("utf-8")
+
+
+def _sha256_regular_file(path: Path) -> str:
+    return hashlib.sha256(_read_regular_bytes(path)).hexdigest()
+
+
+def _read_json(path: Path) -> Any:
+    return json.loads(_read_regular_text(path))
+
+
 
 
 def calculate_aabb(el: Dict[str, Any]) -> Tuple[float, float, float, float]:
@@ -105,8 +165,11 @@ def check_collisions(
                 overlap_area = (ix1 - ix0) * (iy1 - iy0)
                 if overlap_area > 0.0:
                     warnings.append(
-                        f"COLLISION: '{e1['id']}' and '{e2['id']}' overlap by {overlap_area:.0f}px² "
-                        f"at [{ix0:.0f}, {iy0:.0f}, {ix1:.0f}, {iy1:.0f}]"
+                        _escape_diagnostic(
+                            f"COLLISION: '{e1['id']}' and '{e2['id']}' "
+                            f"overlap by {overlap_area:.0f}px² "
+                            f"at [{ix0:.0f}, {iy0:.0f}, {ix1:.0f}, {iy1:.0f}]"
+                        )
                     )
     return warnings
 
@@ -160,7 +223,9 @@ def render_ascii_canvas(
         gy1 = max(1, min(rows - 2, int(max_y * scale_y)))
 
         marker = char_map.get(el.get("type"), "?")
-        label = el.get("id", marker)[: max(1, gx1 - gx0)]
+        label = _escape_diagnostic(el.get("id", marker))[
+            : max(1, gx1 - gx0)
+        ]
 
         for r in range(gy0, min(rows - 1, gy1 + 1)):
             for c in range(gx0, min(cols - 1, gx1 + 1)):
@@ -189,40 +254,57 @@ def inspect_design(
     background_ids = _background_ids(source_context)
     cw, ch = canvas.get("width", 0), canvas.get("height", 0)
 
-    print(f"\n========================================================")
-    print(f"LAYOUT INSPECTION: {title}")
-    print(f"Canvas: {cw} x {ch} px  |  Elements: {len(elements)}")
-    print(f"========================================================")
+    print("\n========================================================")
+    print(_escape_diagnostic(f"LAYOUT INSPECTION: {title}"))
+    print(
+        _escape_diagnostic(
+            f"Canvas: {cw} x {ch} px  |  Elements: {len(elements)}"
+        )
+    )
+    print("========================================================")
 
     # ASCII Canvas
     print(render_ascii_canvas(canvas, elements, background_ids=background_ids))
     print("Legend: # = boundary, T = text, I = image, S = shape, · = canvas area")
 
     # Element Table
-    print(f"\n{'ID':<18} {'TYPE':<7} {'X':<6} {'Y':<6} {'W':<6} {'H':<7} {'ROT':<5} {'Z':<3} {'DETAILS'}")
+    print(
+        _escape_diagnostic(
+            f"\n{'ID':<18} {'TYPE':<7} {'X':<6} {'Y':<6} {'W':<6} "
+            f"{'H':<7} {'ROT':<5} {'Z':<3} {'DETAILS'}"
+        )
+    )
     print("-" * 80)
     for el in sorted(elements, key=lambda e: (e.get("z_index", 0), e.get("id"))):
-        eid = el.get("id", "?")[:17]
-        etype = el.get("type", "?")
+        eid = _escape_diagnostic(el.get("id", "?"))[:17]
+        etype = _escape_diagnostic(el.get("type", "?"))
         x, y = f"{el.get('x', 0):.0f}", f"{el.get('y', 0):.0f}"
         w, h = f"{el.get('width', 0):.0f}", f"{el.get('height', 0):.0f}"
         rot = f"{el.get('rotation', 0):.0f}°"
-        z = str(el.get("z_index", 0))
+        z = _escape_diagnostic(el.get("z_index", 0))
 
         extra = []
         if el.get("group_id"):
-            extra.append(f"group={el['group_id']}")
+            extra.append(
+                f"group={_escape_diagnostic(el['group_id'])}"
+            )
         if etype == "text":
-            extra.append(f"size={el.get('font_size', '?')}")
-            content = el.get("content", "").replace("\n", " ")
+            extra.append(f"size={_escape_diagnostic(el.get('font_size', '?'))}")
+            content = str(el.get("content", "")).replace("\n", " ")
+            content = _escape_diagnostic(content)
             extra.append(f'"{content[:20]}..."' if len(content) > 20 else f'"{content}"')
         elif etype == "image":
-            extra.append(f"fit={el.get('fit', '?')}")
-            extra.append(f"{el.get('asset_id', '?')}")
+            extra.append(f"fit={_escape_diagnostic(el.get('fit', '?'))}")
+            extra.append(_escape_diagnostic(el.get("asset_id", "?")))
         elif etype == "shape":
-            extra.append(f"{el.get('shape_type', '?')}")
+            extra.append(f"shape={_escape_diagnostic(el.get('shape_type', '?'))}")
 
-        print(f"{eid:<18} {etype:<7} {x:<6} {y:<6} {w:<6} {h:<7} {rot:<5} {z:<3} {', '.join(extra)}")
+        print(
+            _escape_diagnostic(
+                f"{eid:<18} {etype:<7} {x:<6} {y:<6} {w:<6} "
+                f"{h:<7} {rot:<5} {z:<3} {', '.join(extra)}"
+            )
+        )
 
     # Off-canvas checks
     off_canvas = []
@@ -231,19 +313,24 @@ def inspect_design(
             continue
         min_x, min_y, max_x, max_y = calculate_aabb(el)
         if min_x < -0.5 or min_y < -0.5 or max_x > cw + 0.5 or max_y > ch + 0.5:
-            off_canvas.append(f"'{el['id']}': bounds [{min_x:.1f}, {min_y:.1f}, {max_x:.1f}, {max_y:.1f}] exceed {cw}x{ch}")
+            off_canvas.append(
+                _escape_diagnostic(
+                    f"'{el['id']}': bounds [{min_x:.1f}, {min_y:.1f}, "
+                    f"{max_x:.1f}, {max_y:.1f}] exceed {cw}x{ch}"
+                )
+            )
 
     if off_canvas:
         print("\n[!] OFF-CANVAS WARNINGS:")
-        for w in off_canvas:
-            print(f"    - {w}")
+        for warning in off_canvas:
+            print(f"    - {warning}")
 
     # Collisions
     collisions = check_collisions(elements, background_ids)
     if collisions:
         print("\n[!] COLLISION WARNINGS:")
-        for c in collisions:
-            print(f"    - {c}")
+        for collision in collisions:
+            print(f"    - {collision}")
     else:
         print("\n[✓] Non-collision check: PASSED (zero unintended foreground overlaps)")
 
@@ -255,20 +342,17 @@ def _is_committed_pair(json_path: Path) -> bool:
     png_path = json_path.with_name(f"{stem}_output.png")
     commit_path = json_path.with_name(f".{stem}_output.commit")
     try:
-        marker = json.loads(commit_path.read_text(encoding="utf-8"))
+        marker = _read_json(commit_path)
         if not isinstance(marker, dict) or marker.get("committed") is not True:
             return False
         if (
             marker.get("json") != json_path.name
             or marker.get("png") != png_path.name
-            or not png_path.is_file()
         ):
             return False
         return (
-            marker.get("json_sha256")
-            == hashlib.sha256(json_path.read_bytes()).hexdigest()
-            and marker.get("png_sha256")
-            == hashlib.sha256(png_path.read_bytes()).hexdigest()
+            marker.get("json_sha256") == _sha256_regular_file(json_path)
+            and marker.get("png_sha256") == _sha256_regular_file(png_path)
         )
     except (OSError, TypeError, ValueError):
         return False
@@ -307,8 +391,8 @@ def _source_context_for_output(json_path: Path) -> Dict[str, Any] | None:
     stem = json_path.name[: -len("_output.json")]
     input_path = json_path.parent.parent / "input" / f"{stem}.json"
     try:
-        task = json.loads(input_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        task = _read_json(input_path)
+    except (OSError, TypeError, ValueError):
         return None
     source = task.get("source") if isinstance(task, dict) else None
     return source if isinstance(source, dict) else None
@@ -333,13 +417,20 @@ def main() -> int:
 
     if target_path.is_file():
         if target_path.name.endswith("_output.json") and not _is_committed_pair(target_path):
-            print(f"Uncommitted or invalid output pair: {target_path}", file=sys.stderr)
+            print(
+                _escape_diagnostic(
+                    f"Uncommitted or invalid output pair: {target_path}"
+                ),
+                file=sys.stderr,
+            )
             return 1
         try:
-            doc = json.loads(target_path.read_text())
-        except (OSError, json.JSONDecodeError) as error:
+            doc = _read_json(target_path)
+        except (OSError, TypeError, ValueError) as error:
             print(
-                f"Unable to read layout document {target_path}: {error}",
+                _escape_diagnostic(
+                    f"Unable to read layout document {target_path}: {error}"
+                ),
                 file=sys.stderr,
             )
             return 1
@@ -352,20 +443,28 @@ def main() -> int:
         if uncommitted:
             for artifact_path in uncommitted:
                 print(
-                    f"Uncommitted or invalid output pair: {artifact_path}",
+                    _escape_diagnostic(
+                        f"Uncommitted or invalid output pair: {artifact_path}"
+                    ),
                     file=sys.stderr,
                 )
             return 1
         json_files = committed_json_files(target_path)
         if not json_files:
-            print(f"No committed *_output.json files found in {target_path}")
+            print(
+                _escape_diagnostic(
+                    f"No committed *_output.json files found in {target_path}"
+                )
+            )
             return 1
         for f in json_files:
             try:
-                doc = json.loads(f.read_text())
-            except (OSError, json.JSONDecodeError) as error:
+                doc = _read_json(f)
+            except (OSError, TypeError, ValueError) as error:
                 print(
-                    f"Unable to read layout document {f}: {error}",
+                    _escape_diagnostic(
+                        f"Unable to read layout document {f}: {error}"
+                    ),
                     file=sys.stderr,
                 )
                 return 1
@@ -373,7 +472,10 @@ def main() -> int:
             inspect_design(design, f.name, source_context)
         return 0
 
-    print(f"Path does not exist: {target_path}", file=sys.stderr)
+    print(
+        _escape_diagnostic(f"Path does not exist: {target_path}"),
+        file=sys.stderr,
+    )
     return 1
 
 

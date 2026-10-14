@@ -17,8 +17,9 @@ from unittest.mock import Mock, patch
 from PIL import Image
 
 from engine import main, staging
-from engine.errors import InfeasibleLayoutError
+from engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
 from chameleon.renderer.converter.assets import asset_path
+from chameleon.renderer.converter.wrap import TextOverflowError
 
 
 def _test_renderer(design, assets_dir, png_path):
@@ -75,12 +76,124 @@ class RunnerIntegrationTests(unittest.TestCase):
         self.assertTrue(png_path.is_file())
         self.assertEqual(json.loads(json_path.read_text()), {"canvas": {"width": 100, "height": 100}, "elements": []})
 
+    def test_input_symlink_is_rejected_without_publishing_pair(self):
+        outside = Path(self.tempdir.name) / "outside-task.json"
+        outside.write_text(json.dumps(self.task()), encoding="utf-8")
+        (self.input_dir / "linked.json").symlink_to(outside)
+
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertNotEqual(main.main(), 0)
+
+        self.assertFalse((self.output_dir / "linked_output.json").exists())
+        self.assertFalse((self.output_dir / "linked_output.png").exists())
+        self.assertFalse((self.output_dir / ".linked_output.commit").exists())
+
+
+    def test_output_root_symlink_is_rejected_without_external_publication(self):
+        outside_output = Path(self.tempdir.name) / "outside-output"
+        outside_output.mkdir()
+        preserved = outside_output / "preserved.txt"
+        preserved.write_text("keep", encoding="utf-8")
+        self.output_dir.rmdir()
+        self.output_dir.symlink_to(outside_output, target_is_directory=True)
+        self.write_task("good", self.task())
+
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertNotEqual(main.main(), 0)
+
+        self.assertTrue(preserved.is_file())
+        self.assertFalse((outside_output / "good_output.json").exists())
+        self.assertFalse((outside_output / "good_output.png").exists())
+
+    def test_invalid_task_name_does_not_block_valid_task(self):
+        self.write_task("bad\nname", self.task())
+        self.write_task("good", self.task())
+        stderr = io.StringIO()
+
+        with contextlib.redirect_stderr(stderr):
+            self.assertEqual(main.main(), 1)
+
+        self.assertIn(
+            r"[bad\nname.json] status=MALFORMED_INPUT",
+            stderr.getvalue(),
+        )
+        self.assertTrue((self.output_dir / "good_output.json").is_file())
+        self.assertTrue((self.output_dir / "good_output.png").is_file())
+        self.assertFalse((self.output_dir / "bad\nname_output.json").exists())
+
+    def test_invalid_stale_stem_is_reconciled_before_valid_task(self):
+        stale_stem = "bad\nname"
+        for suffix in ("json", "png", "json.tmp", "png.tmp"):
+            (self.output_dir / f"{stale_stem}_output.{suffix}").write_text(
+                "stale",
+                encoding="utf-8",
+            )
+        (self.output_dir / f".{stale_stem}_output.commit").write_text(
+            "stale",
+            encoding="utf-8",
+        )
+        (self.output_dir / f".{stale_stem}.stage-old").mkdir()
+        self.write_task("good", self.task())
+
+        self.assertEqual(main.main(), 0)
+
+        self.assertTrue((self.output_dir / "good_output.json").is_file())
+        self.assertTrue((self.output_dir / "good_output.png").is_file())
+        self.assertFalse((self.output_dir / f"{stale_stem}_output.json").exists())
+        self.assertFalse((self.output_dir / f".{stale_stem}_output.commit").exists())
+        self.assertFalse((self.output_dir / f".{stale_stem}.stage-old").exists())
+
+    def test_removed_task_pair_is_reconciled_on_next_no_task_run(self):
+        self.write_task("removed", self.task())
+        self.assertEqual(main.main(), 0)
+        self.assertTrue((self.output_dir / "removed_output.json").is_file())
+        self.assertTrue((self.output_dir / "removed_output.png").is_file())
+
+        (self.input_dir / "removed.json").unlink()
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertNotEqual(main.main(), 0)
+
+        self.assertFalse((self.output_dir / "removed_output.json").exists())
+        self.assertFalse((self.output_dir / "removed_output.png").exists())
+        self.assertFalse((self.output_dir / ".removed_output.commit").exists())
+
+
+
+    def test_task_and_element_control_characters_are_not_raw_diagnostics(self):
+        task_name = "task"
+        element_id = "element\x1b[32m\x07\x08\n"
+        task = self.task()
+        element = {
+            "id": element_id,
+            "type": "shape",
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 1,
+            "shape_type": "rectangle",
+            "fill_color": "rgba(0,0,0,1)",
+        }
+        task["source"]["elements"] = [element, dict(element)]
+        self.write_task(task_name, task)
+
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            self.assertNotEqual(main.main(), 0)
+
+        diagnostics = stdout.getvalue() + stderr.getvalue()
+        for control in ("\x00", "\x01", "\x07", "\x08", "\x09", "\x0b", "\x0c", "\x0d", "\x1b", "\x7f"):
+            self.assertNotIn(control, diagnostics)
+
     def test_infeasible_task_cleans_stale_and_publishes_nothing(self):
         self.write_task("bad", self.task())
         for suffix in ("json", "png", "json.tmp", "png.tmp"):
             (self.output_dir / f"bad_output.{suffix}").write_text("stale")
         for name in (".bad_output.commit", ".bad_output.commit.tmp"):
             (self.output_dir / name).write_text("stale")
+        stale_stage = self.output_dir / ".bad.stage-old"
+        stale_stage.mkdir()
+        (stale_stage / "bad_output.json.tmp").write_text("stale")
         with patch.object(main, "resize", side_effect=InfeasibleLayoutError("NO_HARD_VALID_CANDIDATE")):
             self.assertNotEqual(main.main(), 0)
         self.assertEqual(list(self.output_dir.iterdir()), [])
@@ -177,6 +290,27 @@ class RunnerIntegrationTests(unittest.TestCase):
         self.assertIn("status=RUNTIME_IO_FAILURE", stderr.getvalue())
         self.assertNotIn("status=INFEASIBLE_LAYOUT", stderr.getvalue())
 
+
+    def test_single_candidate_text_rejection_is_runtime_failure(self):
+        self.write_task("text_rejection", self.task())
+        stderr = io.StringIO()
+        with patch.object(
+            main,
+            "resize",
+            return_value={"canvas": {"width": 100, "height": 100}, "elements": []},
+        ), patch.object(
+            main, "render_to_png", side_effect=TextOverflowError("text overflow")
+        ), patch.object(main, "_TextOverflowError", TextOverflowError):
+            with contextlib.redirect_stderr(stderr):
+                result = main.main()
+
+        self.assertEqual(result, 1)
+        self.assertIn(
+            "[text_rejection.json] status=RUNTIME_IO_FAILURE reason=TEXT_OVERFLOW",
+            stderr.getvalue(),
+        )
+        self.assertFalse((self.output_dir / "text_rejection_output.json").exists())
+        self.assertFalse((self.output_dir / "text_rejection_output.png").exists())
     def test_asset_references_cannot_escape_asset_root(self):
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir)
@@ -285,6 +419,42 @@ class RunnerIntegrationTests(unittest.TestCase):
         self.assertFalse((self.output_dir / "bad_output.json").exists())
         self.assertFalse((self.output_dir / "bad_output.png").exists())
 
+
+    def test_typed_search_failures_continue_and_leave_only_successful_pair(self):
+        self.write_task("good", self.task(100))
+        self.write_task("infeasible", self.task(101))
+        self.write_task("cutoff", self.task(102))
+
+        def resize_mixed(source, target):
+            width = source["canvas"]["width"]
+            if width == 101:
+                raise InfeasibleLayoutError(
+                    InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE
+                )
+            if width == 102:
+                raise InfeasibleLayoutError(InfeasibleReasonCode.INCOMPLETE_SEARCH)
+            return {"canvas": dict(target), "elements": []}
+
+        stderr = io.StringIO()
+        with patch.object(main, "resize", side_effect=resize_mixed):
+            with contextlib.redirect_stderr(stderr):
+                result = main.main()
+
+        self.assertEqual(result, 1)
+        diagnostics = stderr.getvalue()
+        self.assertIn(
+            "[cutoff.json] status=INCOMPLETE_SEARCH reason=INCOMPLETE_SEARCH",
+            diagnostics,
+        )
+        self.assertIn(
+            "[infeasible.json] status=INFEASIBLE_LAYOUT reason=NO_HARD_VALID_CANDIDATE",
+            diagnostics,
+        )
+        self.assertTrue((self.output_dir / "good_output.json").is_file())
+        self.assertTrue((self.output_dir / "good_output.png").is_file())
+        for stem in ("infeasible", "cutoff"):
+            self.assertFalse((self.output_dir / f"{stem}_output.json").exists())
+            self.assertFalse((self.output_dir / f"{stem}_output.png").exists())
     def test_complete_batch_returns_zero_only_after_all_pairs_commit(self):
         self.write_task("first", self.task(100))
         self.write_task("second", self.task(100))
