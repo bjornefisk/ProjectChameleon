@@ -10,8 +10,11 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
+import tempfile
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_EVEN
+from fractions import Fraction
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -45,6 +48,30 @@ def artifact_paths(output_dir: Path, task_name: str) -> TaskArtifactPaths:
     )
 
 
+def _staging_entries(output_dir: Path, task_name: str) -> list[Path]:
+    prefix = f".{task_name}.stage-"
+    try:
+        return [path for path in output_dir.iterdir() if path.name.startswith(prefix)]
+    except FileNotFoundError:
+        return []
+
+
+def _private_staging_paths(
+    output_dir: Path, task_name: str, public_paths: TaskArtifactPaths
+) -> tuple[Path, TaskArtifactPaths]:
+    staging_dir = Path(
+        tempfile.mkdtemp(prefix=f".{task_name}.stage-", dir=output_dir)
+    )
+    return staging_dir, TaskArtifactPaths(
+        json_final=public_paths.json_final,
+        png_final=public_paths.png_final,
+        json_tmp=staging_dir / f"{task_name}_output.json.tmp",
+        png_tmp=staging_dir / f"{task_name}_output.png.tmp",
+        commit_marker=public_paths.commit_marker,
+        commit_marker_tmp=staging_dir / f".{task_name}_output.commit.tmp",
+    )
+
+
 def cleanup_task_artifacts(output_dir: Path, task_name: str) -> None:
     """Remove all final and staged paths for ``task_name``.
 
@@ -68,8 +95,52 @@ def cleanup_task_artifacts(output_dir: Path, task_name: str) -> None:
             pass
         except OSError as error:
             errors.append(error)
+    for path in _staging_entries(output_dir, task_name):
+        try:
+            if path.is_symlink() or not path.is_dir():
+                path.unlink()
+            else:
+                shutil.rmtree(path)
+        except FileNotFoundError:
+            pass
+        except OSError as error:
+            errors.append(error)
     if errors:
         raise errors[0]
+
+
+def quarantine_task_artifacts(output_dir: Path, task_name: str) -> None:
+    """Move unremovable task paths out of the scorer-visible namespace."""
+
+    quarantine_dir = Path(
+        tempfile.mkdtemp(prefix=".chameleon-quarantine-", dir=output_dir)
+    )
+    moved = False
+    errors: list[OSError] = []
+    paths = artifact_paths(output_dir, task_name)
+    candidates = [
+        paths.commit_marker,
+        paths.commit_marker_tmp,
+        paths.json_final,
+        paths.png_final,
+        paths.json_tmp,
+        paths.png_tmp,
+        *_staging_entries(output_dir, task_name),
+    ]
+    for path in candidates:
+        try:
+            if not path.exists() and not path.is_symlink():
+                continue
+            os.replace(path, quarantine_dir / path.name)
+            moved = True
+        except FileNotFoundError:
+            pass
+        except OSError as error:
+            errors.append(error)
+    if errors:
+        raise errors[0]
+    if not moved:
+        shutil.rmtree(quarantine_dir)
 
 
 def _reject_constant(value: str) -> None:
@@ -131,8 +202,25 @@ def _read_serialized_design(path: Path) -> Any:
     )
 
 
+def _quantize_mutable(value: Any) -> int:
+    if type(value) is int:
+        return value
+    if isinstance(value, Decimal):
+        if not value.is_finite():
+            raise ValueError("non-finite Decimal cannot be serialized")
+        return int(value.to_integral_value(rounding=ROUND_HALF_EVEN))
+    if isinstance(value, Fraction):
+        return round(value)
+    if isinstance(value, float):
+        raise ValueError(
+            "binary-float mutable geometry cannot be serialized; use Decimal or Fraction"
+        )
+    raise TypeError(f"mutable geometry is not numeric: {type(value).__name__}")
+
+
 def _write_commit_marker(paths: TaskArtifactPaths) -> None:
     marker = {
+        "committed": True,
         "json": paths.json_final.name,
         "png": paths.png_final.name,
         "json_sha256": hashlib.sha256(paths.json_tmp.read_bytes()).hexdigest(),
@@ -145,11 +233,11 @@ def _write_commit_marker(paths: TaskArtifactPaths) -> None:
 
 
 def _canonicalize_response_mutables(response: Mapping[str, Any]) -> Mapping[str, Any]:
-    """Convert integral Decimal mutables to serialized integers.
+    """Round mutable values once using the contract's half-even rule.
 
-    The parser intentionally retains Decimal values.  Contract serialization
-    permits only integer canvas and geometry values, while immutable source
-    fields must retain their exact Decimal representation.
+    The parser intentionally retains Decimal values. Contract serialization
+    emits only finite integers, while immutable source fields retain their
+    exact Decimal representation.
     """
 
     result = dict(response)
@@ -157,9 +245,8 @@ def _canonicalize_response_mutables(response: Mapping[str, Any]) -> Mapping[str,
     if isinstance(canvas, Mapping):
         result["canvas"] = dict(canvas)
         for field in ("width", "height"):
-            value = canvas.get(field)
-            if isinstance(value, Decimal) and value.is_finite() and value == value.to_integral_value():
-                result["canvas"][field] = int(value)
+            if field in canvas:
+                result["canvas"][field] = _quantize_mutable(canvas[field])
     elements = response.get("elements")
     if isinstance(elements, list):
         result["elements"] = []
@@ -169,9 +256,8 @@ def _canonicalize_response_mutables(response: Mapping[str, Any]) -> Mapping[str,
                 continue
             candidate = dict(element)
             for field in ("x", "y", "width", "height", "font_size"):
-                value = element.get(field)
-                if isinstance(value, Decimal) and value.is_finite() and value == value.to_integral_value():
-                    candidate[field] = int(value)
+                if field in element:
+                    candidate[field] = _quantize_mutable(element[field])
             result["elements"].append(candidate)
     return result
 
@@ -210,8 +296,9 @@ def publish_task(
     """Stage, validate, and marker-publish one JSON/PNG task pair."""
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    paths = artifact_paths(output_dir, task_name)
+    public_paths = artifact_paths(output_dir, task_name)
     cleanup_task_artifacts(output_dir, task_name)
+    staging_dir, paths = _private_staging_paths(output_dir, task_name, public_paths)
     try:
         serialized = _publish_response_json(response, paths.json_tmp)
         validate_response(source, target_canvas, serialized)
@@ -222,10 +309,26 @@ def publish_task(
         os.replace(paths.json_tmp, paths.json_final)
         os.replace(paths.png_tmp, paths.png_final)
         os.replace(paths.commit_marker_tmp, paths.commit_marker)
-        return paths
-    except BaseException:
-        cleanup_task_artifacts(output_dir, task_name)
+        return public_paths
+    except BaseException as error:
+        cleanup_error: OSError | None = None
+        try:
+            cleanup_task_artifacts(output_dir, task_name)
+        except OSError as failure:
+            cleanup_error = failure
+            try:
+                quarantine_task_artifacts(output_dir, task_name)
+            except OSError as quarantine_failure:
+                cleanup_error = OSError(
+                    f"{failure}; quarantine failed: {quarantine_failure}"
+                )
+        if cleanup_error is not None and isinstance(error, Exception):
+            raise RuntimeError(
+                f"{type(error).__name__}: {error}; cleanup failed: {cleanup_error}"
+            ) from error
         raise
+    finally:
+        shutil.rmtree(staging_dir, ignore_errors=True)
 
 
 __all__ = [
@@ -233,5 +336,6 @@ __all__ = [
     "artifact_paths",
     "cleanup_task_artifacts",
     "publish_task",
+    "quarantine_task_artifacts",
     "validate_png",
 ]

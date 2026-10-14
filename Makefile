@@ -80,7 +80,13 @@ docker-test:
 	@echo "Docker test completed."
 
 clean:
-	@rm -f chameleon/output/*_output.json chameleon/output/*_output.png
+	@rm -f chameleon/output/*_output.json chameleon/output/*_output.png \
+		chameleon/output/*.tmp chameleon/output/.*_output.commit \
+		chameleon/output/.*_output.commit.tmp
+	@find chameleon/output -maxdepth 1 -type d \
+		-name '.chameleon-quarantine-*' -prune -exec rm -rf {} + 2>/dev/null || true
+	@find chameleon/output -maxdepth 1 -type d \
+		-name '.*.stage-*' -prune -exec rm -rf {} + 2>/dev/null || true
 	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
-	@echo "Cleaned generated files and caches."
+	@echo "Cleaned generated files, markers, and caches."

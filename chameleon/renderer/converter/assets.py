@@ -7,7 +7,15 @@ from PIL import Image, ImageDraw
 def asset_path(assets_dir: Optional[str], asset_id: Optional[str]) -> Optional[Path]:
     if not assets_dir or not asset_id:
         return None
-    candidate = Path(assets_dir) / asset_id
+    try:
+        root = Path(assets_dir).resolve()
+        requested = Path(asset_id)
+        if requested.is_absolute():
+            return None
+        candidate = (root / requested).resolve(strict=False)
+        candidate.relative_to(root)
+    except (OSError, RuntimeError, ValueError):
+        return None
     return candidate if candidate.is_file() else None
 
 

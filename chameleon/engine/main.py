@@ -10,7 +10,11 @@ from typing import Any, Mapping
 from engine.contract import validate_source, validate_target_canvas
 from engine.errors import InfeasibleLayoutError
 from engine.resize import resize
-from engine.staging import cleanup_task_artifacts, publish_task
+from engine.staging import (
+    cleanup_task_artifacts,
+    publish_task,
+    quarantine_task_artifacts,
+)
 
 # Relative to the current working directory, which is /app inside Docker and
 # the chameleon project directory for local execution.
@@ -51,14 +55,28 @@ def _error_status(error: InfeasibleLayoutError) -> str:
         return "INCOMPLETE_SEARCH"
     if error.code == "RUNTIME_IO_FAILURE":
         return "RUNTIME_IO_FAILURE"
-    return "INFEASIBLE_LAYOUT"
+    if error.code == "NO_HARD_VALID_CANDIDATE":
+        return "INFEASIBLE_LAYOUT"
+    return "RUNTIME_IO_FAILURE"
 
 
 def _cleanup_after_failure(stem: str) -> str | None:
     try:
         cleanup_task_artifacts(OUTPUT_DIR, stem)
     except Exception as error:
-        return f"{type(error).__name__}: {error}"
+        quarantine_error = None
+        try:
+            quarantine_task_artifacts(OUTPUT_DIR, stem)
+        except Exception as quarantine_failure:
+            quarantine_error = (
+                f"{type(quarantine_failure).__name__}: {quarantine_failure}"
+            )
+        message = f"{type(error).__name__}: {error}"
+        if quarantine_error:
+            message += f"; quarantine failed: {quarantine_error}"
+        else:
+            message += "; stale paths quarantined"
+        return message
     return None
 
 
@@ -149,14 +167,13 @@ def main() -> int:
     all_succeeded = True
     for task_path in task_files:
         stem = task_path.stem
-        try:
-            cleanup_task_artifacts(OUTPUT_DIR, stem)
-        except Exception as error:
+        cleanup_error = _cleanup_after_failure(stem)
+        if cleanup_error:
             all_succeeded = False
             _report_failure(
                 task_path.name,
                 "RUNTIME_IO_FAILURE",
-                f"RUNTIME_IO_FAILURE: {error}",
+                f"RUNTIME_IO_FAILURE: {cleanup_error}",
                 None,
             )
             continue
@@ -198,6 +215,8 @@ def main() -> int:
         try:
             source, target_canvas = task["source"], task["target_canvas"]
             output = resize(source, target_canvas)
+            for problem in self_check(source, output):
+                print(f"self-check warning: {problem}", file=sys.stderr)
             publish_task(
                 output_dir=OUTPUT_DIR,
                 task_name=stem,

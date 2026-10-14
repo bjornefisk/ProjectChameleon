@@ -57,7 +57,7 @@ These are intentionally visible; none is silently promoted to contract behavior:
 1. `engine/resize.py` is the documented uniform-stretch baseline and violates image-ratio, group, overlap, rotation, and typography rules.
 2. `engine/main.py` has a warning-only self-check that checks unrotated rectangles and ID sets; it is not the contract validator.
 3. The renderer adapter's style-run end handling, Unicode-safe wrapping, letter-spacing/style-width measurement, explicit line/max-lines/height enforcement, glyph-bound validation, and rectangle/ellipse stroke behavior need conformance work.
-4. The runner's typed-status, stale-output, marker-gated pair publication, aggregate exit, exact target validation, and exact numeric-ingress paths are implemented and focused-tested; deterministic cutoff semantics and full runtime qualification remain pending.
+4. The runner's typed-status, private staging, marker-gated pair publication, stale-path quarantine, aggregate exit, exact target validation, exact numeric ingress, and half-even serialization paths are implemented and focused-tested; deterministic cutoff semantics and full runtime qualification remain pending.
 5. The deterministic role-inference, four-topology candidate search, renderer-in-loop ranking, and held-out evaluation path have not been implemented.
 6. The Docker build has no project-owned hash-locked wheelhouse or apt-version lock; the direct compatibility pins are an initial baseline.
 
@@ -82,12 +82,12 @@ These are not unresolved internal design choices. They require external facts or
 
 ## Ticket 03 verification record
 
-- `cd chameleon && ../.venv/bin/python -m unittest tests.runner.test_runner -v` — 17 tests passed.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 45 tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest tests.runner.test_runner -v` — 22 tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 50 tests passed.
 - `python3 scripts/verify_repository.py` — passed.
-- `../.venv/bin/python -m engine.main` — failed closed for all three sample tasks because the current uniform-stretch `resize.py` baseline emits non-integer geometry; no JSON/PNG pair was published.
+- `../.venv/bin/python -m engine.main` — failed closed for all three sample tasks: Level 1 and Level 2 reported `IMAGE_RATIO_VIOLATION`; Level 3 reported `CONTAINMENT_VIOLATION`; no JSON/PNG pair was published.
 - `docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — completed with the existing `FROM --platform` warning.
-- `docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — failed closed for all three sample tasks with the same known resize-baseline geometry issue.
+- `docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — failed closed with the same three typed baseline failures; Docker also reported the expected amd64-image-on-arm64-host warning, so native-amd64 qualification remains unverified.
 
 
 ## Remaining Gate 1 qualification

@@ -15,6 +15,7 @@ from PIL import Image
 
 from engine import main, staging
 from engine.errors import InfeasibleLayoutError
+from renderer.converter.assets import asset_path
 
 
 def _test_renderer(design, assets_dir, png_path):
@@ -95,19 +96,133 @@ class RunnerIntegrationTests(unittest.TestCase):
         }]
         self.write_task("numeric", json.dumps(task).replace("12.5", "1.25e1"), raw=True)
         seen = {}
+        real_resize = main.resize
 
         def resize_probe(source, target):
             seen["x"] = source["elements"][0]["x"]
             seen["target"] = target["width"]
-            result = {"canvas": dict(target), "elements": [dict(source["elements"][0])]}
-            result["elements"][0].update({"x": 10, "y": 2, "width": 10, "height": 10})
-            return result
+            return real_resize(source, target)
 
         with patch.object(main, "resize", side_effect=resize_probe):
             self.assertEqual(main.main(), 0)
         self.assertEqual(seen["x"], Decimal("12.5"))
         self.assertIs(type(seen["x"]), Decimal)
         self.assertIs(type(seen["target"]), int)
+        published = json.loads(
+            (self.output_dir / "numeric_output.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(published["elements"][0]["x"], 12)
+
+    def test_mutable_decimal_output_uses_half_even_quantization(self):
+        task = self.task()
+        element = {
+            "id": "box", "type": "shape", "x": 0, "y": 0,
+            "width": 10, "height": 10, "shape_type": "rectangle",
+            "fill_color": "rgba(0,0,0,1)",
+        }
+        task["source"]["elements"] = [element]
+        self.write_task("rounded", task)
+        response_element = dict(element)
+        response_element.update({
+            "x": Decimal("10.5"),
+            "y": Decimal("11.5"),
+            "width": Decimal("10.5"),
+            "height": Decimal("10.5"),
+        })
+        response = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [response_element],
+        }
+        with patch.object(main, "resize", return_value=response):
+            self.assertEqual(main.main(), 0)
+        published = json.loads(
+            (self.output_dir / "rounded_output.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            published["elements"][0],
+            {
+                **element,
+                "x": 10,
+                "y": 12,
+                "width": 10,
+                "height": 10,
+            },
+        )
+
+    def test_invalid_candidate_is_runtime_failure_not_infeasibility(self):
+        task = self.task()
+        element = {
+            "id": "box", "type": "shape", "x": 10, "y": 10,
+            "width": 10, "height": 10, "shape_type": "rectangle",
+            "fill_color": "rgba(0,0,0,1)",
+        }
+        task["source"]["elements"] = [element]
+        self.write_task("invalid_candidate", task)
+        response_element = dict(element)
+        response_element["x"] = -10
+        stderr = io.StringIO()
+        with patch.object(
+            main,
+            "resize",
+            return_value={
+                "canvas": {"width": 100, "height": 100},
+                "elements": [response_element],
+            },
+        ):
+            with contextlib.redirect_stderr(stderr):
+                self.assertNotEqual(main.main(), 0)
+        self.assertIn("status=RUNTIME_IO_FAILURE", stderr.getvalue())
+        self.assertNotIn("status=INFEASIBLE_LAYOUT", stderr.getvalue())
+
+    def test_asset_references_cannot_escape_asset_root(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            root = Path(tempdir)
+            assets_dir = root / "assets"
+            assets_dir.mkdir()
+            inside = assets_dir / "inside.png"
+            outside = root / "outside.png"
+            inside.write_bytes(b"inside")
+            outside.write_bytes(b"outside")
+            link = assets_dir / "link.png"
+            link.symlink_to(outside)
+
+            self.assertEqual(asset_path(str(assets_dir), "inside.png"), inside.resolve())
+            self.assertIsNone(asset_path(str(assets_dir), "../outside.png"))
+            self.assertIsNone(asset_path(str(assets_dir), str(outside)))
+            self.assertIsNone(asset_path(str(assets_dir), "link.png"))
+
+    def test_cleanup_failure_quarantines_stale_paths(self):
+        self.write_task("stale", self.task())
+        (self.output_dir / "stale_output.json").write_text("stale", encoding="utf-8")
+        (self.output_dir / "stale_output.png").write_bytes(b"stale")
+        (self.output_dir / ".stale_output.commit").mkdir()
+
+        self.assertNotEqual(main.main(), 0)
+        self.assertFalse((self.output_dir / "stale_output.json").exists())
+        self.assertFalse((self.output_dir / "stale_output.png").exists())
+        self.assertTrue(
+            any(
+                path.name.startswith(".chameleon-quarantine-")
+                for path in self.output_dir.iterdir()
+            )
+        )
+
+    def test_inspector_rejects_uncommitted_json_in_directory(self):
+        self.write_task("committed", self.task())
+        self.assertEqual(main.main(), 0)
+        (self.output_dir / "uncommitted_output.json").write_text(
+            json.dumps({"canvas": {"width": 100, "height": 100}, "elements": []}),
+            encoding="utf-8",
+        )
+        inspector = Path(__file__).resolve().parents[3] / "scripts" / "inspect_layout.py"
+        result = subprocess.run(
+            [sys.executable, str(inspector), str(self.output_dir)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Uncommitted or invalid output pair", result.stderr)
 
     def test_staging_cleanup_failure_is_reported(self):
         self.write_task("cleanup_failure", self.task())
@@ -134,7 +249,9 @@ class RunnerIntegrationTests(unittest.TestCase):
                 with contextlib.redirect_stderr(stderr):
                     self.assertNotEqual(main.main(), 0)
         self.assertIn("rollback failed", stderr.getvalue())
-        self.assertEqual(list(self.output_dir.iterdir()), [])
+        visible = [path for path in self.output_dir.iterdir() if not path.name.startswith(".chameleon-quarantine-")]
+        self.assertEqual(visible, [])
+        self.assertTrue(any(path.name.startswith(".chameleon-quarantine-") for path in self.output_dir.iterdir()))
 
     def test_render_failure_cleans_staged_and_final_pair(self):
         self.write_task("render_failure", self.task())

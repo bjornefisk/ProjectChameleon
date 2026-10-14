@@ -48,8 +48,10 @@ python -m engine.main
 
 This processes every `*.json` file in `input/` (the 3 sample designs are
 already there — one per difficulty level). Successful tasks write an
-`_output.json` and `_output.png` pair into `output/`; see the contract for
-typed failure statuses and failed-task artifact behavior.
+`_output.json` and `_output.png` pair plus a hidden hash commit manifest
+(`.<task>_output.commit`) into `output/`; from the repository root,
+`make inspect` treats the manifest as the local pair-publication gate. See the
+contract for typed failure statuses and failed-task artifact behavior.
 
 The included baseline is a **uniform stretch** — deliberately the wrong
 approach (see the main brief: "a naive program stretches the picture; a
@@ -68,9 +70,11 @@ obvious mistakes before you waste a submission on them. See `RULES.md` and
 
 The accepted failure protocol is defined by `../Docs/PROJECT_CONTRACT.md`:
 failed tasks publish neither artifact, while successful JSON and PNG are
-staged and committed as one logical pair; the aggregate process status is
-nonzero if any task fails. The starter baseline may not yet implement every
-accepted rule, so a warning or written artifact is not conformance evidence.
+staged in a private task directory and exposed with a matching hidden commit
+manifest; the aggregate process status is nonzero if any task fails. Do not
+consume raw `_output.json` files while the runner is still executing. The
+starter baseline may not yet implement every accepted rule, so a warning or
+written artifact is not conformance evidence.
 Read the warning; decide whether it identifies a real problem or, like the
 Level 2 sample's intentionally corner-bleeding decorative circle, an expected
 fixture case.

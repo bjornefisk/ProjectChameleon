@@ -218,11 +218,11 @@ The finale may wrap the engine in an Adobe Express add-on and may explore user-a
 | Rotated containment and bleed | ADR-003 | §7 AABB and source-bleed predicate | `offcanvas_decoration.json`, planned rotation cases | Validator/solver pending |
 | Foreground image ratios | ADR-003 | Cross-product equality after rounding | `image_ratio.json`, planned ratio cases | Validator/solver pending |
 | Renderer/text semantics | ADR-002 | §6 and pinned source revision | `style_run_boundary.json`, renderer conformance matrix | Adapter gaps open |
-| Infeasible target behavior | ADR-003 | Typed failure, no misleading output | `infeasible_target.json` | Orchestrator path pending |
-| Offline runtime and platform | ADR-004 | Docker/request pins and network rule | Docker/buildx smoke plan in `STATUS.md` | Packaging pinned; build check pending |
+| Infeasible target behavior | ADR-003 | Typed failure, no misleading output | `infeasible_target.json`, runner integration evidence | Runner fail-closed path implemented; solver search pending |
+| Offline runtime and platform | ADR-004 | Docker/request pins and network rule | Docker/buildx smoke plan in `STATUS.md` | Buildx smoke completed; native-amd64 qualification pending |
 | Stage split | ADR-005 | §10 | Stage boundary review | Ratified |
-| Failure protocol and search status | ADR-006 | Typed internal statuses; no failure envelope; no failed-task artifacts; logical JSON/PNG pair publication; conservative cutoff semantics; nonzero aggregate failure | Planned orchestrator/status/publication evidence | Implementation pending |
-| Numeric and geometry semantics | ADR-007 | Exact rational ingress; one half-even serialization; reduced image-ratio lattice; rigid group transform; AABB and positive-area overlap rules | Planned numeric/geometry conformance cases | Validator/solver pending |
+| Failure protocol and search status | ADR-006 | Typed internal statuses; no failure envelope; no failed-task artifacts; logical JSON/PNG pair publication; conservative cutoff semantics; nonzero aggregate failure | `tests/runner/test_runner.py` publication/failure cases | Runner staging, cleanup, status, and aggregate exit implemented; cutoff semantics pending |
+| Numeric and geometry semantics | ADR-007 | Exact rational ingress; one half-even serialization; reduced image-ratio lattice; rigid group transform; AABB and positive-area overlap rules | Runner exact-ingress/serialization cases; geometry fixtures | Runner ingress and serialization implemented; geometry/search pending |
 | Typography and renderer edge semantics | ADR-008 | Grapheme-safe UAX #14/UAX #29 wrapping; style-run semantics; effective span metrics; overflow rejection; in-box strokes; no public line map | Planned renderer conformance matrix | Adapter gaps open |
 | Initial deterministic search | ADR-009 | Four topology families, bounded source-derived variants, renderer-in-loop validation, fixed-point ranking, no model/CP-SAT initially | Planned held-out search evaluation | Search not started |
 

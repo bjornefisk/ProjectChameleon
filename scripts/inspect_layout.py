@@ -32,14 +32,39 @@ def calculate_aabb(el: Dict[str, Any]) -> Tuple[float, float, float, float]:
     b = abs(w * math.sin(rad)) + abs(h * math.cos(rad))
     return cx - a / 2.0, cy - b / 2.0, cx + a / 2.0, cy + b / 2.0
 
+def _is_target_cover_background(
+    element: Dict[str, Any], canvas: Dict[str, Any] | None
+) -> bool:
+    if not (
+        element.get("type") == "image"
+        and element.get("fit") == "cover"
+        and canvas
+    ):
+        return False
+    min_x, min_y, max_x, max_y = calculate_aabb(element)
+    width = float(canvas.get("width", 0))
+    height = float(canvas.get("height", 0))
+    return min_x <= 0 and min_y <= 0 and max_x >= width and max_y >= height
 
-def check_collisions(elements: List[Dict[str, Any]]) -> List[str]:
+
+def _foreground_elements(
+    elements: List[Dict[str, Any]], canvas: Dict[str, Any] | None
+) -> List[Dict[str, Any]]:
+    return [
+        element
+        for element in elements
+        if not _is_target_cover_background(element, canvas)
+    ]
+
+
+
+
+def check_collisions(
+    elements: List[Dict[str, Any]], canvas: Dict[str, Any] | None = None
+) -> List[str]:
     """Check for positive-area collisions between non-background elements."""
     warnings = []
-    foreground = [
-        el for el in elements
-        if not (el.get("type") == "image" and el.get("fit") == "cover" and el.get("z_index", 0) <= 0)
-    ]
+    foreground = _foreground_elements(elements, canvas)
 
     for i in range(len(foreground)):
         for j in range(i + 1, len(foreground)):
@@ -99,8 +124,8 @@ def render_ascii_canvas(canvas: Dict[str, Any], elements: List[Dict[str, Any]], 
     sorted_els = sorted(elements, key=lambda e: e.get("z_index", 0))
 
     for el in sorted_els:
-        # Skip full-bleed background
-        if el.get("type") == "image" and el.get("fit") == "cover" and el.get("z_index", 0) <= 0:
+        # Skip only a target-covering background.
+        if _is_target_cover_background(el, canvas):
             continue
 
         min_x, min_y, max_x, max_y = calculate_aabb(el)
@@ -172,7 +197,7 @@ def inspect_design(doc: Dict[str, Any], title: str = "Design") -> None:
     # Off-canvas checks
     off_canvas = []
     for el in elements:
-        if el.get("type") == "image" and el.get("fit") == "cover" and el.get("z_index", 0) <= 0:
+        if _is_target_cover_background(el, canvas):
             continue
         min_x, min_y, max_x, max_y = calculate_aabb(el)
         if min_x < -0.5 or min_y < -0.5 or max_x > cw + 0.5 or max_y > ch + 0.5:
@@ -184,7 +209,7 @@ def inspect_design(doc: Dict[str, Any], title: str = "Design") -> None:
             print(f"    - {w}")
 
     # Collisions
-    collisions = check_collisions(elements)
+    collisions = check_collisions(elements, canvas)
     if collisions:
         print("\n[!] COLLISION WARNINGS:")
         for c in collisions:
@@ -201,7 +226,7 @@ def _is_committed_pair(json_path: Path) -> bool:
     commit_path = json_path.with_name(f".{stem}_output.commit")
     try:
         marker = json.loads(commit_path.read_text(encoding="utf-8"))
-        if not isinstance(marker, dict):
+        if not isinstance(marker, dict) or marker.get("committed") is not True:
             return False
         if (
             marker.get("json") != json_path.name
@@ -226,6 +251,14 @@ def _committed_json_files(target_path: Path) -> list[Path]:
         if _is_committed_pair(json_path)
     ]
 
+def _uncommitted_json_files(target_path: Path) -> list[Path]:
+    return [
+        json_path
+        for json_path in sorted(target_path.glob("*_output.json"))
+        if not _is_committed_pair(json_path)
+    ]
+
+
 
 def main() -> int:
     if len(sys.argv) < 2:
@@ -237,18 +270,40 @@ def main() -> int:
         if target_path.name.endswith("_output.json") and not _is_committed_pair(target_path):
             print(f"Uncommitted or invalid output pair: {target_path}", file=sys.stderr)
             return 1
-        doc = json.loads(target_path.read_text())
+        try:
+            doc = json.loads(target_path.read_text())
+        except (OSError, json.JSONDecodeError) as error:
+            print(
+                f"Unable to read layout document {target_path}: {error}",
+                file=sys.stderr,
+            )
+            return 1
         design = doc.get("source", doc)
         inspect_design(design, target_path.name)
         return 0
 
     if target_path.is_dir():
+        uncommitted = _uncommitted_json_files(target_path)
+        if uncommitted:
+            for json_path in uncommitted:
+                print(
+                    f"Uncommitted or invalid output pair: {json_path}",
+                    file=sys.stderr,
+                )
+            return 1
         json_files = _committed_json_files(target_path)
         if not json_files:
             print(f"No committed *_output.json files found in {target_path}")
             return 1
         for f in json_files:
-            doc = json.loads(f.read_text())
+            try:
+                doc = json.loads(f.read_text())
+            except (OSError, json.JSONDecodeError) as error:
+                print(
+                    f"Unable to read layout document {f}: {error}",
+                    file=sys.stderr,
+                )
+                return 1
             inspect_design(doc, f.name)
         return 0
 
