@@ -102,14 +102,14 @@ The hidden `.<stem>_output.commit` marker is the pair manifest and commit author
 
 ## Ticket 03 verification record
 
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 63 tests passed.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 113 tests passed.
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 68 tests passed.
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 118 tests passed.
 - `python3 scripts/verify_repository.py`, `make verify`, and `git diff --check` — passed.
-- `cd chameleon && ../.venv/bin/python -m py_compile engine/main.py engine/staging.py ../scripts/inspect_layout.py tests/runner/test_main.py tests/runner/test_runner.py tests/runner/test_inspect_layout.py` — passed.
-- `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1; all three sample tasks failed closed (`IMAGE_RATIO_VIOLATION` for Levels 1–2 and `CONTAINMENT_VIOLATION` for Level 3), with no JSON/PNG pair beyond `output/.gitkeep`.
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -m py_compile engine/main.py engine/staging.py ../scripts/inspect_layout.py tests/runner/test_main.py tests/runner/test_inspect_layout.py tests/runner/test_runner.py` — passed.
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -m engine.main` — exit 1; all three sample tasks failed closed (`IMAGE_RATIO_VIOLATION` for Levels 1–2 and `CONTAINMENT_VIOLATION` for Level 3), with no JSON/PNG pair beyond `output/.gitkeep`.
 - `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — passed with the existing `FromPlatformFlagConstDisallowed` warning.
 - `cd chameleon && docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — exit 1 with the same typed baseline failures and no task artifacts beyond `output/.gitkeep`. Docker reported amd64-image-on-arm64-host emulation; native-amd64 qualification remains unverified.
-- The exercised regressions cover marker-gated publication, stale reconciliation/quarantine including invalid stems, invalid-filename continuation, aggregate exit, exact numeric ingress and half-even serialization, malformed/non-finite inputs, input/output/final-artifact symlink rejection, task-name boundaries, safe diagnostics, and inspector authorization.
+- The exercised regressions cover marker-gated publication, stale reconciliation/quarantine including invalid stems, quarantine continuation after cleanup failure, invalid-filename continuation, aggregate exit, exact numeric ingress including integral-exponent Decimal tokens, half-even serialization, malformed/non-finite inputs, input/output/final-artifact symlink rejection including direct output-root checks, temporary-artifact rejection, task-name boundaries, safe diagnostics, and inspector authorization.
 
 
 ## Remaining Gate 1 qualification

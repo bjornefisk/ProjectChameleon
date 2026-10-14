@@ -84,6 +84,19 @@ class InspectLayoutTests(unittest.TestCase):
                 [orphan],
             )
 
+    def test_rejects_temporary_output_artifacts(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            output_dir = Path(tempdir)
+            json_tmp = output_dir / "task_output.json.tmp"
+            png_tmp = output_dir / "task_output.png.tmp"
+            json_tmp.write_text("{}", encoding="utf-8")
+            png_tmp.write_bytes(b"partial")
+
+            self.assertEqual(
+                inspect_layout._uncommitted_artifacts(output_dir),
+                [json_tmp, png_tmp],
+            )
+
 
 class CommittedOutputTests(unittest.TestCase):
     def test_unmarked_partial_output_is_not_inspectable(self):
@@ -106,6 +119,20 @@ class CommittedOutputTests(unittest.TestCase):
 
             self.assertEqual(result, 1)
             self.assertIn("Uncommitted or invalid output pair", stderr.getvalue())
+
+    def test_direct_temporary_output_is_not_inspectable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            json_path = Path(directory) / "task_output.json.tmp"
+            json_path.write_text("{}", encoding="utf-8")
+            stderr = io.StringIO()
+            with patch.object(
+                inspect_layout.sys, "argv", ["inspect_layout.py", str(json_path)]
+            ), redirect_stderr(stderr):
+                result = inspect_layout.main()
+
+            self.assertEqual(result, 1)
+            self.assertIn("Uncommitted or invalid output pair", stderr.getvalue())
+
 
     def test_marker_without_both_final_files_is_not_inspectable(self):
         with tempfile.TemporaryDirectory() as directory:

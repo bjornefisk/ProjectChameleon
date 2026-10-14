@@ -521,6 +521,67 @@ class RunnerPublicationTests(unittest.TestCase):
             )
             self.assertEqual(wire["elements"][0]["opacity"], opacity)
 
+    def test_integral_exponent_decimal_token_survives_pair_serialization(self):
+        opacity = Decimal("1e0")
+        source = {
+            "canvas": {"width": 1, "height": 1},
+            "elements": [
+                {
+                    "id": "shape",
+                    "type": "shape",
+                    "x": 0,
+                    "y": 0,
+                    "width": 1,
+                    "height": 1,
+                    "opacity": opacity,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(0,0,0,1)",
+                }
+            ],
+        }
+        target = {"width": 1, "height": 1}
+        with tempfile.TemporaryDirectory() as directory:
+            output_dir = Path(directory)
+            with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
+                main,
+                "render_to_png",
+                side_effect=lambda _design, _assets, path: self._write_png(path),
+            ):
+                self._publish_pair(
+                    source,
+                    target,
+                    {"canvas": target, "elements": [dict(source["elements"][0])]},
+                    "task",
+                )
+
+            wire = json.loads(
+                (output_dir / "task_output.json").read_text(encoding="utf-8"),
+                parse_float=Decimal,
+            )
+            self.assertEqual(wire["elements"][0]["opacity"], opacity)
+
+    def test_publish_rejects_symlinked_output_root(self):
+        source, target = self._empty_request()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            outside = root / "outside"
+            outside.mkdir()
+            output_dir = root / "output"
+            output_dir.symlink_to(outside, target_is_directory=True)
+
+            with self.assertRaisesRegex(OSError, "symlink"):
+                staging.publish_task(
+                    output_dir=output_dir,
+                    task_name="task",
+                    source=source,
+                    target_canvas=target,
+                    response={"canvas": target, "elements": []},
+                    assets_dir=root / "assets",
+                    render_to_png=lambda _design, _assets, path: self._write_png(path),
+                )
+
+            self.assertEqual(list(outside.iterdir()), [])
+
     def test_invalid_design_is_not_committed_or_rendered(self):
         source, target = self._empty_request()
         output = {

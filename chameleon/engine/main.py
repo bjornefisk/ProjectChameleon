@@ -280,6 +280,7 @@ def render_to_png(
 
 
 def main() -> int:
+    reconciliation_warnings: list[str] = []
     try:
         if OUTPUT_DIR.is_symlink():
             raise OSError(f"refusing symlink output directory: {OUTPUT_DIR}")
@@ -294,7 +295,9 @@ def main() -> int:
             except ValueError:
                 continue
             current_task_names.add(task_path.stem)
-        reconcile_output_artifacts(OUTPUT_DIR, current_task_names)
+        reconciliation_warnings = reconcile_output_artifacts(
+            OUTPUT_DIR, current_task_names
+        )
     except Exception as error:
         print(
             _escape_diagnostic(
@@ -304,6 +307,16 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
+
+    if reconciliation_warnings:
+        print(
+            _escape_diagnostic(
+                "[runner] status=RUNTIME_IO_FAILURE "
+                "reason=output reconciliation warnings: "
+                + "; ".join(reconciliation_warnings)
+            ),
+            file=sys.stderr,
+        )
 
     if not task_files:
         print(
@@ -315,7 +328,7 @@ def main() -> int:
         )
         return 1
 
-    all_succeeded = True
+    all_succeeded = not reconciliation_warnings
     for task_path in task_files:
         stem = task_path.stem
         try:

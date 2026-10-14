@@ -344,6 +344,28 @@ class RunnerIntegrationTests(unittest.TestCase):
             )
         )
 
+    def test_reconciliation_quarantine_does_not_block_current_tasks(self):
+        self.write_task("good", self.task())
+        (self.output_dir / "stale_output.json").write_text("stale", encoding="utf-8")
+        (self.output_dir / "stale_output.png").write_bytes(b"stale")
+        (self.output_dir / ".stale_output.commit").mkdir()
+
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            result = main.main()
+
+        self.assertEqual(result, 1)
+        self.assertTrue((self.output_dir / "good_output.json").is_file())
+        self.assertTrue((self.output_dir / "good_output.png").is_file())
+        self.assertFalse((self.output_dir / "stale_output.json").exists())
+        self.assertIn("stale paths quarantined", stderr.getvalue())
+        self.assertTrue(
+            any(
+                path.name.startswith(".chameleon-quarantine-")
+                for path in self.output_dir.iterdir()
+            )
+        )
+
     def test_inspector_rejects_uncommitted_json_in_directory(self):
         self.write_task("committed", self.task())
         self.assertEqual(main.main(), 0)
