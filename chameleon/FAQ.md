@@ -57,7 +57,7 @@ The upstream renderer consumes explicit internal line information, rotates aroun
 
 Missing assets remain in the output record. The development renderer emits a labeled placeholder and warning for a missing file; that placeholder is renderer diagnostic output, not an asset replacement in the engine response.
 
-The ImportError-only box renderer in `engine/main.py` is a development fallback and is not a conforming preview. Do not use it to judge layout quality.
+If the renderer adapter import fails, the runner reports `RUNTIME_IO_FAILURE` and publishes neither artifact.
 
 **Q4. Where do I find the actual brand assets and fonts?**
 

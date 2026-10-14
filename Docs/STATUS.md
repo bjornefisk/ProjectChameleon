@@ -2,8 +2,8 @@
 
 **Date:** 2026-10-09
 
-**Phase:** Ticket 01 implementation complete; ticket 02 remains not started; Gate 1 qualification remains pending.
-**Decision status:** Ticket 01 semantic validation has local contract evidence. Renderer, runner, solver, and runtime qualification remain outside this PR.
+**Phase:** Ticket 01 and ticket 02 implementations complete; Gate 1 qualification remains pending.
+**Decision status:** Ticket 01 semantic validation, ticket 02 renderer conformance, and serialized runner artifact validation have local evidence. Cutoff semantics, solver, and runtime qualification remain outside this PR.
 
 ## Ground truth now recorded
 
@@ -48,7 +48,7 @@ These are contract artifacts, not solver or renderer implementation:
 - `chameleon/chameleon_design_schema_v0.9.json` is no longer provisional, accepts empty designs, and records structural ranges/defaults.
 - Contract fixtures live under `chameleon/tests/fixtures/contract/`.
 - The Level 2 public sample's style range is corrected to valid end-exclusive `[6, 15)` semantics; this is fixture/source-data correction, not solver implementation.
-- Ticket 01's semantic validator and contract tests are implemented at `engine.contract`; the renderer adapter, runner, solver, and full Gate 1 qualification remain pending in later tickets.
+- Ticket 01's semantic validator and contract tests plus ticket 02's renderer adapter/tests are implemented; the runner now validates serialized JSON and decodable PNG pairs, preserves renderer warnings, enforces exact local font faces, constrains asset paths, removes failed-task artifacts, and continues independent tasks, while cutoff semantics, solver, and full Gate 1 qualification remain pending.
 
 ## Known implementation gaps before the solver
 
@@ -56,8 +56,8 @@ These are intentionally visible; none is silently promoted to contract behavior:
 
 1. `engine/resize.py` is the documented uniform-stretch baseline and violates image-ratio, group, overlap, rotation, and typography rules.
 2. `engine/main.py` has a warning-only self-check that checks unrotated rectangles and ID sets; it is not the contract validator.
-3. The renderer adapter's style-run end handling, Unicode-safe wrapping, letter-spacing/style-width measurement, explicit line/max-lines/height enforcement, glyph-bound validation, and rectangle/ellipse stroke behavior need conformance work.
-4. The batch runner has no accepted typed-status, cutoff, stale-output, or logical-pair publication path yet, and its default JSON decoding does not preserve numeric tokens for exact ingress.
+3. The renderer adapter's renderer goldens and native-amd64 qualification remain; ticket 02 closes style-run end handling, Unicode-safe wrapping (including regional-indicator flag-pair breaks), letter-spacing/style-width measurement, mandatory/non-space line-map handling, actual positioned glyph-bound rejection, explicit line/max-lines/height enforcement, and rectangle/ellipse stroke rasterization.
+4. `engine/main.py` parses finite JSON decimals exactly, validates serialized response identity/geometry/text rules and decodable PNGs before publication, writes a hash-bearing hidden commit marker last after final artifact renames, cleans stale/failed artifacts, emits renderer warnings, continues independent tasks, and maps failures to accepted top-level statuses with detailed reasons; accepted cutoff semantics and the complete search/status protocol remain pending.
 5. The deterministic role-inference, four-topology candidate search, renderer-in-loop ranking, and held-out evaluation path have not been implemented.
 6. The Docker build has no project-owned hash-locked wheelhouse or apt-version lock; the direct compatibility pins are an initial baseline.
 
@@ -75,14 +75,34 @@ These are not unresolved internal design choices. They require external facts or
 
 ## Ticket 01 verification record
 
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/contract -p 'test_*.py' -v` — 27 tests passed.
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests/contract -p 'test_*.py' -v` — 28 tests passed.
 - `python3 scripts/verify_repository.py` — passed.
 - The suite covers schema/source validation, identity and immutable-field preservation, exact numeric ingress, serialized integer geometry, rotated containment and bleed, image ratios, rigid groups, source-separated collision, text line-box checks, empty/degenerate designs, and typed reason codes.
-- The ticket-01 PR tree contains no ticket-02 renderer/wrapping implementation, tests, fixtures, or Unicode data. Ticket 02 remains pending human review and approval.
+- The ticket-01 PR tree contains no ticket-02 renderer/wrapping implementation, tests, fixtures, or Unicode data; this was true before ticket 02 and is retained as the ticket-01 boundary record.
+
+
+## Ticket 02 verification record
+
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/renderer -p 'test_*.py' -v` — 22 tests passed, including the regional-indicator flag-pair wrapping regression, exact-font, and asset-containment regressions.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 21 tests passed, including accepted status mapping, setup-failure handling, warning propagation, interruption cleanup, and commit-marker filtering.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 71 tests passed.
+- `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1 as required for the nonconforming baseline; all three sample tasks logged `MALFORMED_INPUT (MALFORMED_INPUT): serialized response x must be a finite integer`, and no task artifacts were produced beyond `output/.gitkeep`.
+- Docker `linux/amd64` image build — passed with the documented constant-platform warning; offline container smoke exited 1 for the same nonconforming baseline and left only `output/.gitkeep`. The run used arm64-host emulation and is not native-amd64 qualification.
+
+## PR 7 review-fix verification
+
+The hidden `.<stem>_output.commit` marker is the pair manifest and commit authority. It records both final filenames and SHA-256 hashes and is installed after the final JSON/PNG renames; the layout inspector authorizes output only when the marker and both final files exist with matching hashes. Per-task cleanup removes staged, final, and marker paths after ordinary failures and on the next run after an abrupt interruption.
+
+- `make verify` — passed.
+- `git diff --check` — passed.
+- `.venv/bin/python -m py_compile chameleon/engine/errors.py chameleon/engine/main.py chameleon/renderer/converter/assets.py chameleon/renderer/converter/brand_fonts.py chameleon/renderer/converter/wrap.py chameleon/renderer/converter/convert.py scripts/inspect_layout.py chameleon/tests/runner/test_main.py chameleon/tests/runner/test_inspect_layout.py chameleon/tests/renderer/test_assets.py chameleon/tests/renderer/test_renderer_conformance.py` — passed.
+- `make test` — 71 tests passed in the project `.venv`.
+- `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — passed with the documented `FromPlatformFlagConstDisallowed` warning.
+- `cd chameleon && docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — exit 1 for the nonconforming baseline; no task artifacts beyond `output/.gitkeep`. Docker reported arm64-host emulation, so native-amd64 qualification remains pending.
 
 ## Remaining Gate 1 qualification
 
-The following sequence is required for later Gate 1 qualification and is not ticket-01 evidence:
+The following sequence is required for later Gate 1 qualification and is not ticket-01 or ticket-02 evidence:
 
 ```bash
 cd chameleon
@@ -94,4 +114,4 @@ docker run --rm --network none \
   chameleon-stage1
 ```
 
-The warning-only baseline self-check, renderer goldens/native-library parity, clean native amd64 run, and solver remain outside this PR.
+The warning-only baseline self-check remains non-authoritative; accepted cutoff/search-status integration, renderer goldens/native-library parity, clean native amd64 run, and solver remain outside this PR.

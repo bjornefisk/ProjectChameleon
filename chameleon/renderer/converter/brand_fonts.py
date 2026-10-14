@@ -5,9 +5,9 @@ The brand kit ships plain `.ttf`/`.otf` files named `<Family>-<Suffix>.ttf`
 `FontManager` normally downloads from Hugging Face. This module scans that
 folder into the same in-memory shape `FontManager` uses internally
 (`{normalized_family: [{"fontFamily", "fontWeight", "fontStyle", "bytes"}]}`)
-and hands it to a `FontManager` instance directly - so lookups still go
-through `FontManager.lookup()`'s existing weight/style fallback logic
-unchanged, just without ever touching the network.
+and hands it to a `FontManager` instance directly. Callers use exact face
+lookups, so missing families or weight/style combinations fail closed without
+silent substitution or network access.
 """
 
 import re
@@ -19,6 +19,26 @@ from cr_renderer.fonts import FONT_WEIGHTS, FontManager, normalize_family
 _CAMEL_SPLIT_RE = re.compile(r"(?<!^)(?=[A-Z])")
 _ITALIC_RE = re.compile("italic", re.IGNORECASE)
 _FONT_EXTENSIONS = {".ttf", ".otf"}
+
+
+class MissingFontError(FileNotFoundError):
+    """Raised when a requested local font family or face is unavailable."""
+
+
+def lookup_exact_font(
+    font_manager: FontManager, family: str, weight: str, style: str
+) -> bytes:
+    """Return requested face bytes without using upstream fallback behavior."""
+    font_dict = getattr(font_manager, "_fonts", None)
+    if not isinstance(font_dict, dict):
+        raise MissingFontError("font manager has no local font dictionary")
+    normalized_family = normalize_family(family)
+    for face in font_dict.get(normalized_family, []):
+        if face.get("fontWeight") == weight and face.get("fontStyle") == style:
+            return face["bytes"]
+    raise MissingFontError(
+        f"font face is unavailable: family={family!r}, weight={weight!r}, style={style!r}"
+    )
 
 
 def _split_family_suffix(stem: str) -> Tuple[str, str]:

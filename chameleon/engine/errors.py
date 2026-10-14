@@ -23,6 +23,16 @@ class InfeasibleReasonCode(str, Enum):
     RUNTIME_IO_FAILURE = "RUNTIME_IO_FAILURE"
 
 
+class TaskStatus(str, Enum):
+    """Stable internal task outcome statuses for batch orchestration."""
+
+    SUCCESS = "SUCCESS"
+    MALFORMED_INPUT = "MALFORMED_INPUT"
+    INFEASIBLE_LAYOUT = "INFEASIBLE_LAYOUT"
+    INCOMPLETE_SEARCH = "INCOMPLETE_SEARCH"
+    RUNTIME_IO_FAILURE = "RUNTIME_IO_FAILURE"
+
+
 class InfeasibleLayoutError(ValueError):
     """A typed, fail-closed contract or layout failure.
 
@@ -49,4 +59,4 @@ class InfeasibleLayoutError(ValueError):
         return self.reason_code.value
 
 
-__all__ = ["InfeasibleLayoutError", "InfeasibleReasonCode"]
+__all__ = ["InfeasibleLayoutError", "InfeasibleReasonCode", "TaskStatus"]

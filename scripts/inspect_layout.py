@@ -4,7 +4,7 @@ Terminal Layout Visualizer for Project Chameleon.
 Allows AI subagents and human engineers to 'see' element positions,
 boundaries, and collisions directly in terminal output.
 """
-
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -192,6 +192,41 @@ def inspect_design(doc: Dict[str, Any], title: str = "Design") -> None:
         print("\n[✓] Non-collision check: PASSED (zero unintended foreground overlaps)")
 
 
+def _is_committed_pair(json_path: Path) -> bool:
+    if not json_path.name.endswith("_output.json"):
+        return False
+    stem = json_path.name[: -len("_output.json")]
+    png_path = json_path.with_name(f"{stem}_output.png")
+    commit_path = json_path.with_name(f".{stem}_output.commit")
+    try:
+        marker = json.loads(commit_path.read_text(encoding="utf-8"))
+        if not isinstance(marker, dict):
+            return False
+        if (
+            marker.get("json") != json_path.name
+            or marker.get("png") != png_path.name
+            or not png_path.is_file()
+        ):
+            return False
+        return (
+            marker.get("json_sha256")
+            == hashlib.sha256(json_path.read_bytes()).hexdigest()
+            and marker.get("png_sha256")
+            == hashlib.sha256(png_path.read_bytes()).hexdigest()
+        )
+    except (OSError, TypeError, ValueError):
+        return False
+
+
+def committed_json_files(target_path: Path) -> List[Path]:
+    """Return only JSON files authorized by a matching pair commit marker."""
+    return [
+        json_path
+        for json_path in sorted(target_path.glob("*_output.json"))
+        if _is_committed_pair(json_path)
+    ]
+
+
 def main() -> int:
     if len(sys.argv) < 2:
         target_path = Path("chameleon/output")
@@ -199,15 +234,20 @@ def main() -> int:
         target_path = Path(sys.argv[1])
 
     if target_path.is_file():
+        if target_path.name.endswith(("_output.json", "_output.json.tmp")) and not _is_committed_pair(
+            target_path
+        ):
+            print(f"Uncommitted or invalid output pair: {target_path}", file=sys.stderr)
+            return 1
         doc = json.loads(target_path.read_text())
         design = doc.get("source", doc)
         inspect_design(design, target_path.name)
         return 0
 
     if target_path.is_dir():
-        json_files = sorted(target_path.glob("*_output.json"))
+        json_files = committed_json_files(target_path)
         if not json_files:
-            print(f"No *_output.json files found in {target_path}")
+            print(f"No committed *_output.json files found in {target_path}")
             return 1
         for f in json_files:
             doc = json.loads(f.read_text())
