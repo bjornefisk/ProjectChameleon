@@ -1,18 +1,25 @@
 import copy
 import json
 import sys
+import tempfile
 import unittest
+from decimal import Decimal
 from pathlib import Path
+
+from PIL import UnidentifiedImageError
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 try:
+    from engine.contract import validate_response
     from engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
     from engine.geometry.ratios import reduced_ratio
     from engine.layout.near_isomorphic import solve_near_isomorphic
 except ModuleNotFoundError:
+    from chameleon.engine.contract import validate_response
     from chameleon.engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
     from chameleon.engine.geometry.ratios import reduced_ratio
     from chameleon.engine.layout.near_isomorphic import solve_near_isomorphic
@@ -157,6 +164,118 @@ class NearIsomorphicTests(unittest.TestCase):
         with self.assertRaises(InfeasibleLayoutError) as raised:
             solve_near_isomorphic(source, {"width": 100, "height": 150})
         self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE)
+
+    def test_source_bleed_follows_target_edge_when_canvas_widens(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                {
+                    "id": "bleed",
+                    "type": "shape",
+                    "x": -10,
+                    "y": 10,
+                    "width": 20,
+                    "height": 20,
+                    "opacity": Decimal("0.5"),
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(1,2,3,1)",
+                }
+            ],
+        }
+
+        response = solve_near_isomorphic(source, {"width": 200, "height": 100})
+
+        validate_response(source, {"width": 200, "height": 100}, response)
+        self.assertEqual(response["elements"][0]["x"], -10)
+
+    def test_group_can_choose_smaller_integral_scale_when_global_scale_does_not_fit(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                {
+                    "id": "left",
+                    "type": "shape",
+                    "x": 0,
+                    "y": 0,
+                    "width": 2,
+                    "height": 2,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(1,2,3,1)",
+                    "group_id": "unit",
+                },
+                {
+                    "id": "right",
+                    "type": "shape",
+                    "x": 88,
+                    "y": 0,
+                    "width": 2,
+                    "height": 2,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(1,2,3,1)",
+                    "group_id": "unit",
+                },
+            ],
+        }
+
+        response = solve_near_isomorphic(source, {"width": 80, "height": 80})
+
+        validate_response(source, {"width": 80, "height": 80}, response)
+        self.assertEqual(response["elements"][0]["width"], 1)
+        self.assertEqual(response["elements"][1]["width"], 1)
+
+    def test_small_source_font_is_not_enlarged_by_target_scale(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                text_element(
+                    x=10,
+                    y=10,
+                    width=80,
+                    height=30,
+                    content="A",
+                    font_size=5,
+                    text_align="center",
+                )
+            ],
+        }
+        manager = load_brand_font_manager(str(FONTS))
+
+        response = solve_near_isomorphic(
+            source,
+            {"width": 200, "height": 200},
+            font_manager=manager,
+        )
+
+        self.assertLessEqual(response["elements"][0]["font_size"], 5)
+
+    def test_renderer_failure_is_checked_before_candidate_return(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                {
+                    "id": "corrupt",
+                    "type": "image",
+                    "x": 10,
+                    "y": 10,
+                    "width": 20,
+                    "height": 20,
+                    "asset_id": "corrupt.png",
+                    "fit": "contain",
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            corrupt_asset = Path(directory) / "corrupt.png"
+            corrupt_asset.write_text("not a PNG", encoding="utf-8")
+            with self.assertRaises(UnidentifiedImageError):
+                solve_near_isomorphic(
+                    source,
+                    source["canvas"],
+                    assets_dir=directory,
+                    fonts_dir=str(FONTS),
+                )
+
 
     def test_foreground_image_uses_dynamic_asset_and_ratio_lattice(self):
         source = {
