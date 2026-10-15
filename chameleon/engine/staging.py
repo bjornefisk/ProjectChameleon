@@ -16,14 +16,14 @@ import stat
 import tempfile
 import unicodedata
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_HALF_EVEN
-from fractions import Fraction
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from PIL import Image
 
 from .contract import validate_response
+from .geometry.math_util import quantize_to_int
 
 
 _OUTPUT_FILE_RE = re.compile(
@@ -352,19 +352,9 @@ def _read_serialized_design(path: Path) -> Any:
 
 
 def _quantize_mutable(value: Any) -> int:
-    if type(value) is int:
-        return value
-    if isinstance(value, Decimal):
-        if not value.is_finite():
-            raise ValueError("non-finite Decimal cannot be serialized")
-        return int(value.to_integral_value(rounding=ROUND_HALF_EVEN))
-    if isinstance(value, Fraction):
-        return round(value)
-    if isinstance(value, float):
-        raise ValueError(
-            "binary-float mutable geometry cannot be serialized; use Decimal or Fraction"
-        )
-    raise TypeError(f"mutable geometry is not numeric: {type(value).__name__}")
+    """Round one mutable value with the contract's centralized rule."""
+
+    return quantize_to_int(value)
 
 
 def _write_commit_marker(paths: TaskArtifactPaths) -> None:
@@ -421,9 +411,11 @@ def _canonicalize_response_mutables(response: Mapping[str, Any]) -> Mapping[str,
                 result["elements"].append(element)
                 continue
             candidate = dict(element)
-            for field in ("x", "y", "width", "height", "font_size"):
+            for field in ("x", "y", "width", "height"):
                 if field in element:
                     candidate[field] = _quantize_mutable(element[field])
+            if element.get("type") == "text" and "font_size" in element:
+                candidate["font_size"] = _quantize_mutable(element["font_size"])
             result["elements"].append(candidate)
     return result
 
