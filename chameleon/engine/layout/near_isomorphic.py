@@ -340,12 +340,6 @@ def solve_near_isomorphic(
     source_elements = list(source["elements"])
     source_aabbs = [rotated_aabb(element) for element in source_elements]
     background_index = _background_index(source, source_aabbs)
-    if background_index is not None and source_elements[background_index].get("group_id") is not None:
-        _fail(
-            "classified full-canvas backgrounds cannot be rigid-group members",
-            element_id=source_elements[background_index]["id"],
-            group_id=source_elements[background_index]["group_id"],
-        )
     scale, tx, ty = _global_transform(source, target_canvas)
     response_elements = [dict(element) for element in source_elements]
     group_indices: dict[Any, list[int]] = {}
@@ -368,7 +362,24 @@ def solve_near_isomorphic(
     target_height = to_fraction(target_canvas["height"])
     for index, element in enumerate(source_elements):
         if index == background_index:
-            transformed[index] = (0, 0, int(target_width), int(target_height))
+            if element.get("group_id") is None:
+                transformed[index] = (0, 0, int(target_width), int(target_height))
+                continue
+            if index not in transformed:
+                _fail("grouped background has no rigid candidate", element_id=element["id"])
+            grouped_background = dict(element)
+            grouped_background.update(dict(zip(_GEOMETRY_FIELDS, transformed[index])))
+            background_aabb = rotated_aabb(grouped_background)
+            if not (
+                background_aabb[0] <= 0
+                and background_aabb[1] <= 0
+                and background_aabb[2] >= target_width
+                and background_aabb[3] >= target_height
+            ):
+                _fail(
+                    "rigid grouped background does not cover the target canvas",
+                    element_id=element["id"],
+                )
             continue
         if element.get("group_id") in handled_groups:
             continue

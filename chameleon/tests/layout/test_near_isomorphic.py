@@ -56,6 +56,43 @@ class NearIsomorphicTests(unittest.TestCase):
         self.assertEqual(response["elements"][0]["width"], 1080)
         self.assertEqual(response["elements"][0]["height"], 1350)
 
+    def test_same_canvas_grouped_background_preserves_rigid_cover(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                {
+                    "id": "grouped-background",
+                    "type": "image",
+                    "x": 0,
+                    "y": 0,
+                    "width": 100,
+                    "height": 100,
+                    "asset_id": "dynamic-background.png",
+                    "fit": "cover",
+                    "group_id": "background-unit",
+                },
+                {
+                    "id": "background-label",
+                    "type": "shape",
+                    "x": 10,
+                    "y": 10,
+                    "width": 20,
+                    "height": 20,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(0,0,0,1)",
+                    "group_id": "background-unit",
+                },
+            ],
+        }
+        response = solve_near_isomorphic(source, source["canvas"])
+        self.assertEqual(
+            response["elements"][0]["x"],
+            0,
+        )
+        self.assertEqual(response["elements"][0]["y"], 0)
+        self.assertEqual(response["elements"][0]["width"], 100)
+        self.assertEqual(response["elements"][0]["height"], 100)
+
     def test_grouped_background_fails_closed_instead_of_uncovering_canvas(self):
         source = {
             "canvas": {"width": 100, "height": 100},
