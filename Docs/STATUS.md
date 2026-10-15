@@ -2,8 +2,8 @@
 
 **Date:** 2026-10-14
 
-**Phase:** Tickets 01, 02, 03, and 04 implementation complete; Gate 1 qualification remains pending.
-**Decision status:** Ticket 01 semantic validation, ticket 02 renderer conformance, ticket 03 runner behavior, and ticket 04 exact geometry have local evidence. Deterministic cutoff/search semantics, solver, and full runtime qualification remain pending.
+**Phase:** Tickets 01, 02, 03, 04, and 05 implementation complete within their bounded scopes; full Gate 1 qualification and later solver gates remain pending.
+**Decision status:** Tickets 01–05 have local implementation evidence. Ticket 05 covers only the deterministic Level 1 near-isomorphic path; deterministic cutoff/full-search semantics, later topology families, ranking, and full runtime qualification remain pending.
 
 ## Ground truth now recorded
 
@@ -48,17 +48,17 @@ These are contract artifacts, not solver or renderer implementation:
 - `chameleon/chameleon_design_schema_v0.9.json` is no longer provisional, accepts empty designs, and records structural ranges/defaults.
 - Contract fixtures live under `chameleon/tests/fixtures/contract/`.
 - The Level 2 public sample's style range is corrected to valid end-exclusive `[6, 15)` semantics; this is fixture/source-data correction, not solver implementation.
-- Ticket 01's semantic validator and contract tests, ticket 02's renderer adapter/tests, ticket 03's fail-closed runner, and ticket 04's exact geometry package/tests are implemented; the renderer adapter, runner, solver, and full Gate 1 qualification remain pending only where the verification records below identify evidence gaps.
+- Ticket 01's semantic validator and contract tests, ticket 02's renderer adapter/tests, ticket 03's fail-closed runner, ticket 04's exact geometry package/tests, and ticket 05's bounded Level 1 solver/tests are implemented; full Gate 1 qualification and later solver work remain pending where the verification records below identify evidence gaps.
 
-## Known implementation gaps before the solver
+## Known implementation gaps after the Level 1 baseline
 
 These are intentionally visible; none is silently promoted to contract behavior:
 
-1. `engine/resize.py` is the documented uniform-stretch baseline and violates image-ratio, group, overlap, rotation, and typography rules.
+1. Ticket 05 implements only the deterministic near-isomorphic Level 1 candidate; column-pivot, horizontal-ribbon, vertical-re-stack, multi-candidate ranking, cutoff/exhaustion, and held-out evaluation paths remain unimplemented.
 2. `engine/main.py` has a warning-only self-check that checks unrotated rectangles and ID sets; it is not the contract validator.
-3. Renderer goldens and native-amd64 qualification remain; ticket 02 closes style-run end handling, Unicode-safe wrapping, letter-spacing/style-width measurement, mandatory/non-space line-map handling, positioned glyph-bound rejection, explicit line/max-lines/height enforcement, and rectangle/ellipse stroke rasterization.
-4. The runner's typed-status, private staging, marker-gated pair publication, stale-path quarantine, aggregate exit, exact target validation, exact numeric ingress, and half-even serialization paths are implemented and focused-tested; deterministic cutoff semantics and full runtime qualification remain pending.
-5. The deterministic role-inference, four-topology candidate search, renderer-in-loop ranking, and held-out evaluation path have not been implemented.
+3. Renderer goldens and native-amd64 qualification remain; ticket 02 now covers style-run end handling, Unicode-safe wrapping, CRLF as one transient mandatory break, letter-spacing/style-width measurement, mandatory/non-space line-map handling, serialized integer font-size enforcement, positioned glyph-bound rejection, explicit line/max-lines/height enforcement, and rectangle/ellipse stroke rasterization.
+4. The runner's typed-status, private staging, marker-gated pair publication, stale-path quarantine, aggregate exit, exact target validation, exact numeric ingress, and half-even serialization paths are implemented and focused-tested; the inspector now rejects symlinked inspection roots, while deterministic cutoff producer semantics remain absent from the observed solver path.
+5. The deterministic role-inference and four-topology candidate search, renderer-in-loop ranking, cutoff/exhaustion distinction, and held-out evaluation path have not been implemented beyond the bounded Level 1 near-isomorphic candidate.
 6. The Docker build has no project-owned hash-locked wheelhouse or apt-version lock; the direct compatibility pins are an initial baseline.
 
 ## External blockers that remain explicitly unverified
@@ -83,11 +83,11 @@ These are not unresolved internal design choices. They require external facts or
 
 ## Ticket 02 verification record
 
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/renderer -p 'test_*.py' -v` — 22 tests passed, including the regional-indicator flag-pair wrapping regression, exact-font, and asset-containment regressions.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 21 tests passed, including accepted status mapping, setup-failure handling, warning propagation, interruption cleanup, and commit-marker filtering.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 71 tests passed.
-- `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1 as required for the nonconforming baseline; all three sample tasks logged `MALFORMED_INPUT (MALFORMED_INPUT): serialized response x must be a finite integer`, and no task artifacts were produced beyond `output/.gitkeep`.
-- Docker `linux/amd64` image build — passed with the documented constant-platform warning; offline container smoke exited 1 for the same nonconforming baseline and left only `output/.gitkeep`. The run used arm64-host emulation and is not native-amd64 qualification.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/renderer -p 'test_*.py' -v` — 23 tests passed, including the CRLF one-break and serialized-font-size regressions.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 65 tests passed, including symlink/path-boundary handling.
+- The first-four focused suites (contract 28, geometry 11, renderer 23, runner 65) total 127 passing tests. The full source-tree suite now requires explicit top-level discovery (`-t .`) because the `tests/renderer` package name otherwise shadows the production `renderer` package once the out-of-phase layout suite is present; that corrected command runs 133 tests.
+- `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1; the runtime reaches the observed Ticket 05 near-isomorphic path, Level 1/2 fail with `IMAGE_RATIO_VIOLATION`, Level 3 with `CONTAINMENT_VIOLATION`, and no task artifacts are produced beyond `output/.gitkeep`.
+- Docker `linux/amd64` image build — passed with the documented constant-platform warning; the offline container smoke exits 1 with the same typed failures and leaves only `output/.gitkeep`. The run uses arm64-host emulation and is not native-amd64 qualification.
 
 ## PR 7 review-fix verification
 
@@ -102,8 +102,8 @@ The hidden `.<stem>_output.commit` marker is the pair manifest and commit author
 
 ## Ticket 03 verification record
 
-- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 68 tests passed.
-- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 118 tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 65 tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — the current source-tree total is recorded by the final verification run; the first-four subset remains separate from the six out-of-phase layout tests.
 - `python3 scripts/verify_repository.py`, `make verify`, and `git diff --check` — passed.
 - `cd chameleon && /tmp/chameleon-venv312/bin/python -m py_compile engine/main.py engine/staging.py ../scripts/inspect_layout.py tests/runner/test_main.py tests/runner/test_inspect_layout.py tests/runner/test_runner.py` — passed.
 - `cd chameleon && /tmp/chameleon-venv312/bin/python -m engine.main` — exit 1; all three sample tasks failed closed (`IMAGE_RATIO_VIOLATION` for Levels 1–2 and `CONTAINMENT_VIOLATION` for Level 3), with no JSON/PNG pair beyond `output/.gitkeep`.
@@ -113,8 +113,8 @@ The hidden `.<stem>_output.commit` marker is the pair manifest and commit author
 
 ## Ticket 04 verification record
 
-- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests/geometry -p 'test_*.py' -v` — 11 geometry tests passed.
-- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 130 tests passed, including contract, runner, and geometry coverage through the staging/validator integration.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/geometry -p 'test_*.py' -v` — 11 geometry tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — the current source-tree total is recorded by the final verification run; this is not solver or Gate 1 qualification evidence.
 - `python3 scripts/verify_repository.py`, `make verify`, `git diff --check`, and changed-file `py_compile` — passed.
 - `cd chameleon && /tmp/chameleon-venv312/bin/python -m engine.main` — exit 1 as required for the nonconforming baseline; Level 1/2 failed with `IMAGE_RATIO_VIOLATION`, Level 3 with `CONTAINMENT_VIOLATION`, and no artifacts were produced beyond `output/.gitkeep`.
 - The integrated PR9 runner fixes preserve Decimal exponent tokens, reject direct symlinked output roots and temporary inspector inputs, and continue valid tasks after quarantine warnings.
@@ -123,9 +123,27 @@ The hidden `.<stem>_output.commit` marker is the pair manifest and commit author
 - Geometry predicates are now reused by `engine.contract`; `engine.staging` delegates mutable serialization to `engine.geometry.math_util.quantize_to_int`.
 
 
+## First-four passover audit (2026-10-14)
+
+- **Ticket 01 — aligned.** The semantic validator preserves identity, immutable fields, omission/default semantics, serialized integer geometry, AABB containment, bleed, ratios, rigid groups, source-separated overlap, and typed failures. Its geometry predicates are intentionally shared with Ticket 04; the remaining evidence risk is that tests do not independently duplicate every predicate calculation.
+- **Ticket 02 — corrected and locally aligned.** The audit found and fixed CRLF rendering as two transient newlines and inconsistent non-integer font-size handling. The adapter now collapses CRLF to one transient break, projects style maps onto that transient text, and requires the staging-serialized integer font size. Native `cr-renderer` goldens, repeated PNG hashes, and native-amd64 parity remain unverified.
+- **Ticket 03 — partially aligned by design.** Atomic staging, marker-gated pair publication, cleanup/quarantine, exact ingress, typed dispatch, continuation, and aggregate exit are locally evidenced. The audit added symlinked inspection-root rejection. The current runtime has no producer distinction between cutoff and exhausted search; injected runner status tests do not prove that missing producer semantics.
+- **Ticket 04 — aligned locally.** Exact ingress, half-even quantization, AABBs, bleed, ratios, positive-area contact, and rigid transforms are integrated into validator/staging paths and covered by geometry/contract tests. Cross-platform/native-amd64 qualification remains pending.
+
+## Ticket 05 boundary and verification record
+
+Ticket 05 is implemented within its bounded Level 1 near-isomorphic scope through `chameleon/engine/layout/near_isomorphic.py`, `engine/resize.py`, and `tests/layout`. It does not claim the ADR-009 four-topology search, candidate ranking, or cutoff semantics.
+- `make test` — 134 tests passed after the Makefile set unittest's top-level directory explicitly (`-t .`), preventing the `tests/renderer` package from shadowing the production `renderer` package.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 7 focused layout tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — 134 tests passed in the current source tree.
+- `python3 scripts/verify_repository.py`, changed-file `py_compile`, and `git diff --check` — passed.
+- `cd chameleon && ../.venv/bin/python -m engine.main` — Level 1 committed a valid JSON/PNG pair; Level 2 and Level 3 failed closed with `NO_HARD_VALID_CANDIDATE`, leaving only the Level 1 pair and `.gitkeep`.
+- The committed Level 1 PNG is `1080 × 1350` RGBA; its serialized JSON passes `validate_response()`.
+
+
 ## Remaining Gate 1 qualification
 
-The following sequence is required for later Gate 1 qualification and is not complete ticket-01 through ticket-04 evidence:
+The following sequence is required for later Gate 1 qualification and is not complete ticket-01 through ticket-05 evidence:
 
 ```bash
 cd chameleon
@@ -137,4 +155,4 @@ docker run --rm --network none \
   chameleon-stage1
 ```
 
-The warning-only baseline self-check remains non-authoritative; accepted cutoff/search-status integration, renderer goldens/native-library parity, clean native amd64 run, and solver remain outside this PR.
+The warning-only self-check remains non-authoritative; Ticket 05 has only local Level 1 evidence and does not complete Gate 1. Accepted cutoff/search-status integration, renderer goldens/native-library parity, clean native amd64 run, and the full ADR-009 solver remain pending.

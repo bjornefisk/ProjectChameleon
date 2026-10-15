@@ -420,6 +420,14 @@ def main() -> int:
     else:
         target_path = Path(sys.argv[1])
 
+
+    if target_path.is_symlink():
+        print(
+            _escape_diagnostic(f"Refusing symlink inspection path: {target_path}"),
+            file=sys.stderr,
+        )
+        return 1
+
     if target_path.is_file():
         if (
             target_path.name.endswith(("_output.json.tmp", "_output.png.tmp"))

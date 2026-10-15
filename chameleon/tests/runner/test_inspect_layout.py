@@ -242,6 +242,43 @@ class CommittedOutputTests(unittest.TestCase):
 
             self.assertEqual(inspect_layout.committed_json_files(output_dir), [])
 
+    def test_symlinked_inspection_directory_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            outside = root / "outside"
+            outside.mkdir()
+            json_path = outside / "task_output.json"
+            png_path = outside / "task_output.png"
+            marker_path = outside / ".task_output.commit"
+            json_path.write_text(
+                json.dumps({"canvas": {"width": 10, "height": 10}, "elements": []}),
+                encoding="utf-8",
+            )
+            png_path.write_bytes(b"png")
+            marker_path.write_text(
+                json.dumps(
+                    {
+                        "committed": True,
+                        "json": json_path.name,
+                        "png": png_path.name,
+                        "json_sha256": hashlib.sha256(json_path.read_bytes()).hexdigest(),
+                        "png_sha256": hashlib.sha256(png_path.read_bytes()).hexdigest(),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            inspection_path = root / "inspection"
+            inspection_path.symlink_to(outside, target_is_directory=True)
+
+            stderr = io.StringIO()
+            with patch.object(
+                inspect_layout.sys, "argv", ["inspect_layout.py", str(inspection_path)]
+            ), redirect_stderr(stderr):
+                result = inspect_layout.main()
+
+            self.assertEqual(result, 1)
+            self.assertIn("symlink", stderr.getvalue().lower())
+
 
 if __name__ == "__main__":
     unittest.main()

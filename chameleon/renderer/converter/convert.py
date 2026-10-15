@@ -31,6 +31,7 @@ from .shapes import render_shape
 from .wrap import (
     MalformedTextError,
     TextOverflowError,
+    _collapse_crlf,
     char_widths,
     enforce_text_limits,
     wrap_text_with_line_map,
@@ -389,25 +390,32 @@ def _validate_positioned_glyph_bounds(
 
 def _append_text(out: Dict[str, Any], element: Dict[str, Any], font_manager) -> None:
     content = str(element.get("content", ""))
+    transient_content, source_indices = _collapse_crlf(content)
     family = element.get("font_family", "Montserrat")
-    size = float(element.get("font_size", 24))
+    raw_size = element.get("font_size", 24)
+    if type(raw_size) is not int or raw_size < 1:
+        raise MalformedTextError("font_size must be a serialized integer")
+    size = raw_size
     line_height = float(element.get("line_height", _DEFAULT_LINE_HEIGHT))
     letter_spacing = float(element.get("letter_spacing", 0.0))
     colors, bold_flags, italic_flags = _style_maps(element, len(content))
+    transient_colors = [colors[index] for index in source_indices]
+    transient_bold_flags = [bold_flags[index] for index in source_indices]
+    transient_italic_flags = [italic_flags[index] for index in source_indices]
     _validate_font_faces(font_manager, family, element, bold_flags, italic_flags)
     measure = _measure_text(
-        content,
+        transient_content,
         font_manager,
         family,
         size,
         letter_spacing,
-        colors,
-        bold_flags,
-        italic_flags,
+        transient_colors,
+        transient_bold_flags,
+        transient_italic_flags,
     )
 
     wrapped, line_indices, line_count = wrap_text_with_line_map(
-        content,
+        transient_content,
         (),
         float(element.get("width", 1.0)),
         measure=measure,
@@ -430,9 +438,9 @@ def _append_text(out: Dict[str, Any], element: Dict[str, Any], font_manager) -> 
         size,
         line_height,
         letter_spacing,
-        colors,
-        bold_flags,
-        italic_flags,
+        transient_colors,
+        transient_bold_flags,
+        transient_italic_flags,
     )
 
     out["text"].append(wrapped)
@@ -442,9 +450,9 @@ def _append_text(out: Dict[str, Any], element: Dict[str, Any], font_manager) -> 
     out["text_align"].append(element.get("text_align", "left"))
     out["capitalize"].append(bool(element.get("capitalize", False)))
     out["letter_spacing"].append(letter_spacing)
-    out["font_bold"].append(bold_flags)
-    out["font_italic"].append(italic_flags)
-    out["text_color"].append(colors)
+    out["font_bold"].append(transient_bold_flags)
+    out["font_italic"].append(transient_italic_flags)
+    out["text_color"].append(transient_colors)
     out["text_line"].append(line_indices)
 
 
