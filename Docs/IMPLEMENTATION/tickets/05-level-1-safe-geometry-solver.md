@@ -12,8 +12,8 @@ implemented with local Level 1 solver, resize-time semantic validation, and warm
 The current tree contains a narrow deterministic near-isomorphic candidate path, not the complete ADR-009 four-topology search/ranking implementation. Ticket 05 is complete within its Level 1 scope without changing the public schema, renderer contract, dependency baseline, or runner publication protocol.
 
 **Observed evidence:**
-- `cd chameleon && ../.venv/bin/python -m unittest tests.layout.test_near_isomorphic tests.layout.test_level1 -v` — 7 focused tests passed.
-- `make test` — 134 tests passed in the current source tree.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 9 focused tests passed.
+- `make test` — 139 tests passed in the current source tree.
 - `cd chameleon && ../.venv/bin/python -m engine.main` — Level 1 committed a JSON/PNG pair; Level 2 and Level 3 failed closed with `NO_HARD_VALID_CANDIDATE`, leaving no failed-task artifacts.
 - The Level 1 PNG is `1080 × 1350` RGBA and the JSON passes `validate_response()`.
 

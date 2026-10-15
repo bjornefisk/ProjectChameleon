@@ -188,6 +188,8 @@ def _group_candidate(
     elements: list[Mapping[str, Any]],
     scale: Fraction,
     target: Mapping[str, Any],
+    *,
+    cover_element_id: Any | None = None,
 ) -> tuple[dict[str, tuple[int, int, int, int]], Fraction] | None:
     first = elements[0]
     first_x = to_fraction(first["x"])
@@ -203,26 +205,65 @@ def _group_candidate(
             ]
         )
     unit = _smallest_integral_scale(values)
-    multiplier = scale.numerator * unit.denominator // (scale.denominator * unit.numerator)
-    if multiplier < 1:
-        return None
-    group_scale = unit * multiplier
-
+    minimum_scale = scale
+    cover_element = next(
+        (element for element in elements if element["id"] == cover_element_id),
+        None,
+    )
     source_aabbs = [rotated_aabb(element) for element in elements]
-    source_min_x = min(aabb[0] for aabb in source_aabbs)
-    source_max_x = max(aabb[2] for aabb in source_aabbs)
-    source_min_y = min(aabb[1] for aabb in source_aabbs)
-    source_max_y = max(aabb[3] for aabb in source_aabbs)
-    source_center_x = (source_min_x + source_max_x) / 2
-    source_center_y = (source_min_y + source_max_y) / 2
-    target_center_x = to_fraction(target["width"]) / 2
-    target_center_y = to_fraction(target["height"]) / 2
-    centered_tx = target_center_x - group_scale * source_center_x
-    centered_ty = target_center_y - group_scale * source_center_y
-    # Anchor translations to integer first-child coordinates; admissibility of
-    # the unit scale makes every other child coordinate integral as well.
-    tx = quantize_to_int(group_scale * first_x + centered_tx) - group_scale * first_x
-    ty = quantize_to_int(group_scale * first_y + centered_ty) - group_scale * first_y
+    if cover_element is not None:
+        cover_aabb = rotated_aabb(cover_element)
+        cover_width = cover_aabb[2] - cover_aabb[0]
+        cover_height = cover_aabb[3] - cover_aabb[1]
+        minimum_scale = max(
+            minimum_scale,
+            to_fraction(target["width"]) / cover_width,
+            to_fraction(target["height"]) / cover_height,
+        )
+    scale_ratio = minimum_scale / unit
+    minimum_multiplier = scale_ratio.numerator // scale_ratio.denominator
+    if scale_ratio.numerator % scale_ratio.denominator:
+        minimum_multiplier += 1
+    if minimum_multiplier < 1:
+        minimum_multiplier = 1
+    group_scale = unit * minimum_multiplier
+
+    def _translation_for_axis(axis: int, first_coordinate: Fraction, target_size: Fraction) -> Fraction | None:
+        source_min = min(aabb[axis] for aabb in source_aabbs)
+        source_max = max(aabb[axis + 2] for aabb in source_aabbs)
+        source_center = (source_min + source_max) / 2
+        lower: Fraction | None = None
+        upper: Fraction | None = None
+        for element, aabb in zip(elements, source_aabbs):
+            if element["id"] == cover_element_id:
+                element_lower = target_size - group_scale * aabb[axis + 2]
+                element_upper = -group_scale * aabb[axis]
+            else:
+                element_lower = -group_scale * aabb[axis]
+                element_upper = target_size - group_scale * aabb[axis + 2]
+            lower = element_lower if lower is None else max(lower, element_lower)
+            upper = element_upper if upper is None else min(upper, element_upper)
+        assert lower is not None and upper is not None
+        anchor_lower = lower + group_scale * first_coordinate
+        anchor_upper = upper + group_scale * first_coordinate
+        if anchor_lower > anchor_upper:
+            return None
+        minimum_anchor = -((-anchor_lower.numerator) // anchor_lower.denominator)
+        maximum_anchor = anchor_upper.numerator // anchor_upper.denominator
+        if minimum_anchor > maximum_anchor:
+            return None
+        desired_anchor = (
+            target_size / 2
+            - group_scale * source_center
+            + group_scale * first_coordinate
+        )
+        anchor = min(maximum_anchor, max(minimum_anchor, quantize_to_int(desired_anchor)))
+        return anchor - group_scale * first_coordinate
+
+    tx = _translation_for_axis(0, first_x, to_fraction(target["width"]))
+    ty = _translation_for_axis(1, first_y, to_fraction(target["height"]))
+    if tx is None or ty is None:
+        return None
 
     result: dict[str, tuple[int, int, int, int]] = {}
     for element in elements:
@@ -230,7 +271,20 @@ def _group_candidate(
         height = quantize_to_int(to_fraction(element["height"]) * group_scale)
         x = quantize_to_int(to_fraction(element["x"]) * group_scale + tx)
         y = quantize_to_int(to_fraction(element["y"]) * group_scale + ty)
-        if not _safe_geometry(element, x, y, width, height, target, None):
+        candidate = dict(element)
+        candidate.update({"x": x, "y": y, "width": width, "height": height})
+        aabb = rotated_aabb(candidate)
+        if element["id"] == cover_element_id:
+            target_width = to_fraction(target["width"])
+            target_height = to_fraction(target["height"])
+            if not (
+                aabb[0] <= 0
+                and aabb[1] <= 0
+                and aabb[2] >= target_width
+                and aabb[3] >= target_height
+            ):
+                return None
+        elif not _safe_geometry(element, x, y, width, height, target, None):
             return None
         result[element["id"]] = (x, y, width, height)
     return result, group_scale
@@ -350,7 +404,17 @@ def solve_near_isomorphic(
     transformed: dict[int, tuple[int, int, int, int]] = {}
     handled_groups: set[Any] = set()
     for group_id, indices in group_indices.items():
-        group = _group_candidate([source_elements[index] for index in indices], scale, target_canvas)
+        cover_element_id = (
+            source_elements[background_index]["id"]
+            if background_index in indices
+            else None
+        )
+        group = _group_candidate(
+            [source_elements[index] for index in indices],
+            scale,
+            target_canvas,
+            cover_element_id=cover_element_id,
+        )
         if group is None:
             _fail("explicit group cannot be represented by one positive integer transform", group_id=group_id)
         geometries, _group_scale = group

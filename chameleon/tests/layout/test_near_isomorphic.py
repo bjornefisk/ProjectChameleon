@@ -93,7 +93,7 @@ class NearIsomorphicTests(unittest.TestCase):
         self.assertEqual(response["elements"][0]["width"], 100)
         self.assertEqual(response["elements"][0]["height"], 100)
 
-    def test_grouped_background_fails_closed_instead_of_uncovering_canvas(self):
+    def test_aspect_ratio_grouped_background_scales_rigidly_to_cover(self):
         source = {
             "canvas": {"width": 100, "height": 100},
             "elements": [
@@ -115,6 +115,39 @@ class NearIsomorphicTests(unittest.TestCase):
                     "y": 10,
                     "width": 20,
                     "height": 20,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(0,0,0,1)",
+                    "group_id": "background-unit",
+                },
+            ],
+        }
+        response = solve_near_isomorphic(source, {"width": 100, "height": 150})
+        background, label = response["elements"]
+        self.assertEqual((background["x"], background["y"], background["width"], background["height"]), (-15, 0, 150, 150))
+        self.assertEqual((label["x"], label["y"], label["width"], label["height"]), (0, 15, 30, 30))
+
+    def test_grouped_background_fails_closed_when_sibling_cannot_fit_cover(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                {
+                    "id": "grouped-background",
+                    "type": "image",
+                    "x": 0,
+                    "y": 0,
+                    "width": 100,
+                    "height": 100,
+                    "asset_id": "dynamic-background.png",
+                    "fit": "cover",
+                    "group_id": "background-unit",
+                },
+                {
+                    "id": "background-sibling",
+                    "type": "shape",
+                    "x": 0,
+                    "y": 0,
+                    "width": 100,
+                    "height": 100,
                     "shape_type": "rectangle",
                     "fill_color": "rgba(0,0,0,1)",
                     "group_id": "background-unit",
