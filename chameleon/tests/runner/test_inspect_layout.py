@@ -27,6 +27,30 @@ class InspectLayoutTests(unittest.TestCase):
         self.assertEqual(len(warnings), 1)
         self.assertIn("0px²", warnings[0])
 
+    def test_ignores_positive_area_collision_inside_empty_group(self):
+        elements = [
+            {
+                "id": "first",
+                "type": "shape",
+                "x": 0,
+                "y": 0,
+                "width": 1,
+                "height": 1,
+                "group_id": "",
+            },
+            {
+                "id": "second",
+                "type": "shape",
+                "x": 0.5,
+                "y": 0.5,
+                "width": 1,
+                "height": 1,
+                "group_id": "",
+            },
+        ]
+
+        self.assertEqual(inspect_layout.check_collisions(elements, set()), [])
+
     def test_background_selection_uses_source_coverage_not_target_coverage(self):
         output_cover = {
             "id": "foreground-cover",
@@ -279,6 +303,44 @@ class CommittedOutputTests(unittest.TestCase):
             self.assertEqual(result, 1)
             self.assertIn("symlink", stderr.getvalue().lower())
 
+
+    def test_symlinked_parent_of_inspection_file_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            outside = root / "outside"
+            outside.mkdir()
+            json_path = outside / "task_output.json"
+            png_path = outside / "task_output.png"
+            marker_path = outside / ".task_output.commit"
+            json_path.write_text(
+                json.dumps({"canvas": {"width": 10, "height": 10}, "elements": []}),
+                encoding="utf-8",
+            )
+            png_path.write_bytes(b"png")
+            marker_path.write_text(
+                json.dumps(
+                    {
+                        "committed": True,
+                        "json": json_path.name,
+                        "png": png_path.name,
+                        "json_sha256": hashlib.sha256(json_path.read_bytes()).hexdigest(),
+                        "png_sha256": hashlib.sha256(png_path.read_bytes()).hexdigest(),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            inspection_dir = root / "inspection"
+            inspection_dir.symlink_to(outside, target_is_directory=True)
+            inspection_path = inspection_dir / json_path.name
+
+            stderr = io.StringIO()
+            with patch.object(
+                inspect_layout.sys, "argv", ["inspect_layout.py", str(inspection_path)]
+            ), redirect_stderr(stderr):
+                result = inspect_layout.main()
+
+            self.assertEqual(result, 1)
+            self.assertIn("symlink", stderr.getvalue().lower())
 
 if __name__ == "__main__":
     unittest.main()

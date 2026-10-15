@@ -13,17 +13,15 @@ from math import gcd
 from pathlib import Path
 from typing import Any, NoReturn
 
-from ..contract import validate_source, validate_target_canvas
+from ..contract import validate_response, validate_source, validate_target_canvas
 from ..errors import InfeasibleLayoutError, InfeasibleReasonCode
 from ..geometry.bounds import (
     clipped_sides,
     intersects_canvas,
     is_contained_in_canvas,
-    positive_aabb_intersection,
     rotated_aabb,
     source_bleed_sides,
 )
-from ..geometry.groups import derive_common_transform
 from ..geometry.math_util import quantize_to_int, to_fraction
 from ..geometry.ratios import reduced_ratio
 try:
@@ -122,6 +120,44 @@ def _position_candidates(x: Fraction, y: Fraction) -> list[tuple[int, int]]:
     return candidates
 
 
+def _bleed_position_candidates(
+    element: Mapping[str, Any],
+    scale: Fraction,
+    tx: Fraction,
+    ty: Fraction,
+    source_canvas: Mapping[str, Any],
+    target: Mapping[str, Any],
+    expected_bleed: frozenset[str],
+) -> list[tuple[int, int]]:
+    """Try source- and target-edge translations for eligible bleed shapes."""
+
+    source_width = to_fraction(source_canvas["width"])
+    source_height = to_fraction(source_canvas["height"])
+    target_width = to_fraction(target["width"])
+    target_height = to_fraction(target["height"])
+    x_translations = [tx]
+    y_translations = [ty]
+    if "left" in expected_bleed:
+        x_translations.append(Fraction(0))
+    if "right" in expected_bleed:
+        x_translations.append(target_width - source_width * scale)
+    if "top" in expected_bleed:
+        y_translations.append(Fraction(0))
+    if "bottom" in expected_bleed:
+        y_translations.append(target_height - source_height * scale)
+
+    candidates: list[tuple[int, int]] = []
+    for candidate_tx in x_translations:
+        for candidate_ty in y_translations:
+            raw_x, raw_y, _raw_width, _raw_height = _transformed_box(
+                element, scale, candidate_tx, candidate_ty
+            )
+            for candidate in _position_candidates(raw_x, raw_y):
+                if candidate not in candidates:
+                    candidates.append(candidate)
+    return candidates
+
+
 def _safe_geometry(
     element: Mapping[str, Any],
     x: int,
@@ -154,12 +190,18 @@ def _choose_ratio_dimensions(
     raw_y: Fraction,
     target: Mapping[str, Any],
     expected_bleed: frozenset[str] | None,
+    position_candidates: list[tuple[int, int]] | None = None,
 ) -> tuple[int, int, int, int] | None:
     ratio = reduced_ratio(element["width"], element["height"])
     if ratio is None:
         width = quantize_to_int(raw_width)
         height = quantize_to_int(raw_height)
-        for x, y in _position_candidates(raw_x, raw_y):
+        positions = (
+            _position_candidates(raw_x, raw_y)
+            if position_candidates is None
+            else position_candidates
+        )
+        for x, y in positions:
             if _safe_geometry(element, x, y, width, height, target, expected_bleed):
                 return x, y, width, height
         return None
@@ -178,7 +220,15 @@ def _choose_ratio_dimensions(
             multipliers.append(multiplier)
     for multiplier in multipliers:
         width, height = multiplier * p, multiplier * q
-        for x, y in _position_candidates(raw_x + (raw_width - width) / 2, raw_y + (raw_height - height) / 2):
+        positions = (
+            _position_candidates(
+                raw_x + (raw_width - width) / 2,
+                raw_y + (raw_height - height) / 2,
+            )
+            if position_candidates is None
+            else position_candidates
+        )
+        for x, y in positions:
             if _safe_geometry(element, x, y, width, height, target, expected_bleed):
                 return x, y, width, height
     return None
@@ -188,6 +238,8 @@ def _group_candidate(
     elements: list[Mapping[str, Any]],
     scale: Fraction,
     target: Mapping[str, Any],
+    *,
+    cover_element_id: Any | None = None,
 ) -> tuple[dict[str, tuple[int, int, int, int]], Fraction] | None:
     first = elements[0]
     first_x = to_fraction(first["x"])
@@ -203,26 +255,70 @@ def _group_candidate(
             ]
         )
     unit = _smallest_integral_scale(values)
-    multiplier = scale.numerator * unit.denominator // (scale.denominator * unit.numerator)
-    if multiplier < 1:
-        return None
-    group_scale = unit * multiplier
-
+    minimum_scale = scale
+    cover_element = next(
+        (element for element in elements if element["id"] == cover_element_id),
+        None,
+    )
     source_aabbs = [rotated_aabb(element) for element in elements]
-    source_min_x = min(aabb[0] for aabb in source_aabbs)
-    source_max_x = max(aabb[2] for aabb in source_aabbs)
-    source_min_y = min(aabb[1] for aabb in source_aabbs)
-    source_max_y = max(aabb[3] for aabb in source_aabbs)
-    source_center_x = (source_min_x + source_max_x) / 2
-    source_center_y = (source_min_y + source_max_y) / 2
-    target_center_x = to_fraction(target["width"]) / 2
-    target_center_y = to_fraction(target["height"]) / 2
-    centered_tx = target_center_x - group_scale * source_center_x
-    centered_ty = target_center_y - group_scale * source_center_y
-    # Anchor translations to integer first-child coordinates; admissibility of
-    # the unit scale makes every other child coordinate integral as well.
-    tx = quantize_to_int(group_scale * first_x + centered_tx) - group_scale * first_x
-    ty = quantize_to_int(group_scale * first_y + centered_ty) - group_scale * first_y
+    if cover_element is not None:
+        cover_aabb = rotated_aabb(cover_element)
+        cover_width = cover_aabb[2] - cover_aabb[0]
+        cover_height = cover_aabb[3] - cover_aabb[1]
+        minimum_scale = max(
+            minimum_scale,
+            to_fraction(target["width"]) / cover_width,
+            to_fraction(target["height"]) / cover_height,
+        )
+    scale_ratio = minimum_scale / unit
+    minimum_multiplier = scale_ratio.numerator // scale_ratio.denominator
+    if scale_ratio.numerator % scale_ratio.denominator:
+        minimum_multiplier += 1
+    if minimum_multiplier < 1:
+        minimum_multiplier = 1
+    group_scale = unit * minimum_multiplier
+
+    def _translation_for_axis(
+        axis: int, first_coordinate: Fraction, target_size: Fraction
+    ) -> Fraction | None:
+        source_min = min(aabb[axis] for aabb in source_aabbs)
+        source_max = max(aabb[axis + 2] for aabb in source_aabbs)
+        source_center = (source_min + source_max) / 2
+        lower: Fraction | None = None
+        upper: Fraction | None = None
+        for element, aabb in zip(elements, source_aabbs):
+            if element["id"] == cover_element_id:
+                element_lower = target_size - group_scale * aabb[axis + 2]
+                element_upper = -group_scale * aabb[axis]
+            else:
+                element_lower = -group_scale * aabb[axis]
+                element_upper = target_size - group_scale * aabb[axis + 2]
+            lower = element_lower if lower is None else max(lower, element_lower)
+            upper = element_upper if upper is None else min(upper, element_upper)
+        assert lower is not None and upper is not None
+        anchor_lower = lower + group_scale * first_coordinate
+        anchor_upper = upper + group_scale * first_coordinate
+        if anchor_lower > anchor_upper:
+            return None
+        minimum_anchor = -((-anchor_lower.numerator) // anchor_lower.denominator)
+        maximum_anchor = anchor_upper.numerator // anchor_upper.denominator
+        if minimum_anchor > maximum_anchor:
+            return None
+        desired_anchor = (
+            target_size / 2
+            - group_scale * source_center
+            + group_scale * first_coordinate
+        )
+        anchor = min(
+            maximum_anchor,
+            max(minimum_anchor, quantize_to_int(desired_anchor)),
+        )
+        return anchor - group_scale * first_coordinate
+
+    tx = _translation_for_axis(0, first_x, to_fraction(target["width"]))
+    ty = _translation_for_axis(1, first_y, to_fraction(target["height"]))
+    if tx is None or ty is None:
+        return None
 
     result: dict[str, tuple[int, int, int, int]] = {}
     for element in elements:
@@ -230,7 +326,20 @@ def _group_candidate(
         height = quantize_to_int(to_fraction(element["height"]) * group_scale)
         x = quantize_to_int(to_fraction(element["x"]) * group_scale + tx)
         y = quantize_to_int(to_fraction(element["y"]) * group_scale + ty)
-        if not _safe_geometry(element, x, y, width, height, target, None):
+        candidate = dict(element)
+        candidate.update({"x": x, "y": y, "width": width, "height": height})
+        aabb = rotated_aabb(candidate)
+        if element["id"] == cover_element_id:
+            target_width = to_fraction(target["width"])
+            target_height = to_fraction(target["height"])
+            if not (
+                aabb[0] <= 0
+                and aabb[1] <= 0
+                and aabb[2] >= target_width
+                and aabb[3] >= target_height
+            ):
+                return None
+        elif not _safe_geometry(element, x, y, width, height, target, None):
             return None
         result[element["id"]] = (x, y, width, height)
     return result, group_scale
@@ -251,73 +360,26 @@ def _text_fits(element: Mapping[str, Any], font_size: int, font_manager, target:
     return True
 
 
+def _floor_fraction(value: Fraction) -> int:
+    return value.numerator // value.denominator
+
+
+def _preferred_font_size(source_size: Fraction, scale: Fraction) -> int:
+    """Choose a search ceiling without enlarging text below the readable floor."""
+
+    readable_floor = min(source_size, Fraction(10))
+    preferred = min(source_size, max(readable_floor, source_size * scale))
+    return max(1, _floor_fraction(preferred))
+
+
 def _validate_candidate(
     source: Mapping[str, Any],
     response: Mapping[str, Any],
-    background_index: int | None,
-    source_aabbs: list[Any],
 ) -> bool:
-    target = response["canvas"]
-    response_elements = response["elements"]
-    response_aabbs = [rotated_aabb(element) for element in response_elements]
-    for index, (source_element, element, aabb) in enumerate(
-        zip(source["elements"], response_elements, response_aabbs)
-    ):
-        if any(type(element[field]) is not int for field in _GEOMETRY_FIELDS):
-            return False
-        if element["width"] < 0 or element["height"] < 0:
-            return False
-        if source_element["width"] > 0 and source_element["height"] > 0 and (
-            element["width"] <= 0 or element["height"] <= 0
-        ):
-            return False
-        if index == background_index:
-            if not intersects_canvas(aabb, target):
-                return False
-            continue
-        expected_bleed = source_bleed_sides(source_element, source_aabbs[index], source["canvas"])
-        if expected_bleed is None:
-            if not is_contained_in_canvas(aabb, target):
-                return False
-        elif clipped_sides(aabb, target) != expected_bleed or not intersects_canvas(aabb, target):
-            return False
-        if source_element["type"] == "image" and index != background_index:
-            source_ratio = reduced_ratio(source_element["width"], source_element["height"])
-            if source_ratio is not None and (
-                element["width"] * source_ratio[1] != element["height"] * source_ratio[0]
-            ):
-                return False
-        if source_element["type"] == "text":
-            if type(element["font_size"]) is not int or element["font_size"] < 1:
-                return False
-            line_count = element["content"].count("\n") + 1
-            max_lines = element.get("max_lines")
-            if max_lines is not None and line_count > max_lines:
-                return False
-            if to_fraction(element["font_size"]) * to_fraction(element.get("line_height", Fraction(6, 5))) * line_count > element["height"]:
-                return False
-
-    groups: dict[Any, list[int]] = {}
-    for index, element in enumerate(source["elements"]):
-        if element.get("group_id") is not None:
-            groups.setdefault(element["group_id"], []).append(index)
-    for indices in groups.values():
-        try:
-            derive_common_transform(
-                [source["elements"][index] for index in indices],
-                [response_elements[index] for index in indices],
-            )
-        except (KeyError, TypeError, ValueError):
-            return False
-
-    for left in range(len(response_elements)):
-        if response_elements[left]["width"] <= 0 or response_elements[left]["height"] <= 0:
-            continue
-        for right in range(left + 1, len(response_elements)):
-            if response_elements[right]["width"] <= 0 or response_elements[right]["height"] <= 0:
-                continue
-            if not positive_aabb_intersection(source_aabbs[left], source_aabbs[right]) and positive_aabb_intersection(response_aabbs[left], response_aabbs[right]):
-                return False
+    try:
+        validate_response(source, response["canvas"], response)
+    except InfeasibleLayoutError:
+        return False
     return True
 
 
@@ -350,7 +412,17 @@ def solve_near_isomorphic(
     transformed: dict[int, tuple[int, int, int, int]] = {}
     handled_groups: set[Any] = set()
     for group_id, indices in group_indices.items():
-        group = _group_candidate([source_elements[index] for index in indices], scale, target_canvas)
+        cover_element_id = (
+            source_elements[background_index]["id"]
+            if background_index in indices
+            else None
+        )
+        group = _group_candidate(
+            [source_elements[index] for index in indices],
+            scale,
+            target_canvas,
+            cover_element_id=cover_element_id,
+        )
         if group is None:
             _fail("explicit group cannot be represented by one positive integer transform", group_id=group_id)
         geometries, _group_scale = group
@@ -385,6 +457,19 @@ def solve_near_isomorphic(
             continue
         raw_x, raw_y, raw_width, raw_height = _transformed_box(element, scale, tx, ty)
         expected_bleed = source_bleed_sides(element, source_aabbs[index], source["canvas"])
+        bleed_positions = (
+            _bleed_position_candidates(
+                element,
+                scale,
+                tx,
+                ty,
+                source["canvas"],
+                target_canvas,
+                expected_bleed,
+            )
+            if expected_bleed is not None
+            else None
+        )
         geometry = _choose_ratio_dimensions(
             element,
             raw_width,
@@ -393,6 +478,7 @@ def solve_near_isomorphic(
             raw_y,
             target_canvas,
             expected_bleed,
+            bleed_positions,
         )
         if geometry is None:
             _fail("foreground geometry cannot be represented as safe integer bounds", element_id=element["id"])
@@ -408,7 +494,7 @@ def solve_near_isomorphic(
             font_manager = load_brand_font_manager(resolved_fonts_dir)
         for index in text_indices:
             element = source_elements[index]
-            preferred = max(1, quantize_to_int(to_fraction(element["font_size"]) * scale))
+            preferred = _preferred_font_size(to_fraction(element["font_size"]), scale)
             selected = None
             for size in range(preferred, 0, -1):
                 if _text_fits(response_elements[index], size, font_manager, target_canvas):
@@ -422,8 +508,8 @@ def solve_near_isomorphic(
         "canvas": {"width": int(target_width), "height": int(target_height)},
         "elements": response_elements,
     }
-    if not _validate_candidate(source, response, background_index, source_aabbs):
-        _fail("candidate failed hard geometry, topology, ratio, or group validation")
+    if not _validate_candidate(source, response):
+        _fail("candidate failed serialized hard validation")
     return response
 
 

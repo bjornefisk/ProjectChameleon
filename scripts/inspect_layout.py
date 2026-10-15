@@ -32,6 +32,33 @@ def _escape_diagnostic(value: object) -> str:
             escaped.append(f"\\u{ord(character):04x}")
     return "".join(escaped)
 
+def _is_darwin_private_alias(path: Path) -> bool:
+    """Allow macOS's fixed /private aliases, not user-created links."""
+
+    if path.parent != Path(path.anchor):
+        return False
+    try:
+        resolved = path.resolve(strict=False)
+    except OSError:
+        return False
+    return resolved.parent == Path("/private") and resolved.name == path.name
+
+
+def _symlink_component(path: Path) -> Path | None:
+    """Return the first user-controlled symlink in a path."""
+
+    absolute = path.absolute()
+    current = Path(absolute.anchor)
+    for component in absolute.parts[1:]:
+        current /= component
+        try:
+            mode = current.lstat().st_mode
+        except (FileNotFoundError, NotADirectoryError):
+            break
+        if stat.S_ISLNK(mode) and not _is_darwin_private_alias(current):
+            return current
+    return None
+
 
 def _open_regular_file(path: Path):
     initial = path.lstat()
@@ -148,8 +175,11 @@ def check_collisions(
     for i in range(len(foreground)):
         for j in range(i + 1, len(foreground)):
             e1, e2 = foreground[i], foreground[j]
-            # Ignore same rigid group
-            if e1.get("group_id") and e1.get("group_id") == e2.get("group_id"):
+            # Ignore same rigid group; the schema permits an empty string id.
+            if (
+                e1.get("group_id") is not None
+                and e1.get("group_id") == e2.get("group_id")
+            ):
                 continue
 
             b1 = calculate_aabb(e1)
@@ -421,9 +451,12 @@ def main() -> int:
         target_path = Path(sys.argv[1])
 
 
-    if target_path.is_symlink():
+    symlink_component = _symlink_component(target_path)
+    if symlink_component is not None:
         print(
-            _escape_diagnostic(f"Refusing symlink inspection path: {target_path}"),
+            _escape_diagnostic(
+                f"Refusing symlink inspection path component: {symlink_component}"
+            ),
             file=sys.stderr,
         )
         return 1

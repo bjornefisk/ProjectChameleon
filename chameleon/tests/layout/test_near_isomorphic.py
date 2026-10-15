@@ -2,6 +2,7 @@ import copy
 import json
 import sys
 import unittest
+from decimal import Decimal
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -9,10 +10,12 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 try:
+    from engine.contract import validate_response
     from engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
     from engine.geometry.ratios import reduced_ratio
     from engine.layout.near_isomorphic import solve_near_isomorphic
 except ModuleNotFoundError:
+    from chameleon.engine.contract import validate_response
     from chameleon.engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
     from chameleon.engine.geometry.ratios import reduced_ratio
     from chameleon.engine.layout.near_isomorphic import solve_near_isomorphic
@@ -93,7 +96,7 @@ class NearIsomorphicTests(unittest.TestCase):
         self.assertEqual(response["elements"][0]["width"], 100)
         self.assertEqual(response["elements"][0]["height"], 100)
 
-    def test_grouped_background_fails_closed_instead_of_uncovering_canvas(self):
+    def test_aspect_ratio_grouped_background_scales_rigidly_to_cover(self):
         source = {
             "canvas": {"width": 100, "height": 100},
             "elements": [
@@ -121,9 +124,77 @@ class NearIsomorphicTests(unittest.TestCase):
                 },
             ],
         }
+
+        target_canvas = {"width": 100, "height": 150}
+        response = solve_near_isomorphic(source, target_canvas)
+
+        validate_response(source, target_canvas, response)
+        background, label = response["elements"]
+        self.assertEqual(
+            (background["x"], background["y"], background["width"], background["height"]),
+            (-15, 0, 150, 150),
+        )
+        self.assertEqual(
+            (label["x"], label["y"], label["width"], label["height"]),
+            (0, 15, 30, 30),
+        )
+
+    def test_grouped_background_fails_closed_when_sibling_cannot_fit_cover(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                {
+                    "id": "grouped-background",
+                    "type": "image",
+                    "x": 0,
+                    "y": 0,
+                    "width": 100,
+                    "height": 100,
+                    "asset_id": "dynamic-background.png",
+                    "fit": "cover",
+                    "group_id": "background-unit",
+                },
+                {
+                    "id": "background-sibling",
+                    "type": "shape",
+                    "x": 0,
+                    "y": 0,
+                    "width": 100,
+                    "height": 100,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(0,0,0,1)",
+                    "group_id": "background-unit",
+                },
+            ],
+        }
+
         with self.assertRaises(InfeasibleLayoutError) as raised:
             solve_near_isomorphic(source, {"width": 100, "height": 150})
         self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE)
+
+    def test_source_bleed_follows_target_edge_when_canvas_widens(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                {
+                    "id": "bleed",
+                    "type": "shape",
+                    "x": -10,
+                    "y": 10,
+                    "width": 20,
+                    "height": 20,
+                    "opacity": Decimal("0.5"),
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(1,2,3,1)",
+                }
+            ],
+        }
+
+        target_canvas = {"width": 200, "height": 100}
+        response = solve_near_isomorphic(source, target_canvas)
+
+        validate_response(source, target_canvas, response)
+        self.assertEqual(response["elements"][0]["x"], -10)
 
     def test_foreground_image_uses_dynamic_asset_and_ratio_lattice(self):
         source = {
@@ -171,6 +242,31 @@ class NearIsomorphicTests(unittest.TestCase):
         self.assertEqual(response["elements"][0]["id"], "shape")
         for field in ("x", "y", "width", "height"):
             self.assertIs(type(response["elements"][0][field]), int)
+
+    def test_small_source_text_is_not_enlarged_on_larger_canvas(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                text_element(
+                    x=10,
+                    y=10,
+                    width=80,
+                    height=30,
+                    content="A",
+                    font_size=8,
+                    text_align="center",
+                )
+            ],
+        }
+        manager = load_brand_font_manager(str(FONTS))
+
+        response = solve_near_isomorphic(
+            source,
+            {"width": 200, "height": 200},
+            font_manager=manager,
+        )
+
+        self.assertEqual(response["elements"][0]["font_size"], 8)
 
     def test_text_measurement_selects_smaller_fitting_integer(self):
         source = {

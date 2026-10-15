@@ -127,15 +127,15 @@ The hidden `.<stem>_output.commit` marker is the pair manifest and commit author
 
 - **Ticket 01 — aligned.** The semantic validator preserves identity, immutable fields, omission/default semantics, serialized integer geometry, AABB containment, bleed, ratios, rigid groups, source-separated overlap, and typed failures. Its geometry predicates are intentionally shared with Ticket 04; the remaining evidence risk is that tests do not independently duplicate every predicate calculation.
 - **Ticket 02 — corrected and locally aligned.** The audit found and fixed CRLF rendering as two transient newlines and inconsistent non-integer font-size handling. The adapter now collapses CRLF to one transient break, projects style maps onto that transient text, and requires the staging-serialized integer font size. Native `cr-renderer` goldens, repeated PNG hashes, and native-amd64 parity remain unverified.
-- **Ticket 03 — partially aligned by design.** Atomic staging, marker-gated pair publication, cleanup/quarantine, exact ingress, typed dispatch, continuation, and aggregate exit are locally evidenced. The audit added symlinked inspection-root rejection. The current runtime has no producer distinction between cutoff and exhausted search; injected runner status tests do not prove that missing producer semantics.
+- **Ticket 03 — partially aligned by design.** Atomic staging, marker-gated pair publication, cleanup/quarantine, exact ingress, typed dispatch, continuation, and aggregate exit are locally evidenced. The audit added rejection of symlinked inspection paths, including parent components. The current runtime has no producer distinction between cutoff and exhausted search; injected runner status tests do not prove that missing producer semantics.
 - **Ticket 04 — aligned locally.** Exact ingress, half-even quantization, AABBs, bleed, ratios, positive-area contact, and rigid transforms are integrated into validator/staging paths and covered by geometry/contract tests. Cross-platform/native-amd64 qualification remains pending.
 
 ## Ticket 05 boundary and verification record
 
 Ticket 05 is implemented within its bounded Level 1 near-isomorphic scope through `chameleon/engine/layout/near_isomorphic.py`, `engine/resize.py`, and `tests/layout`. It does not claim the ADR-009 four-topology search, candidate ranking, or cutoff semantics.
-- `make test` — 186 tests passed: 140 project tests plus 46 review-capsule tests. The Makefile sets unittest's top-level directory explicitly (`-t .`) to prevent the `tests/renderer` package from shadowing the production `renderer` package.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 8 focused layout tests passed.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — 140 tests passed in the current source tree.
+- `make test` — 191 tests passed: 145 project tests plus 46 review-capsule tests. The Makefile sets unittest's top-level directory explicitly (`-t .`) to prevent the `tests/renderer` package from shadowing the production `renderer` package.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 11 focused layout tests passed, including grouped cover feasibility, source-bleed edge relocation, and font-size preference regressions.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — 145 tests passed in the current source tree.
 - `python3 scripts/verify_repository.py`, changed-file `py_compile`, and `git diff --check` — passed.
 - `cd chameleon && ../.venv/bin/python -m engine.main` — Level 1 committed a valid JSON/PNG pair; Level 2 and Level 3 failed closed with `NO_HARD_VALID_CANDIDATE`, leaving only the Level 1 pair and `.gitkeep`.
 - The committed Level 1 PNG is `1080 × 1350` RGBA; its serialized JSON passes `validate_response()`.
