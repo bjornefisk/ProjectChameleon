@@ -8,6 +8,8 @@ fails closed with ``NO_HARD_VALID_CANDIDATE``.
 from __future__ import annotations
 
 import logging
+from functools import lru_cache
+
 from collections.abc import Mapping
 from fractions import Fraction
 from math import gcd
@@ -27,14 +29,33 @@ from ..geometry.bounds import (
 from ..geometry.math_util import quantize_to_int, to_fraction
 from ..geometry.ratios import reduced_ratio
 
-try:
-    from chameleon.renderer.converter.brand_fonts import load_brand_font_manager
-    from chameleon.renderer.converter.convert import convert_chameleon_to_crello
-    from chameleon.renderer.converter.wrap import TextLayoutError
-except ModuleNotFoundError:
-    from renderer.converter.brand_fonts import load_brand_font_manager
-    from renderer.converter.convert import convert_chameleon_to_crello
-    from renderer.converter.wrap import TextLayoutError
+
+@lru_cache(maxsize=1)
+def _renderer_components():
+    """Load renderer dependencies only when a candidate is evaluated."""
+
+    try:
+        from chameleon.renderer.converter.brand_fonts import (
+            load_brand_font_manager,
+        )
+        from chameleon.renderer.converter.convert import (
+            convert_chameleon_to_crello,
+            render_design_to_png,
+        )
+        from chameleon.renderer.converter.wrap import TextLayoutError
+    except ModuleNotFoundError:
+        from renderer.converter.brand_fonts import load_brand_font_manager
+        from renderer.converter.convert import (
+            convert_chameleon_to_crello,
+            render_design_to_png,
+        )
+        from renderer.converter.wrap import TextLayoutError
+    return (
+        load_brand_font_manager,
+        convert_chameleon_to_crello,
+        render_design_to_png,
+        TextLayoutError,
+    )
 
 
 _GEOMETRY_FIELDS = ("x", "y", "width", "height")
@@ -210,7 +231,11 @@ def _choose_ratio_dimensions(
     raw_positions: list[tuple[Fraction, Fraction]] | None = None,
 ) -> tuple[int, int, int, int] | None:
     positions = raw_positions or _position_candidates(raw_x, raw_y)
-    ratio = reduced_ratio(element["width"], element["height"])
+    ratio = (
+        reduced_ratio(element["width"], element["height"])
+        if element.get("type") == "image"
+        else None
+    )
     if ratio is None:
         for x, y in positions:
             geometry = _serialize_box((x, y, raw_width, raw_height))
@@ -414,6 +439,7 @@ def _group_candidate(
 
 
 def _text_fits(element: Mapping[str, Any], font_size: int, font_manager, target: Mapping[str, Any]) -> bool:
+    _, convert_chameleon_to_crello, _, TextLayoutError = _renderer_components()
     candidate = dict(element)
     candidate["font_size"] = font_size
     try:
@@ -434,14 +460,7 @@ def _render_candidate(
     fonts_dir: str | None,
     font_manager,
 ) -> bytes:
-    try:
-        from renderer.converter.convert import (
-            render_design_to_png as render_candidate_to_png,
-        )
-    except ModuleNotFoundError:
-        from chameleon.renderer.converter.convert import (
-            render_design_to_png as render_candidate_to_png,
-        )
+    _, _, render_candidate_to_png, _ = _renderer_components()
     resolved_assets_dir = assets_dir or str(Path(__file__).resolve().parents[2] / "brand_kit" / "assets")
     resolved_fonts_dir = fonts_dir or str(Path(__file__).resolve().parents[2] / "brand_kit" / "fonts")
     with TemporaryDirectory(prefix=".chameleon-layout-") as directory:
@@ -479,7 +498,6 @@ def solve_near_isomorphic(
     font_manager=None,
     fonts_dir: str | None = None,
     assets_dir: str | None = None,
-    _rendered_png: list[bytes] | None = None,
 ) -> dict[str, Any]:
     """Return one hard-safe, centered near-isomorphic candidate.
 
@@ -581,6 +599,7 @@ def solve_near_isomorphic(
     text_indices = [index for index, element in enumerate(source_elements) if element["type"] == "text"]
     if text_indices:
         if font_manager is None:
+            load_brand_font_manager = _renderer_components()[0]
             resolved_fonts_dir = fonts_dir or str(Path(__file__).resolve().parents[2] / "brand_kit" / "fonts")
             font_manager = load_brand_font_manager(resolved_fonts_dir)
         for index in text_indices:
@@ -608,9 +627,7 @@ def solve_near_isomorphic(
             reason=error.message,
             details=error.details,
         )
-    rendered_png = _render_candidate(response, assets_dir, fonts_dir, font_manager)
-    if _rendered_png is not None:
-        _rendered_png.append(rendered_png)
+    _render_candidate(response, assets_dir, fonts_dir, font_manager)
     return response
 
 

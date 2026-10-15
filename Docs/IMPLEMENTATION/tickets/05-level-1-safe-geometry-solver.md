@@ -12,13 +12,15 @@ implemented with local Level 1 solver, resize-time semantic validation, and warm
 The current tree contains a narrow deterministic near-isomorphic candidate path, not the complete ADR-009 four-topology search/ranking implementation. Ticket 05 is complete within its Level 1 scope without changing the public schema, renderer contract, dependency baseline, or runner publication protocol.
 
 **Merge gate:**
-The repository phase rules still place the project before the solver. This branch does not override that authority. Gate 1 amd64 Docker qualification remains unverified because the local Docker daemon was unavailable.
+The merge gate still requires native-amd64 qualification; the local Buildx build and offline run below used amd64 emulation on the arm64 workstation.
 
 **Observed evidence:**
-- `PYTHONPATH=. /tmp/chameleon-venv312/bin/python -m unittest tests.layout.test_near_isomorphic -v` — 15 solver regression tests passed.
-- `make PYTHON=/tmp/chameleon-venv312/bin/python test` — 146 project tests and 46 review tests passed.
+- `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 18 layout tests passed.
+- `make test` — 148 project tests and 46 review tests passed.
 - `make verify` — repository governance and implementation wiring passed.
-- `make PYTHON=/tmp/chameleon-venv312/bin/python run` — Level 1 committed a JSON/PNG pair; Level 2 and Level 3 failed closed with typed `NO_HARD_VALID_CANDIDATE`, leaving no failed-task artifacts.
+- `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m engine.main` — Level 1 committed a JSON/PNG pair; Level 2 and Level 3 failed closed with typed `NO_HARD_VALID_CANDIDATE`, leaving no failed-task artifacts.
+- `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — passed with the existing `FromPlatformFlagConstDisallowed` warning.
+- `cd chameleon && docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — Level 1 succeeded and Levels 2–3 failed closed with typed `NO_HARD_VALID_CANDIDATE`; exit 1 is expected for the intentionally infeasible batch.
 - The Level 1 PNG was `1080 × 1350` RGBA and the JSON passed `validate_response()`.
 
 - [x] Implement `chameleon/engine/layout/near_isomorphic.py` to generate safe near-isomorphic layouts for moderate aspect-ratio changes.

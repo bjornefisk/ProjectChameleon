@@ -1,5 +1,6 @@
 import copy
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -431,6 +432,57 @@ class NearIsomorphicTests(unittest.TestCase):
             solve_near_isomorphic(source, source["canvas"], font_manager=manager)
         self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE)
 
+
+    def test_non_image_geometry_is_not_forced_to_image_ratio_lattice(self):
+        source = {
+            "canvas": {"width": 6, "height": 4},
+            "elements": [
+                {
+                    "id": "shape",
+                    "type": "shape",
+                    "x": 0,
+                    "y": 0,
+                    "width": 3,
+                    "height": 4,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(0,0,0,1)",
+                }
+            ],
+        }
+
+        response = solve_near_isomorphic(source, {"width": 2, "height": 1})
+
+        validate_response(source, {"width": 2, "height": 1}, response)
+        self.assertEqual(
+            (response["elements"][0]["x"], response["elements"][0]["y"]),
+            (0, 0),
+        )
+        self.assertEqual(
+            (response["elements"][0]["width"], response["elements"][0]["height"]),
+            (1, 1),
+        )
+
+    def test_renderer_dependencies_are_lazy_until_candidate_evaluation(self):
+        script = """
+import builtins
+
+real_import = builtins.__import__
+
+def block_renderer_imports(name, *args, **kwargs):
+    if name.split(".", 1)[0] in {"cr_renderer", "skia"}:
+        raise ModuleNotFoundError(name=name)
+    return real_import(name, *args, **kwargs)
+
+builtins.__import__ = block_renderer_imports
+import engine.resize
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 if __name__ == "__main__":
     unittest.main()

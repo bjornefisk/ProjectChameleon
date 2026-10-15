@@ -10,14 +10,6 @@ from .errors import InfeasibleLayoutError, InfeasibleReasonCode
 from .layout.near_isomorphic import solve_near_isomorphic
 
 
-class _RenderedResponse(dict[str, Any]):
-    """Keep the gated PNG private while preserving the response schema."""
-
-    def __init__(self, response: Mapping[str, Any], rendered_png: bytes):
-        super().__init__(response)
-        self._rendered_png = rendered_png
-
-
 def resize(
     source: Mapping[str, Any], target_canvas: Mapping[str, Any]
 ) -> dict[str, Any]:
@@ -30,23 +22,9 @@ def resize(
     output.
     """
 
-    response, rendered_png = resize_with_render(source, target_canvas)
-    return _RenderedResponse(response, rendered_png)
-
-
-def resize_with_render(
-    source: Mapping[str, Any], target_canvas: Mapping[str, Any]
-) -> tuple[dict[str, Any], bytes]:
-    """Return a hard-validated design and its already-gated PNG bytes."""
-
     validate_source(source)
     validate_target_canvas(target_canvas)
-    rendered_png: list[bytes] = []
-    response = solve_near_isomorphic(
-        source,
-        target_canvas,
-        _rendered_png=rendered_png,
-    )
+    response = solve_near_isomorphic(source, target_canvas)
     try:
         validate_response(source, target_canvas, response)
     except InfeasibleLayoutError as error:
@@ -59,6 +37,4 @@ def resize_with_render(
                 "details": error.details,
             },
         ) from error
-    if len(rendered_png) != 1:
-        raise RuntimeError("near-isomorphic renderer gate returned no PNG")
-    return response, rendered_png[0]
+    return response

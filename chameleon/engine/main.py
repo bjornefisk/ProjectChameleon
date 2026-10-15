@@ -278,9 +278,6 @@ def render_to_png(
         )
     return warnings
 
-_DEFAULT_RENDER_TO_PNG = render_to_png
-
-
 
 def main() -> int:
     reconciliation_warnings: list[str] = []
@@ -363,9 +360,6 @@ def main() -> int:
             source, target_canvas = task["source"], task["target_canvas"]
             phase = "resize"
             output = resize(source, target_canvas)
-            rendered_png = getattr(output, "_rendered_png", None)
-            if render_to_png is not _DEFAULT_RENDER_TO_PNG:
-                rendered_png = None
             for problem in self_check(source, output):
                 print(
                     _escape_diagnostic(f"self-check warning: {problem}"),
@@ -380,7 +374,6 @@ def main() -> int:
                 response=output,
                 assets_dir=ASSETS_DIR,
                 render_to_png=render_to_png,
-                rendered_png=rendered_png,
             )
         except Exception as error:
             all_succeeded = False
