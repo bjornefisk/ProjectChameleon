@@ -15,8 +15,8 @@ The current tree contains a narrow deterministic near-isomorphic candidate path,
 The repository phase rules still place the project before the solver. This branch does not override that authority. Gate 1 amd64 Docker qualification remains unverified because the local Docker daemon was unavailable.
 
 **Observed evidence:**
-- `PYTHONPATH=. /tmp/chameleon-venv312/bin/python -m unittest tests.layout.test_near_isomorphic -v` — 12 solver regression tests passed.
-- `make PYTHON=/tmp/chameleon-venv312/bin/python test` — 143 project tests and 46 review tests passed.
+- `PYTHONPATH=. /tmp/chameleon-venv312/bin/python -m unittest tests.layout.test_near_isomorphic -v` — 15 solver regression tests passed.
+- `make PYTHON=/tmp/chameleon-venv312/bin/python test` — 146 project tests and 46 review tests passed.
 - `make verify` — repository governance and implementation wiring passed.
 - `make PYTHON=/tmp/chameleon-venv312/bin/python run` — Level 1 committed a JSON/PNG pair; Level 2 and Level 3 failed closed with typed `NO_HARD_VALID_CANDIDATE`, leaving no failed-task artifacts.
 - The Level 1 PNG was `1080 × 1350` RGBA and the JSON passed `validate_response()`.
