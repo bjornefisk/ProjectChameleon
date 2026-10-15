@@ -6,7 +6,25 @@ Docker packaging around the public `resize()` seam. The implementation tickets
 may update those modules where contract conformance requires it.
 """
 
+from decimal import Decimal
+from fractions import Fraction
 from typing import Any
+
+
+def _as_fraction(value: Any) -> Fraction:
+    if isinstance(value, Fraction):
+        return value
+    if isinstance(value, Decimal):
+        return Fraction(value)
+    if type(value) is int:
+        return Fraction(value, 1)
+    if isinstance(value, float):
+        return Fraction(str(value))
+    raise TypeError(f"geometry value is not numeric: {type(value).__name__}")
+
+
+def _scale(value: Any, factor: Fraction) -> Fraction:
+    return _as_fraction(value) * factor
 
 
 def resize(source: dict[str, Any], target_canvas: dict[str, Any]) -> dict[str, Any]:
@@ -47,25 +65,32 @@ def resize(source: dict[str, Any], target_canvas: dict[str, Any]) -> dict[str, A
 
     # ------------------------------------------------------------------
     # Uniform-stretch baseline so the starter pipeline runs out of the box.
-    # It is deliberately nonconforming: it distorts foreground ratios, emits
-    # floating-point geometry, and ignores groups, rotated bounds, and collisions.
+    # It is deliberately nonconforming: it distorts foreground ratios,
+    # ignores groups, rotated bounds, and collisions, and leaves quantization
+    # to the staging serializer.
     # Replace the implementation; do not tune these independent scale factors.
-    scale_x = target_canvas["width"] / source["canvas"]["width"]
-    scale_y = target_canvas["height"] / source["canvas"]["height"]
+    scale_x = _as_fraction(target_canvas["width"]) / _as_fraction(
+        source["canvas"]["width"]
+    )
+    scale_y = _as_fraction(target_canvas["height"]) / _as_fraction(
+        source["canvas"]["height"]
+    )
 
     out_elements = []
     for el in source["elements"]:
         el = dict(el)  # shallow copy — don't mutate the input
-        el["x"] = el["x"] * scale_x
-        el["y"] = el["y"] * scale_y
-        el["width"] = el["width"] * scale_x
-        el["height"] = el["height"] * scale_y
+        el["x"] = _scale(el["x"], scale_x)
+        el["y"] = _scale(el["y"], scale_y)
+        el["width"] = _scale(el["width"], scale_x)
+        el["height"] = _scale(el["height"], scale_y)
         if el["type"] == "text":
             # font_size scaling isn't required to be uniform — this is
             # just a starting point. Floored at 1px: the schema requires
             # font_size >= 1, and an extreme downscale (e.g. a tall poster
             # squeezed into a short banner) can otherwise compute < 1.
-            el["font_size"] = max(1.0, el["font_size"] * min(scale_x, scale_y))
+            el["font_size"] = max(
+                Fraction(1), _scale(el["font_size"], min(scale_x, scale_y))
+            )
         out_elements.append(el)
 
     return {

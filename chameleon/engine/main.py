@@ -1,46 +1,44 @@
-"""
-Orchestrator for batch execution.
+"""Batch runner for independent fail-closed Stage 1 tasks."""
 
-The development self-check remains warning-only and is not the semantic
-contract validator. Task JSON and PNG files are staged privately and published
-only after both the resize and render paths succeed.
-"""
+from __future__ import annotations
 
-import hashlib
 import json
 import os
+import stat
 import sys
 import time
+import unicodedata
 from decimal import Decimal
 from pathlib import Path
+from typing import Any, Mapping
 
-from PIL import Image
-
-from engine.contract import validate_response, validate_source
+from engine.contract import validate_source, validate_target_canvas
 from engine.errors import InfeasibleLayoutError, InfeasibleReasonCode, TaskStatus
 from engine.resize import resize
+from engine.staging import (
+    cleanup_task_artifacts,
+    publish_task,
+    quarantine_task_artifacts,
+    reconcile_output_artifacts,
+    validate_task_name,
+)
 
 try:
     from renderer.converter.wrap import (  # type: ignore
         MalformedTextError as _MalformedTextError,
         TextLayoutError as _TextLayoutError,
+        TextOverflowError as _TextOverflowError,
     )
 except ImportError:
     _MalformedTextError = None
     _TextLayoutError = None
+    _TextOverflowError = None
 
-# Relative to the current working directory, which is /app both inside the
-# Docker image (WORKDIR /app) and when run locally from this repo's root.
+# Relative to the current working directory, which is /app inside Docker and
+# the chameleon project directory for local execution.
 INPUT_DIR = Path("input")
 OUTPUT_DIR = Path("output")
 ASSETS_DIR = Path("brand_kit/assets")
-
-REQUIRED_COMMON = ["id", "type", "x", "y", "width", "height"]
-REQUIRED_BY_TYPE = {
-    "text": ["content", "font_family", "font_size", "color"],
-    "image": ["asset_id"],
-    "shape": ["shape_type", "fill_color"],
-}
 
 
 class _MalformedInputError(ValueError):
@@ -51,77 +49,188 @@ def _reject_json_constant(value: str) -> None:
     raise _MalformedInputError(f"non-finite JSON constant {value!r} is not allowed")
 
 
-def _load_task(task_path: Path) -> dict:
-    """Decode a task without converting decimal JSON tokens to binary floats."""
-    return json.loads(
-        task_path.read_text(encoding="utf-8"),
-        parse_int=int,
-        parse_float=Decimal,
-        parse_constant=_reject_json_constant,
-    )
+def _escape_diagnostic(value: object) -> str:
+    """Render untrusted diagnostic text without terminal control effects."""
+
+    escaped: list[str] = []
+    for character in str(value):
+        if unicodedata.category(character) != "Cc":
+            escaped.append(character)
+        elif character == "\n":
+            escaped.append(r"\n")
+        elif character == "\r":
+            escaped.append(r"\r")
+        elif character == "\t":
+            escaped.append(r"\t")
+        else:
+            escaped.append(f"\\u{ord(character):04x}")
+    return "".join(escaped)
 
 
-def _serialize_json(value: object) -> str:
-    """Serialize JSON while preserving Decimal tokens without binary floats."""
-    if value is None:
-        return "null"
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, int):
-        return str(value)
-    if isinstance(value, Decimal):
-        if not value.is_finite():
-            raise _MalformedInputError("non-finite Decimal cannot be serialized")
-        return str(value)
-    if isinstance(value, float):
-        try:
-            return json.dumps(value, allow_nan=False)
-        except ValueError as error:
-            raise _MalformedInputError("non-finite float cannot be serialized") from error
-    if isinstance(value, str):
-        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-    if isinstance(value, dict):
-        fields = [
-            f"{_serialize_json(str(key))}:{_serialize_json(child)}"
-            for key, child in value.items()
-        ]
-        return "{" + ",".join(fields) + "}"
-    if isinstance(value, (list, tuple)):
-        return "[" + ",".join(_serialize_json(child) for child in value) + "]"
-    raise TypeError(f"value of type {type(value).__name__} is not JSON serializable")
+def _open_input_text(task_path: Path):
+    """Open a direct input task only when it is contained and regular."""
 
-
-def _serialized_output(
-    source: dict, target_canvas: dict, output: dict
-) -> tuple[str, dict]:
-    """Return JSON text and validate the exact values that will be rendered."""
-    serialized = _serialize_json(output)
-    wire_output = json.loads(
-        serialized,
-        parse_int=int,
-        parse_float=Decimal,
-        parse_constant=_reject_json_constant,
-    )
-    validate_response(source, target_canvas, wire_output)
-    return serialized, wire_output
-
-
-def _validate_staged_png(png_path: Path) -> None:
-    """Require a decodable PNG before it becomes a committed artifact."""
-    if not png_path.is_file():
-        raise OSError("renderer did not write staged PNG")
+    input_root = INPUT_DIR.resolve(strict=True)
+    if task_path.is_symlink():
+        raise OSError(f"refusing symlink input: {task_path}")
+    resolved = task_path.resolve(strict=True)
     try:
-        with Image.open(png_path) as image:
-            if image.format != "PNG":
-                raise OSError(f"renderer wrote {image.format or 'unknown'} instead of PNG")
-            image.verify()
-        with Image.open(png_path) as image:
-            image.load()
+        resolved.relative_to(input_root)
+    except ValueError as error:
+        raise OSError(f"input path escapes {INPUT_DIR}: {task_path}") from error
+    initial = task_path.lstat()
+    if not stat.S_ISREG(initial.st_mode):
+        raise OSError(f"refusing non-regular input: {task_path}")
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
+    if nofollow:
+        flags |= nofollow
+    fd = os.open(task_path, flags)
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise OSError(f"refusing non-regular input: {task_path}")
+        return os.fdopen(fd, "r", encoding="utf-8")
+    except BaseException:
+        os.close(fd)
+        raise
+
+
+def _discover_task_files() -> list[Path]:
+    if INPUT_DIR.is_symlink():
+        raise OSError(f"refusing symlink input directory: {INPUT_DIR}")
+    if not INPUT_DIR.exists():
+        return []
+    task_files = sorted(
+        path for path in INPUT_DIR.iterdir() if path.name.endswith(".json")
+    )
+    return task_files
+
+
+def _load_task(task_path: Path) -> Mapping[str, Any]:
+    """Decode and validate a task envelope without binary-float ingress."""
+    with _open_input_text(task_path) as stream:
+        task = json.load(
+            stream,
+            parse_int=int,
+            parse_float=Decimal,
+            parse_constant=_reject_json_constant,
+        )
+    if not isinstance(task, Mapping):
+        raise _MalformedInputError("task envelope must be a JSON object")
+    if "source" not in task or "target_canvas" not in task:
+        raise _MalformedInputError("task envelope requires source and target_canvas")
+    source, target_canvas = task["source"], task["target_canvas"]
+    if not isinstance(source, Mapping) or not isinstance(target_canvas, Mapping):
+        raise _MalformedInputError("source and target_canvas must be JSON objects")
+    validate_source(source)
+    validate_target_canvas(target_canvas)
+    return task
+
+
+def _failure_reason(error: Exception, phase: str) -> str:
+    if isinstance(error, InfeasibleLayoutError):
+        return error.reason_code.value
+    if _MalformedTextError is not None and isinstance(error, _MalformedTextError):
+        return InfeasibleReasonCode.MALFORMED_INPUT.value
+    if _TextOverflowError is not None and isinstance(error, _TextOverflowError):
+        return InfeasibleReasonCode.TEXT_OVERFLOW.value
+    if _TextLayoutError is not None and isinstance(error, _TextLayoutError):
+        return InfeasibleReasonCode.TEXT_OVERFLOW.value
+    if phase == "input" and isinstance(
+        error, (_MalformedInputError, json.JSONDecodeError, KeyError, TypeError, ValueError)
+    ):
+        return InfeasibleReasonCode.MALFORMED_INPUT.value
+    return type(error).__name__
+
+
+def _classify_failure(
+    error: Exception, phase: str
+) -> tuple[TaskStatus, str]:
+    """Map a failure to an accepted task status and stable diagnostic reason."""
+    reason = _failure_reason(error, phase)
+
+    if isinstance(error, InfeasibleLayoutError):
+        code = error.reason_code
+        if code in {
+            InfeasibleReasonCode.INVALID_SOURCE,
+            InfeasibleReasonCode.INVALID_TARGET,
+            InfeasibleReasonCode.MALFORMED_INPUT,
+        }:
+            return TaskStatus.MALFORMED_INPUT, reason
+        if code == InfeasibleReasonCode.INCOMPLETE_SEARCH:
+            return TaskStatus.INCOMPLETE_SEARCH, reason
+        if code == InfeasibleReasonCode.RUNTIME_IO_FAILURE:
+            return TaskStatus.RUNTIME_IO_FAILURE, reason
+        if code == InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE:
+            return TaskStatus.INFEASIBLE_LAYOUT, reason
+        # A response validator rejection means the engine produced an invalid
+        # candidate; it is a runtime failure, not proof of infeasibility.
+        return TaskStatus.RUNTIME_IO_FAILURE, reason
+
+    if phase == "input":
+        if isinstance(
+            error, (_MalformedInputError, json.JSONDecodeError, KeyError, TypeError, ValueError)
+        ):
+            return TaskStatus.MALFORMED_INPUT, reason
+        return TaskStatus.RUNTIME_IO_FAILURE, reason
+
+    if _MalformedTextError is not None and isinstance(error, _MalformedTextError):
+        return TaskStatus.MALFORMED_INPUT, reason
+    if (
+        (_TextOverflowError is not None and isinstance(error, _TextOverflowError))
+        or (_TextLayoutError is not None and isinstance(error, _TextLayoutError))
+    ):
+        # A renderer rejection concerns this one candidate.  Without an
+        # exhausted finite search signal it is not proof of infeasibility.
+        return TaskStatus.RUNTIME_IO_FAILURE, reason
+    return TaskStatus.RUNTIME_IO_FAILURE, reason
+
+
+def _cleanup_after_failure(stem: str) -> str | None:
+    try:
+        cleanup_task_artifacts(OUTPUT_DIR, stem)
     except Exception as error:
-        raise OSError(f"staged PNG is not a valid decodable PNG: {error}") from error
+        quarantine_error = None
+        try:
+            quarantine_task_artifacts(OUTPUT_DIR, stem)
+        except Exception as quarantine_failure:
+            quarantine_error = (
+                f"{type(quarantine_failure).__name__}: {quarantine_failure}"
+            )
+        message = f"{type(error).__name__}: {error}"
+        if quarantine_error:
+            message += f"; quarantine failed: {quarantine_error}"
+        else:
+            message += "; stale paths quarantined"
+        return message
+    return None
 
 
-def self_check(source: dict, output: dict) -> list[str]:
+def _report_failure(
+    task_name: str,
+    status: TaskStatus | str,
+    reason: str,
+    cleanup_error: str | None,
+) -> None:
+    status_value = status.value if isinstance(status, TaskStatus) else status
+    if cleanup_error:
+        status_value = TaskStatus.RUNTIME_IO_FAILURE.value
+        reason = f"{reason}; cleanup failed: {cleanup_error}"
+    print(
+        _escape_diagnostic(f"[{task_name}] status={status_value} reason={reason}"),
+        file=sys.stderr,
+    )
+
+
+REQUIRED_COMMON = ["id", "type", "x", "y", "width", "height"]
+REQUIRED_BY_TYPE = {
+    "text": ["content", "font_family", "font_size", "color"],
+    "image": ["asset_id"],
+    "shape": ["shape_type", "fill_color"],
+}
+
+
+def self_check(source: Mapping[str, Any], output: Mapping[str, Any]) -> list[str]:
     """Run the non-authoritative development sanity check."""
     problems = []
 
@@ -136,7 +245,8 @@ def self_check(source: dict, output: dict) -> list[str]:
             f"unexpected {sorted(out_ids - src_ids)}"
         )
 
-    cw, ch = output["canvas"].get("width"), output["canvas"].get("height")
+    canvas = output["canvas"]
+    cw, ch = canvas.get("width"), canvas.get("height")
     for el in output["elements"]:
         for field in REQUIRED_COMMON:
             if field not in el:
@@ -155,191 +265,137 @@ def self_check(source: dict, output: dict) -> list[str]:
     return problems
 
 
-def render_to_png(design: dict, assets_dir: Path, png_path: Path) -> list[str]:
+def render_to_png(
+    design: Mapping[str, Any], assets_dir: Path, png_path: Path
+) -> list[str]:
     """Render with the pinned local adapter and return conversion warnings."""
     from renderer.converter.convert import render_design_to_png  # type: ignore
 
-    return render_design_to_png(design, assets_dir, str(png_path))
-
-
-def _task_paths(stem: str) -> tuple[Path, Path, Path, Path, Path]:
-    return (
-        OUTPUT_DIR / f"{stem}_output.json",
-        OUTPUT_DIR / f"{stem}_output.png",
-        OUTPUT_DIR / f"{stem}_output.json.tmp",
-        OUTPUT_DIR / f"{stem}_output.png.tmp",
-        OUTPUT_DIR / f".{stem}_output.commit",
-    )
-
-
-def _cleanup_task_paths(stem: str) -> None:
-    paths = _task_paths(stem)
-    for path in (*paths, paths[-1].with_suffix(".commit.tmp")):
-        path.unlink(missing_ok=True)
-
-
-def _publish_pair(
-    source: dict, target_canvas: dict, output: dict, stem: str
-) -> list[str]:
-    """Stage and validate a logical JSON/PNG pair before committing it."""
-    json_path, png_path, json_tmp, png_tmp, commit_path = _task_paths(stem)
-    commit_tmp = commit_path.with_suffix(".commit.tmp")
-    try:
-        _cleanup_task_paths(stem)
-        serialized, serialized_output = _serialized_output(
-            source, target_canvas, output
+    warnings = render_design_to_png(design, assets_dir, str(png_path)) or []
+    for warning in warnings:
+        print(
+            _escape_diagnostic(f"renderer warning: {warning}"), file=sys.stderr
         )
-        json_tmp.write_text(serialized, encoding="utf-8")
-        render_warnings = render_to_png(serialized_output, ASSETS_DIR, png_tmp) or []
-        _validate_staged_png(png_tmp)
-        commit_tmp.write_text(
-            json.dumps(
-                {
-                    "json": json_path.name,
-                    "png": png_path.name,
-                    "json_sha256": hashlib.sha256(json_tmp.read_bytes()).hexdigest(),
-                    "png_sha256": hashlib.sha256(png_tmp.read_bytes()).hexdigest(),
-                },
-                sort_keys=True,
-            ),
-            encoding="utf-8",
-        )
-        os.replace(json_tmp, json_path)
-        os.replace(png_tmp, png_path)
-        os.replace(commit_tmp, commit_path)
-    except BaseException:
-        try:
-            _cleanup_task_paths(stem)
-        except Exception:
-            pass
-        raise
-    return render_warnings
-
-
-def _failure_reason(error: Exception) -> str:
-    if isinstance(error, InfeasibleLayoutError):
-        return error.reason_code.value
-    if _MalformedTextError is not None and isinstance(error, _MalformedTextError):
-        return InfeasibleReasonCode.MALFORMED_INPUT.value
-    if _TextLayoutError is not None and isinstance(error, _TextLayoutError):
-        return InfeasibleReasonCode.TEXT_OVERFLOW.value
-    if isinstance(error, (_MalformedInputError, json.JSONDecodeError)):
-        return InfeasibleReasonCode.MALFORMED_INPUT.value
-    return type(error).__name__
-
-
-def _classify_failure(
-    error: Exception, phase: str
-) -> tuple[TaskStatus, str]:
-    """Map a failure to an accepted task status and stable diagnostic reason."""
-    reason = _failure_reason(error)
-
-    if isinstance(error, InfeasibleLayoutError):
-        code = error.reason_code
-        if code in {
-            InfeasibleReasonCode.INVALID_SOURCE,
-            InfeasibleReasonCode.INVALID_TARGET,
-            InfeasibleReasonCode.MALFORMED_INPUT,
-        }:
-            return TaskStatus.MALFORMED_INPUT, reason
-        if code == InfeasibleReasonCode.INCOMPLETE_SEARCH:
-            return TaskStatus.INCOMPLETE_SEARCH, reason
-        if code == InfeasibleReasonCode.RUNTIME_IO_FAILURE:
-            return TaskStatus.RUNTIME_IO_FAILURE, reason
-        if phase == "input":
-            return TaskStatus.MALFORMED_INPUT, reason
-        return TaskStatus.INFEASIBLE_LAYOUT, reason
-
-    if phase == "input":
-        if isinstance(error, (_MalformedInputError, json.JSONDecodeError, KeyError, TypeError)):
-            return TaskStatus.MALFORMED_INPUT, reason
-        return TaskStatus.RUNTIME_IO_FAILURE, reason
-
-    if _MalformedTextError is not None and isinstance(error, _MalformedTextError):
-        return TaskStatus.MALFORMED_INPUT, reason
-    if _TextLayoutError is not None and isinstance(error, _TextLayoutError):
-        return TaskStatus.INFEASIBLE_LAYOUT, reason
-    return TaskStatus.RUNTIME_IO_FAILURE, reason
+    return warnings
 
 
 def main() -> int:
+    reconciliation_warnings: list[str] = []
     try:
+        if OUTPUT_DIR.is_symlink():
+            raise OSError(f"refusing symlink output directory: {OUTPUT_DIR}")
+        if OUTPUT_DIR.exists() and not OUTPUT_DIR.is_dir():
+            raise OSError(f"output path is not a directory: {OUTPUT_DIR}")
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        task_files = sorted(INPUT_DIR.glob("*.json"))
+        task_files = _discover_task_files()
+        current_task_names = set()
+        for task_path in task_files:
+            try:
+                validate_task_name(task_path.stem)
+            except ValueError:
+                continue
+            current_task_names.add(task_path.stem)
+        reconciliation_warnings = reconcile_output_artifacts(
+            OUTPUT_DIR, current_task_names
+        )
     except Exception as error:
         print(
-            f"[runner] {TaskStatus.RUNTIME_IO_FAILURE.value} "
-            f"({type(error).__name__}): {error}",
+            _escape_diagnostic(
+                f"[runner] status=RUNTIME_IO_FAILURE "
+                f"reason=RUNTIME_IO_FAILURE: {error}"
+            ),
             file=sys.stderr,
         )
         return 1
+
+    if reconciliation_warnings:
+        print(
+            _escape_diagnostic(
+                "[runner] status=RUNTIME_IO_FAILURE "
+                "reason=output reconciliation warnings: "
+                + "; ".join(reconciliation_warnings)
+            ),
+            file=sys.stderr,
+        )
 
     if not task_files:
         print(
-            f"[runner] {TaskStatus.RUNTIME_IO_FAILURE.value} (NO_TASK_FILES): "
-            f"No task files found in {INPUT_DIR}",
+            _escape_diagnostic(
+                "[runner] status=RUNTIME_IO_FAILURE "
+                f"reason=RUNTIME_IO_FAILURE: no task files found in {INPUT_DIR}"
+            ),
             file=sys.stderr,
         )
         return 1
 
-    exit_code = 0
+    all_succeeded = not reconciliation_warnings
     for task_path in task_files:
         stem = task_path.stem
         try:
-            phase = "input"
-            _cleanup_task_paths(stem)
-            task = _load_task(task_path)
-            source, target_canvas = task["source"], task["target_canvas"]
-            validate_source(source)
-
-            t0 = time.monotonic()
-            phase = "resize"
-            output = resize(source, target_canvas)
-            elapsed = time.monotonic() - t0
-            problems = self_check(source, output)
-            phase = "publish"
-            render_warnings = _publish_pair(source, target_canvas, output, stem)
-        except Exception as error:
-            exit_code = 1
-            cleanup_error = None
-            try:
-                _cleanup_task_paths(stem)
-            except Exception as cleanup_exception:
-                cleanup_error = cleanup_exception
-            if cleanup_error is not None:
-                print(
-                    f"[{task_path.name}] {TaskStatus.RUNTIME_IO_FAILURE.value} "
-                    f"({type(cleanup_error).__name__}): "
-                    f"{error}; cleanup failed: {cleanup_error}",
-                    file=sys.stderr,
-                )
-            else:
-                status, reason = _classify_failure(error, phase)
-                print(
-                    f"[{task_path.name}] {status.value} ({reason}): {error}",
-                    file=sys.stderr,
-                )
+            validate_task_name(stem)
+        except ValueError as error:
+            all_succeeded = False
+            _report_failure(
+                task_path.name,
+                TaskStatus.MALFORMED_INPUT,
+                f"{InfeasibleReasonCode.MALFORMED_INPUT.value}: {error}",
+                None,
+            )
+            continue
+        cleanup_error = _cleanup_after_failure(stem)
+        if cleanup_error:
+            all_succeeded = False
+            _report_failure(
+                task_path.name,
+                TaskStatus.RUNTIME_IO_FAILURE,
+                f"RUNTIME_IO_FAILURE: {cleanup_error}",
+                None,
+            )
             continue
 
-        if problems:
-            success_detail = f"{len(problems)} self-check warning(s)"
-        elif render_warnings:
-            success_detail = f"{len(render_warnings)} renderer warning(s)"
-        else:
-            success_detail = ""
-        status = TaskStatus.SUCCESS.value
-        if success_detail:
-            status = f"{status} ({success_detail})"
-        print(
-            f"[{task_path.name}] {status} in {elapsed:.2f}s "
-            f"-> {stem}_output.json, {stem}_output.png"
-        )
-        for problem in problems:
-            print(f"    - {problem}")
-        for warning in render_warnings:
-            print(f"    - renderer warning: {warning}")
+        started = time.monotonic()
+        phase = "input"
+        try:
+            task = _load_task(task_path)
+            source, target_canvas = task["source"], task["target_canvas"]
+            phase = "resize"
+            output = resize(source, target_canvas)
+            for problem in self_check(source, output):
+                print(
+                    _escape_diagnostic(f"self-check warning: {problem}"),
+                    file=sys.stderr,
+                )
+            phase = "publish"
+            publish_task(
+                output_dir=OUTPUT_DIR,
+                task_name=stem,
+                source=source,
+                target_canvas=target_canvas,
+                response=output,
+                assets_dir=ASSETS_DIR,
+                render_to_png=render_to_png,
+            )
+        except Exception as error:
+            all_succeeded = False
+            cleanup_error = _cleanup_after_failure(stem)
+            status, reason = _classify_failure(error, phase)
+            _report_failure(
+                task_path.name,
+                status,
+                f"{reason}: {error}",
+                cleanup_error,
+            )
+            continue
 
-    return exit_code
+        elapsed = time.monotonic() - started
+        print(
+            _escape_diagnostic(
+                f"[{task_path.name}] status=SUCCESS in {elapsed:.2f}s "
+                f"-> {stem}_output.json, {stem}_output.png"
+            )
+        )
+
+    return 0 if all_succeeded else 1
 
 
 if __name__ == "__main__":

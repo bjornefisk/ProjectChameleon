@@ -70,6 +70,13 @@ def validate_source(source: Mapping[str, Any]) -> None:
             _validate_source_style_runs(element, index)
 
 
+
+def validate_target_canvas(target_canvas: Mapping[str, Any]) -> None:
+    """Validate a task target canvas before candidate generation."""
+
+    _validate_target_canvas(target_canvas)
+
+
 def validate_response(
     source: Mapping[str, Any],
     target_canvas: Mapping[str, Any],
@@ -84,7 +91,7 @@ def validate_response(
     """
 
     validate_source(source)
-    _validate_target_canvas(target_canvas)
+    validate_target_canvas(target_canvas)
 
     if not isinstance(response, Mapping):
         _fail(
@@ -831,4 +838,4 @@ def _fail(
     raise InfeasibleLayoutError(reason_code, message, details)
 
 
-__all__ = ["validate_response", "validate_source"]
+__all__ = ["validate_response", "validate_source", "validate_target_canvas"]

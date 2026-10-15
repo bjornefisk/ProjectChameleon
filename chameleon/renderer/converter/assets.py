@@ -14,6 +14,16 @@ def asset_path(assets_dir: Optional[str], asset_id: Optional[str]) -> Optional[P
         return candidate if candidate.is_file() else None
     except (OSError, ValueError):
         return None
+    try:
+        root = Path(assets_dir).resolve()
+        requested = Path(asset_id)
+        if requested.is_absolute():
+            return None
+        candidate = (root / requested).resolve(strict=False)
+        candidate.relative_to(root)
+    except (OSError, RuntimeError, ValueError):
+        return None
+    return candidate if candidate.is_file() else None
 
 
 def load_asset_image(

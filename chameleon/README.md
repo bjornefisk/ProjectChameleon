@@ -48,8 +48,10 @@ python -m engine.main
 
 This processes every `*.json` file in `input/` (the 3 sample designs are
 already there — one per difficulty level). Successful tasks write an
-`_output.json` and `_output.png` pair into `output/`; see the contract for
-typed failure statuses and failed-task artifact behavior.
+`_output.json` and `_output.png` pair plus a hidden hash commit manifest
+(`.<task>_output.commit`) into `output/`. The manifest is the pair-publication
+gate: final files without a matching marker are uncommitted and consumers
+must reject them. From the repository root, `make inspect` enforces this gate.
 
 The included baseline is a **uniform stretch** — deliberately the wrong
 approach (see the main brief: "a naive program stretches the picture; a
@@ -68,9 +70,11 @@ obvious mistakes before you waste a submission on them. See `RULES.md` and
 
 The accepted failure protocol is defined by `../Docs/PROJECT_CONTRACT.md`:
 failed tasks publish neither artifact, while successful JSON and PNG are
-staged and committed as one logical pair; the aggregate process status is
-nonzero if any task fails. The starter baseline may not yet implement every
-accepted rule, so a warning or written artifact is not conformance evidence.
+staged in a private task directory and exposed with a matching hidden commit
+manifest; the aggregate process status is nonzero if any task fails. Do not
+consume raw `_output.json` files while the runner is still executing. The
+starter baseline may not yet implement every accepted rule, so a warning or
+written artifact is not conformance evidence.
 Read the warning; decide whether it identifies a real problem or, like the
 Level 2 sample's intentionally corner-bleeding decorative circle, an expected
 fixture case.
@@ -81,10 +85,11 @@ The hidden `.<stem>_output.commit` marker is written last with both artifact has
 
 `main.py` calls `renderer/converter/convert.py`'s `render_design_to_png()`
 (the integrated converter, wrapping the pinned `cr-renderer` revision)
-to produce each task's PNG. It reads fonts/assets from `brand_kit/` and
-writes a real rendered preview, not a placeholder. If the adapter import or
-render fails, the runner reports `RUNTIME_IO_FAILURE` and publishes neither
-artifact.
+to produce each task's PNG — already wired in, no setup needed. It reads
+fonts/assets from `brand_kit/` and writes a real rendered preview, not a
+placeholder. If the renderer import fails, that task reports
+`RUNTIME_IO_FAILURE` and publishes no JSON/PNG pair. Install the pinned
+dependencies from `requirements.txt` before running the engine.
 
 ## Docker (how you'll actually be run)
 

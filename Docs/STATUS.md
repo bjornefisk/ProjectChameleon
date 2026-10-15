@@ -1,9 +1,9 @@
 # Project Chameleon status
 
-**Date:** 2026-10-09
+**Date:** 2026-10-13
 
-**Phase:** Ticket 01 and ticket 02 implementations complete; Gate 1 qualification remains pending.
-**Decision status:** Ticket 01 semantic validation, ticket 02 renderer conformance, and serialized runner artifact validation have local evidence. Cutoff semantics, solver, and runtime qualification remain outside this PR.
+**Phase:** Tickets 01, 02, and 03 implementation complete; Gate 1 qualification remains pending.
+**Decision status:** Ticket 01 semantic validation, ticket 02 renderer conformance, and ticket 03 runner behavior have local evidence. Deterministic cutoff/search semantics, solver, and full runtime qualification remain pending.
 
 ## Ground truth now recorded
 
@@ -48,7 +48,7 @@ These are contract artifacts, not solver or renderer implementation:
 - `chameleon/chameleon_design_schema_v0.9.json` is no longer provisional, accepts empty designs, and records structural ranges/defaults.
 - Contract fixtures live under `chameleon/tests/fixtures/contract/`.
 - The Level 2 public sample's style range is corrected to valid end-exclusive `[6, 15)` semantics; this is fixture/source-data correction, not solver implementation.
-- Ticket 01's semantic validator and contract tests plus ticket 02's renderer adapter/tests are implemented; the runner now validates serialized JSON and decodable PNG pairs, preserves renderer warnings, enforces exact local font faces, constrains asset paths, removes failed-task artifacts, and continues independent tasks, while cutoff semantics, solver, and full Gate 1 qualification remain pending.
+- Ticket 01's semantic validator and contract tests, ticket 02's renderer adapter/tests, and ticket 03's fail-closed runner are implemented; the renderer adapter, runner, solver, and full Gate 1 qualification remain pending only where the verification records below identify evidence gaps.
 
 ## Known implementation gaps before the solver
 
@@ -56,8 +56,8 @@ These are intentionally visible; none is silently promoted to contract behavior:
 
 1. `engine/resize.py` is the documented uniform-stretch baseline and violates image-ratio, group, overlap, rotation, and typography rules.
 2. `engine/main.py` has a warning-only self-check that checks unrotated rectangles and ID sets; it is not the contract validator.
-3. The renderer adapter's renderer goldens and native-amd64 qualification remain; ticket 02 closes style-run end handling, Unicode-safe wrapping (including regional-indicator flag-pair breaks), letter-spacing/style-width measurement, mandatory/non-space line-map handling, actual positioned glyph-bound rejection, explicit line/max-lines/height enforcement, and rectangle/ellipse stroke rasterization.
-4. `engine/main.py` parses finite JSON decimals exactly, validates serialized response identity/geometry/text rules and decodable PNGs before publication, writes a hash-bearing hidden commit marker last after final artifact renames, cleans stale/failed artifacts, emits renderer warnings, continues independent tasks, and maps failures to accepted top-level statuses with detailed reasons; accepted cutoff semantics and the complete search/status protocol remain pending.
+3. Renderer goldens and native-amd64 qualification remain; ticket 02 closes style-run end handling, Unicode-safe wrapping, letter-spacing/style-width measurement, mandatory/non-space line-map handling, positioned glyph-bound rejection, explicit line/max-lines/height enforcement, and rectangle/ellipse stroke rasterization.
+4. The runner's typed-status, private staging, marker-gated pair publication, stale-path quarantine, aggregate exit, exact target validation, exact numeric ingress, and half-even serialization paths are implemented and focused-tested; deterministic cutoff semantics and full runtime qualification remain pending.
 5. The deterministic role-inference, four-topology candidate search, renderer-in-loop ranking, and held-out evaluation path have not been implemented.
 6. The Docker build has no project-owned hash-locked wheelhouse or apt-version lock; the direct compatibility pins are an initial baseline.
 
@@ -100,9 +100,21 @@ The hidden `.<stem>_output.commit` marker is the pair manifest and commit author
 - `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — passed with the documented `FromPlatformFlagConstDisallowed` warning.
 - `cd chameleon && docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — exit 1 for the nonconforming baseline; no task artifacts beyond `output/.gitkeep`. Docker reported arm64-host emulation, so native-amd64 qualification remains pending.
 
+## Ticket 03 verification record
+
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 68 tests passed.
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 118 tests passed.
+- `python3 scripts/verify_repository.py`, `make verify`, and `git diff --check` — passed.
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -m py_compile engine/main.py engine/staging.py ../scripts/inspect_layout.py tests/runner/test_main.py tests/runner/test_inspect_layout.py tests/runner/test_runner.py` — passed.
+- `cd chameleon && /tmp/chameleon-venv312/bin/python -m engine.main` — exit 1; all three sample tasks failed closed (`IMAGE_RATIO_VIOLATION` for Levels 1–2 and `CONTAINMENT_VIOLATION` for Level 3), with no JSON/PNG pair beyond `output/.gitkeep`.
+- `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — passed with the existing `FromPlatformFlagConstDisallowed` warning.
+- `cd chameleon && docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — exit 1 with the same typed baseline failures and no task artifacts beyond `output/.gitkeep`. Docker reported amd64-image-on-arm64-host emulation; native-amd64 qualification remains unverified.
+- The exercised regressions cover marker-gated publication, stale reconciliation/quarantine including invalid stems, quarantine continuation after cleanup failure, invalid-filename continuation, aggregate exit, exact numeric ingress including integral-exponent Decimal tokens, half-even serialization, malformed/non-finite inputs, input/output/final-artifact symlink rejection including direct output-root checks, temporary-artifact rejection, task-name boundaries, safe diagnostics, and inspector authorization.
+
+
 ## Remaining Gate 1 qualification
 
-The following sequence is required for later Gate 1 qualification and is not ticket-01 or ticket-02 evidence:
+The following sequence is required for later Gate 1 qualification and is not complete ticket-01, ticket-02, or ticket-03 evidence:
 
 ```bash
 cd chameleon
