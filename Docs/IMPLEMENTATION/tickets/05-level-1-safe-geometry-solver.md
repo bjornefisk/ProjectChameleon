@@ -6,16 +6,22 @@ The first end-to-end working layout solver in `chameleon/engine/resize.py` that 
 **Blocked by:**  
 - `02: Renderer Text Wrapping and Style-Run Conformance`
 - `03: Atomic Batch Staging and Fail-Closed Runner`
-- `04: Exact Rational Geometry, Bounds, and Group Transforms`
-
 **Status:**  
-ready-for-agent
+implemented with local Level 1 solver, resize-time semantic validation, and warmup render evidence; full Gate 1 qualification, later topology families, ranking, and cutoff semantics remain pending
 
-- [ ] Implement `chameleon/engine/layout/near_isomorphic.py` to generate safe near-isomorphic layouts for moderate aspect-ratio changes.
-- [ ] Implement background detection: identify full-canvas images with `fit="cover"` and resize them to match the target canvas while preserving cover semantics.
-- [ ] Scale every non-background foreground image isotropically to an exact positive integer ratio-lattice dimension derived from its source record. Resolve assets dynamically from the task's `asset_id`; never hardcode sample filenames.
-- [ ] Measure text elements using the renderer font manager and choose the largest measured size that fits, preferring the readable size near $10\text{px}$ unless the source is smaller. Enforce the schema minimum `font_size >= 1`, keep actual glyph bounds inside the text geometry, and reject overflow rather than hiding or rewriting text.
-- [ ] Quantize all output coordinates and font sizes using `round-half-even` to finite integers once.
-- [ ] Wire `resize()` in `chameleon/engine/resize.py` to invoke the near-isomorphic solver and pass output through `validate_response()`.
-- [ ] Verify that `chameleon_sample_level1_warmup.json` passes full semantic validation and renders a clean preview PNG without distorted artwork.
-- [ ] Add integration tests in `chameleon/tests/layout/test_level1.py`.
+The current tree contains a narrow deterministic near-isomorphic candidate path, not the complete ADR-009 four-topology search/ranking implementation. Ticket 05 is complete within its Level 1 scope without changing the public schema, renderer contract, dependency baseline, or runner publication protocol.
+
+**Observed evidence:**
+- `cd chameleon && ../.venv/bin/python -m unittest tests.layout.test_near_isomorphic tests.layout.test_level1 -v` — 7 focused tests passed.
+- `make test` — 134 tests passed in the current source tree.
+- `cd chameleon && ../.venv/bin/python -m engine.main` — Level 1 committed a JSON/PNG pair; Level 2 and Level 3 failed closed with `NO_HARD_VALID_CANDIDATE`, leaving no failed-task artifacts.
+- The Level 1 PNG is `1080 × 1350` RGBA and the JSON passes `validate_response()`.
+
+- [x] Implement `chameleon/engine/layout/near_isomorphic.py` to generate safe near-isomorphic layouts for moderate aspect-ratio changes.
+- [x] Implement background detection: identify full-canvas images with `fit="cover"` and resize them to match the target canvas while preserving cover semantics.
+- [x] Scale every non-background foreground image isotropically to an exact positive integer ratio-lattice dimension derived from its source record. Resolve assets dynamically from the task's `asset_id`; never hardcode sample filenames.
+- [x] Measure text elements using the renderer font manager and choose the largest measured size that fits, preferring the readable size near $10\text{px}$ unless the source is smaller. Enforce the schema minimum `font_size >= 1`, keep actual glyph bounds inside the text geometry, and reject overflow rather than hiding or rewriting text.
+- [x] Quantize all output coordinates and font sizes using `round-half-even` to finite integers once.
+- [x] Wire `resize()` in `chameleon/engine/resize.py` to invoke the near-isomorphic solver and pass output through `validate_response()`.
+- [x] Verify that `chameleon_sample_level1_warmup.json` passes full semantic validation and renders a clean preview PNG without distorted artwork.
+- [x] Add integration tests in `chameleon/tests/layout/test_level1.py`.
