@@ -7,6 +7,7 @@ fails closed with ``NO_HARD_VALID_CANDIDATE``.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from fractions import Fraction
 from math import gcd
@@ -28,18 +29,16 @@ from ..geometry.ratios import reduced_ratio
 
 try:
     from chameleon.renderer.converter.brand_fonts import load_brand_font_manager
-    from chameleon.renderer.converter.convert import (
-        convert_chameleon_to_crello,
-        render_design_to_png,
-    )
+    from chameleon.renderer.converter.convert import convert_chameleon_to_crello
     from chameleon.renderer.converter.wrap import TextLayoutError
 except ModuleNotFoundError:
     from renderer.converter.brand_fonts import load_brand_font_manager
-    from renderer.converter.convert import convert_chameleon_to_crello, render_design_to_png
+    from renderer.converter.convert import convert_chameleon_to_crello
     from renderer.converter.wrap import TextLayoutError
 
 
 _GEOMETRY_FIELDS = ("x", "y", "width", "height")
+logger = logging.getLogger(__name__)
 
 
 def _floor_fraction(value: Fraction) -> int:
@@ -433,24 +432,44 @@ def _render_candidate(
     response: Mapping[str, Any],
     assets_dir: str | None,
     fonts_dir: str | None,
-) -> None:
+    font_manager,
+) -> bytes:
+    try:
+        from renderer.converter.convert import (
+            render_design_to_png as render_candidate_to_png,
+        )
+    except ModuleNotFoundError:
+        from chameleon.renderer.converter.convert import (
+            render_design_to_png as render_candidate_to_png,
+        )
     resolved_assets_dir = assets_dir or str(Path(__file__).resolve().parents[2] / "brand_kit" / "assets")
     resolved_fonts_dir = fonts_dir or str(Path(__file__).resolve().parents[2] / "brand_kit" / "fonts")
     with TemporaryDirectory(prefix=".chameleon-layout-") as directory:
-        render_design_to_png(
+        png_path = Path(directory) / "candidate.png"
+        warnings = render_candidate_to_png(
             dict(response),
             resolved_assets_dir,
-            Path(directory) / "candidate.png",
+            png_path,
             fonts_dir=resolved_fonts_dir,
+            font_manager=font_manager,
         )
+        for warning in warnings or []:
+            logger.warning("renderer warning: %r", warning)
+        return png_path.read_bytes()
 
 
 def _preferred_font_size(source_size: Fraction, scale: Fraction) -> int:
     """Choose a serialized search ceiling without enlarging small source text."""
 
-    readable_floor = min(source_size, Fraction(10))
-    preferred = min(source_size, max(readable_floor, source_size * scale))
-    return max(1, _floor_fraction(preferred))
+    source_limit = (
+        _floor_fraction(source_size)
+        if source_size < Fraction(10)
+        else quantize_to_int(source_size)
+    )
+    readable_floor = min(source_limit, 10)
+    scaled_size = quantize_to_int(source_size * scale)
+    preferred = min(source_limit, max(readable_floor, scaled_size))
+    return max(1, preferred)
 
 
 def solve_near_isomorphic(
@@ -460,6 +479,7 @@ def solve_near_isomorphic(
     font_manager=None,
     fonts_dir: str | None = None,
     assets_dir: str | None = None,
+    _rendered_png: list[bytes] | None = None,
 ) -> dict[str, Any]:
     """Return one hard-safe, centered near-isomorphic candidate.
 
@@ -588,7 +608,9 @@ def solve_near_isomorphic(
             reason=error.message,
             details=error.details,
         )
-    _render_candidate(response, assets_dir, fonts_dir)
+    rendered_png = _render_candidate(response, assets_dir, fonts_dir, font_manager)
+    if _rendered_png is not None:
+        _rendered_png.append(rendered_png)
     return response
 
 

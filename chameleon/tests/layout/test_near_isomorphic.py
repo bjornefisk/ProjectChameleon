@@ -277,6 +277,93 @@ class NearIsomorphicTests(unittest.TestCase):
                 )
 
 
+    def test_half_even_font_size_ceiling_is_preserved(self):
+        source = {
+            "canvas": {"width": 200, "height": 100},
+            "elements": [
+                text_element(
+                    x=10,
+                    y=10,
+                    width=160,
+                    height=40,
+                    content="A",
+                    font_size=Decimal("10.6"),
+                    text_align="center",
+                )
+            ],
+        }
+        manager = load_brand_font_manager(str(FONTS))
+
+        response = solve_near_isomorphic(
+            source,
+            source["canvas"],
+            font_manager=manager,
+        )
+
+        self.assertEqual(response["elements"][0]["font_size"], 11)
+
+    def test_renderer_gate_uses_supplied_font_manager(self):
+        source = {
+            "canvas": {"width": 200, "height": 100},
+            "elements": [
+                text_element(
+                    x=10,
+                    y=10,
+                    width=160,
+                    height=40,
+                    content="A",
+                    font_family="Custom Family",
+                    font_size=12,
+                    text_align="center",
+                )
+            ],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            custom_fonts = Path(directory) / "fonts"
+            custom_fonts.mkdir()
+            (
+                custom_fonts / "CustomFamily-Regular.ttf"
+            ).write_bytes((FONTS / "SolsticeSans-Regular.ttf").read_bytes())
+            manager = load_brand_font_manager(str(custom_fonts))
+
+            response = solve_near_isomorphic(
+                source,
+                source["canvas"],
+                font_manager=manager,
+                fonts_dir=str(FONTS),
+            )
+
+        self.assertEqual(response["elements"][0]["font_family"], "Custom Family")
+
+    def test_renderer_warnings_are_logged(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                {
+                    "id": "missing-image",
+                    "type": "image",
+                    "x": 10,
+                    "y": 10,
+                    "width": 20,
+                    "height": 20,
+                    "asset_id": "missing.png",
+                    "fit": "contain",
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertLogs(level="WARNING") as captured:
+                solve_near_isomorphic(
+                    source,
+                    source["canvas"],
+                    assets_dir=directory,
+                )
+
+        self.assertTrue(
+            any("Missing asset 'missing.png'" in message for message in captured.output)
+        )
+
+
     def test_foreground_image_uses_dynamic_asset_and_ratio_lattice(self):
         source = {
             "canvas": {"width": 200, "height": 100},

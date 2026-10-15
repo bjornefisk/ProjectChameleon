@@ -463,6 +463,7 @@ def publish_task(
     render_to_png: Callable[
         [Mapping[str, Any], Path, Path], list[str] | None
     ],
+    rendered_png: bytes | None = None,
 ) -> TaskArtifactPaths:
     """Stage, validate, and marker-publish one JSON/PNG task pair."""
 
@@ -485,7 +486,11 @@ def publish_task(
     try:
         serialized = _publish_response_json(response, paths.json_tmp)
         validate_response(source, target_canvas, serialized)
-        render_to_png(serialized, assets_dir, paths.png_tmp)
+        if rendered_png is None:
+            render_to_png(serialized, assets_dir, paths.png_tmp)
+        else:
+            with paths.png_tmp.open("xb") as stream:
+                stream.write(rendered_png)
         validate_png(paths.png_tmp)
         _write_commit_marker(paths)
 
