@@ -84,10 +84,10 @@ These are not unresolved internal design choices. They require external facts or
 ## Ticket 02 verification record
 
 - `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/renderer -p 'test_*.py' -v` — 23 tests passed, including the CRLF one-break and serialized-font-size regressions.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 65 tests passed, including symlink/path-boundary handling.
-- The first-four focused suites (contract 28, geometry 11, renderer 23, runner 65) total 127 passing tests. The full source-tree suite now requires explicit top-level discovery (`-t .`) because the `tests/renderer` package name otherwise shadows the production `renderer` package once the out-of-phase layout suite is present; that corrected command runs 133 tests.
-- `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1; the runtime reaches the observed Ticket 05 near-isomorphic path, Level 1/2 fail with `IMAGE_RATIO_VIOLATION`, Level 3 with `CONTAINMENT_VIOLATION`, and no task artifacts are produced beyond `output/.gitkeep`.
-- Docker `linux/amd64` image build — passed with the documented constant-platform warning; the offline container smoke exits 1 with the same typed failures and leaves only `output/.gitkeep`. The run uses arm64-host emulation and is not native-amd64 qualification.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 70 tests passed, including symlink/path-boundary handling.
+- The first-four focused suites (contract 28, geometry 11, renderer 23, runner 70) total 132 passing tests. The full source-tree suite uses explicit top-level discovery (`-t .`) because the `tests/renderer` package name otherwise shadows the production `renderer` package once the layout suite is present; that corrected command runs 140 tests.
+- `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1; Level 1 commits a valid JSON/PNG pair, while Levels 2–3 fail closed with `NO_HARD_VALID_CANDIDATE`; no failed-task artifacts are produced.
+- Docker `linux/amd64` image build — passed with the documented constant-platform warning; the offline container smoke has the same Level 1 success and typed Level 2/3 failures, leaving only the committed Level 1 pair plus `output/.gitkeep`. The run uses arm64-host emulation and is not native-amd64 qualification.
 
 ## PR 7 review-fix verification
 
@@ -102,8 +102,8 @@ The hidden `.<stem>_output.commit` marker is the pair manifest and commit author
 
 ## Ticket 03 verification record
 
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 65 tests passed.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — the current source-tree total is recorded by the final verification run; the first-four subset remains separate from the six out-of-phase layout tests.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 70 tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — 140 tests passed; the first-four subset is 132 tests and the eight layout tests are Ticket 05 coverage.
 - `python3 scripts/verify_repository.py`, `make verify`, and `git diff --check` — passed.
 - `cd chameleon && /tmp/chameleon-venv312/bin/python -m py_compile engine/main.py engine/staging.py ../scripts/inspect_layout.py tests/runner/test_main.py tests/runner/test_inspect_layout.py tests/runner/test_runner.py` — passed.
 - `cd chameleon && /tmp/chameleon-venv312/bin/python -m engine.main` — exit 1; all three sample tasks failed closed (`IMAGE_RATIO_VIOLATION` for Levels 1–2 and `CONTAINMENT_VIOLATION` for Level 3), with no JSON/PNG pair beyond `output/.gitkeep`.
@@ -114,9 +114,9 @@ The hidden `.<stem>_output.commit` marker is the pair manifest and commit author
 ## Ticket 04 verification record
 
 - `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/geometry -p 'test_*.py' -v` — 11 geometry tests passed.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — the current source-tree total is recorded by the final verification run; this is not solver or Gate 1 qualification evidence.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — 140 tests passed; this is not solver or Gate 1 qualification evidence.
 - `python3 scripts/verify_repository.py`, `make verify`, `git diff --check`, and changed-file `py_compile` — passed.
-- `cd chameleon && /tmp/chameleon-venv312/bin/python -m engine.main` — exit 1 as required for the nonconforming baseline; Level 1/2 failed with `IMAGE_RATIO_VIOLATION`, Level 3 with `CONTAINMENT_VIOLATION`, and no artifacts were produced beyond `output/.gitkeep`.
+- `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1; Level 1 commits a valid JSON/PNG pair, while Levels 2–3 fail closed with `NO_HARD_VALID_CANDIDATE`; no failed-task artifacts are produced.
 - The integrated PR9 runner fixes preserve Decimal exponent tokens, reject direct symlinked output roots and temporary inspector inputs, and continue valid tasks after quarantine warnings.
 - `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — passed with the existing `FromPlatformFlagConstDisallowed` warning.
 - `cd chameleon && docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — exit 1 with the same typed baseline failures and no artifacts beyond `output/.gitkeep`; Docker used amd64-on-arm64 emulation, so native-amd64 qualification remains unverified.
@@ -133,9 +133,9 @@ The hidden `.<stem>_output.commit` marker is the pair manifest and commit author
 ## Ticket 05 boundary and verification record
 
 Ticket 05 is implemented within its bounded Level 1 near-isomorphic scope through `chameleon/engine/layout/near_isomorphic.py`, `engine/resize.py`, and `tests/layout`. It does not claim the ADR-009 four-topology search, candidate ranking, or cutoff semantics.
-- `make test` — 134 tests passed after the Makefile set unittest's top-level directory explicitly (`-t .`), preventing the `tests/renderer` package from shadowing the production `renderer` package.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 7 focused layout tests passed.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — 134 tests passed in the current source tree.
+- `make test` — 186 tests passed: 140 project tests plus 46 review-capsule tests. The Makefile sets unittest's top-level directory explicitly (`-t .`) to prevent the `tests/renderer` package from shadowing the production `renderer` package.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 8 focused layout tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — 140 tests passed in the current source tree.
 - `python3 scripts/verify_repository.py`, changed-file `py_compile`, and `git diff --check` — passed.
 - `cd chameleon && ../.venv/bin/python -m engine.main` — Level 1 committed a valid JSON/PNG pair; Level 2 and Level 3 failed closed with `NO_HARD_VALID_CANDIDATE`, leaving only the Level 1 pair and `.gitkeep`.
 - The committed Level 1 PNG is `1080 × 1350` RGBA; its serialized JSON passes `validate_response()`.
