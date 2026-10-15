@@ -11,11 +11,15 @@ implemented with local Level 1 solver, resize-time semantic validation, and warm
 
 The current tree contains a narrow deterministic near-isomorphic candidate path, not the complete ADR-009 four-topology search/ranking implementation. Ticket 05 is complete within its Level 1 scope without changing the public schema, renderer contract, dependency baseline, or runner publication protocol.
 
+**Merge gate:**
+The repository phase rules still place the project before the solver. This branch does not override that authority. Gate 1 amd64 Docker qualification remains unverified because the local Docker daemon was unavailable.
+
 **Observed evidence:**
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 9 focused tests passed.
-- `make test` — 139 tests passed in the current source tree.
-- `cd chameleon && ../.venv/bin/python -m engine.main` — Level 1 committed a JSON/PNG pair; Level 2 and Level 3 failed closed with `NO_HARD_VALID_CANDIDATE`, leaving no failed-task artifacts.
-- The Level 1 PNG is `1080 × 1350` RGBA and the JSON passes `validate_response()`.
+- `PYTHONPATH=. /tmp/chameleon-venv312/bin/python -m unittest tests.layout.test_near_isomorphic -v` — 12 solver regression tests passed.
+- `make PYTHON=/tmp/chameleon-venv312/bin/python test` — 143 project tests and 46 review tests passed.
+- `make verify` — repository governance and implementation wiring passed.
+- `make PYTHON=/tmp/chameleon-venv312/bin/python run` — Level 1 committed a JSON/PNG pair; Level 2 and Level 3 failed closed with typed `NO_HARD_VALID_CANDIDATE`, leaving no failed-task artifacts.
+- The Level 1 PNG was `1080 × 1350` RGBA and the JSON passed `validate_response()`.
 
 - [x] Implement `chameleon/engine/layout/near_isomorphic.py` to generate safe near-isomorphic layouts for moderate aspect-ratio changes.
 - [x] Implement background detection: identify full-canvas images with `fit="cover"` and resize them to match the target canvas while preserving cover semantics.
