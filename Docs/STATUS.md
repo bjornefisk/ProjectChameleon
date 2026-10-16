@@ -2,8 +2,21 @@
 
 **Date:** 2026-10-14
 
-**Phase:** Tickets 01, 02, 03, and 04 implementation complete; Gate 1 qualification remains pending.
-**Decision status:** Ticket 01 semantic validation, ticket 02 renderer conformance, ticket 03 runner behavior, and ticket 04 exact geometry have local evidence. Deterministic cutoff/search semantics, solver, and full runtime qualification remain pending.
+**Phase:** Tickets 01, 02, 03, 04, and 05 implementation complete within bounded scopes; full Gate 1 qualification and later solver gates remain pending.
+**Decision status:** Tickets 01–05 have local implementation evidence. Ticket 05 covers only the deterministic Level 1 near-isomorphic path; deterministic cutoff/full-search semantics, later topology families, ranking, and full runtime qualification remain pending.
+
+## PR12 merge gate
+
+The bounded Ticket 05 implementation is present on this branch for review. It does not advance the project phase or complete Gate 1.
+
+PR12 MUST remain unmerged until the repository records:
+
+- renderer goldens, repeated render hashes, and native-library parity;
+- a clean native `linux/amd64` build and `--network none` run;
+- synchronized status and implementation-frontier documentation;
+- accepted phase ownership through the repository change-control process, if the project advances before all planned gates close.
+
+Local tests and arm64-host Docker emulation are supplemental evidence. They are not native-amd64 qualification.
 
 ## Ground truth now recorded
 
@@ -48,17 +61,17 @@ These are contract artifacts, not solver or renderer implementation:
 - `chameleon/chameleon_design_schema_v0.9.json` is no longer provisional, accepts empty designs, and records structural ranges/defaults.
 - Contract fixtures live under `chameleon/tests/fixtures/contract/`.
 - The Level 2 public sample's style range is corrected to valid end-exclusive `[6, 15)` semantics; this is fixture/source-data correction, not solver implementation.
-- Ticket 01's semantic validator and contract tests, ticket 02's renderer adapter/tests, ticket 03's fail-closed runner, and ticket 04's exact geometry package/tests are implemented; the renderer adapter, runner, solver, and full Gate 1 qualification remain pending only where the verification records below identify evidence gaps.
+- Ticket 01's semantic validator and contract tests, ticket 02's renderer adapter/tests, ticket 03's fail-closed runner, ticket 04's exact geometry package/tests, and ticket 05's bounded Level 1 solver/tests are implemented; full Gate 1 qualification and later solver work remain pending where the verification records below identify evidence gaps.
 
-## Known implementation gaps before the solver
+## Known implementation gaps after the Level 1 baseline
 
 These are intentionally visible; none is silently promoted to contract behavior:
 
-1. `engine/resize.py` is the documented uniform-stretch baseline and violates image-ratio, group, overlap, rotation, and typography rules.
+1. Ticket 05 implements only the deterministic near-isomorphic Level 1 candidate; column-pivot, horizontal-ribbon, vertical re-stack, multi-candidate ranking, cutoff/exhaustion, and held-out evaluation paths remain unimplemented.
 2. `engine/main.py` has a warning-only self-check that checks unrotated rectangles and ID sets; it is not the contract validator.
 3. Renderer goldens and native-amd64 qualification remain; ticket 02 closes style-run end handling, Unicode-safe wrapping, letter-spacing/style-width measurement, mandatory/non-space line-map handling, positioned glyph-bound rejection, explicit line/max-lines/height enforcement, and rectangle/ellipse stroke rasterization.
 4. The runner's typed-status, private staging, marker-gated pair publication, stale-path quarantine, aggregate exit, exact target validation, exact numeric ingress, and half-even serialization paths are implemented and focused-tested; deterministic cutoff semantics and full runtime qualification remain pending.
-5. The deterministic role-inference, four-topology candidate search, renderer-in-loop ranking, and held-out evaluation path have not been implemented.
+5. The deterministic role-inference and four-topology candidate search, renderer-in-loop ranking, cutoff/exhaustion distinction, and held-out evaluation path have not been implemented beyond the bounded Level 1 near-isomorphic candidate.
 6. The Docker build has no project-owned hash-locked wheelhouse or apt-version lock; the direct compatibility pins are an initial baseline.
 
 ## External blockers that remain explicitly unverified
@@ -125,7 +138,7 @@ The hidden `.<stem>_output.commit` marker is the pair manifest and commit author
 
 ## Remaining Gate 1 qualification
 
-The following sequence is required for later Gate 1 qualification and is not complete ticket-01 through ticket-04 evidence:
+The following sequence is required for later Gate 1 qualification and is not complete ticket-01 through ticket-05 evidence.
 
 ```bash
 cd chameleon
@@ -137,4 +150,4 @@ docker run --rm --network none \
   chameleon-stage1
 ```
 
-The warning-only baseline self-check remains non-authoritative; accepted cutoff/search-status integration, renderer goldens/native-library parity, clean native amd64 run, and solver remain outside this PR.
+The warning-only baseline self-check remains non-authoritative; Ticket 05 has only local Level 1 evidence and does not complete Gate 1. Accepted cutoff/search-status integration, renderer goldens/native-library parity, clean native amd64 run, and the full ADR-009 solver remain pending, so PR12 remains blocked.

@@ -6,13 +6,14 @@ The first end-to-end working layout solver in `chameleon/engine/resize.py` that 
 **Blocked by:**  
 - `02: Renderer Text Wrapping and Style-Run Conformance`
 - `03: Atomic Batch Staging and Fail-Closed Runner`
+- `04: Exact Rational Geometry, Bounds, and Group Transforms`
 **Status:**  
 implemented with local Level 1 solver, resize-time semantic validation, and warmup render evidence; full Gate 1 qualification, later topology families, ranking, and cutoff semantics remain pending
 
 The current tree contains a narrow deterministic near-isomorphic candidate path, not the complete ADR-009 four-topology search/ranking implementation. Ticket 05 is complete within its Level 1 scope without changing the public schema, renderer contract, dependency baseline, or runner publication protocol.
 
 **Merge gate:**
-The merge gate still requires native-amd64 qualification; the local Buildx build and offline run below used amd64 emulation on the arm64 workstation.
+The merge gate requires Gate 1 exit evidence, renderer goldens/native-library parity, and a clean native-amd64 offline run. The local Buildx build and offline run used amd64 emulation on the arm64 workstation, so native qualification remains unverified.
 
 **Observed evidence:**
 - `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 18 layout tests passed.
