@@ -170,7 +170,7 @@ class NearIsomorphicTests(unittest.TestCase):
 
         with self.assertRaises(InfeasibleLayoutError) as raised:
             solve_near_isomorphic(source, {"width": 100, "height": 150})
-        self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE)
+        self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.INCOMPLETE_SEARCH)
 
     def test_source_bleed_follows_target_edge_when_canvas_widens(self):
         source = {
@@ -286,7 +286,7 @@ class NearIsomorphicTests(unittest.TestCase):
         manager = load_brand_font_manager(str(FONTS))
         with self.assertRaises(InfeasibleLayoutError) as raised:
             solve_near_isomorphic(source, source["canvas"], font_manager=manager)
-        self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE)
+        self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.INCOMPLETE_SEARCH)
 
 
 if __name__ == "__main__":

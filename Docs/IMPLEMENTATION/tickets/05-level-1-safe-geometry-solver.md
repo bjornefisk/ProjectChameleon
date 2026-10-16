@@ -6,16 +6,18 @@ The first end-to-end working layout solver in `chameleon/engine/resize.py` that 
 **Blocked by:**  
 - `02: Renderer Text Wrapping and Style-Run Conformance`
 - `03: Atomic Batch Staging and Fail-Closed Runner`
+- `04: Exact Rational Geometry, Bounds, and Group Transforms`
 **Status:**  
-implemented with local Level 1 solver, resize-time semantic validation, and warmup render evidence; full Gate 1 qualification, later topology families, ranking, and cutoff semantics remain pending
+implemented with local Level 1 solver, resize-time semantic validation, and warmup render evidence; bounded failures now report `INCOMPLETE_SEARCH`; full Gate 1 qualification, later topology families, ranking, and exhausted-search infeasibility remain pending
+**Merge status:**
+Blocked until Gate 1 exit evidence and native-amd64 qualification are accepted. This bounded implementation remains phase-gated review work and does not advance the project frontier.
 
 The current tree contains a narrow deterministic near-isomorphic candidate path, not the complete ADR-009 four-topology search/ranking implementation. Ticket 05 is complete within its Level 1 scope without changing the public schema, renderer contract, dependency baseline, or runner publication protocol.
 
 **Observed evidence:**
-- `cd chameleon && ../.venv/bin/python -m unittest tests.layout.test_near_isomorphic tests.layout.test_level1 -v` — 11 focused tests passed, including grouped cover feasibility, source-bleed edge relocation, and font-size preference regressions.
-- `make test` — 191 tests passed: 145 project tests plus 46 review-capsule tests.
-- `cd chameleon && ../.venv/bin/python -m engine.main` — Level 1 committed a JSON/PNG pair; Levels 2 and 3 failed closed with `NO_HARD_VALID_CANDIDATE`, leaving no failed-task artifacts.
-- The Level 1 PNG is `1080 × 1350` RGBA and the JSON passes `validate_response()`.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 11 focused tests passed, including bounded-search status regressions.
+- `make test` — passed.
+- `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1 as expected for the mixed sample batch; Level 1 returned `SUCCESS`, while bounded Level 2/3 failures returned `INCOMPLETE_SEARCH` and published no failed-task artifacts.
 
 - [x] Implement `chameleon/engine/layout/near_isomorphic.py` to generate safe near-isomorphic layouts for moderate aspect-ratio changes.
 - [x] Implement background detection: identify full-canvas images with `fit="cover"` and resize them to match the target canvas while preserving cover semantics.

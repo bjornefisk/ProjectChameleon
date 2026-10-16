@@ -5,6 +5,19 @@
 **Phase:** Tickets 01, 02, 03, 04, and 05 implementation complete within their bounded scopes; full Gate 1 qualification and later solver gates remain pending.
 **Decision status:** Tickets 01–05 have local implementation evidence. Ticket 05 covers only the deterministic Level 1 near-isomorphic path; deterministic cutoff/full-search semantics, later topology families, ranking, and full runtime qualification remain pending.
 
+## PR12 merge gate
+
+The bounded Ticket 05 implementation exists on a blocked review branch. It does not advance the project phase or complete Gate 1.
+
+PR12 MUST remain unmerged until the repository records:
+
+- renderer goldens, repeated render hashes, and native-library parity;
+- a clean native `linux/amd64` build and `--network none` run;
+- synchronized status and implementation-frontier documentation;
+- accepted phase ownership through the repository change-control process, if the project advances before all planned gates close.
+
+Local tests and arm64-host Docker emulation are supplemental evidence. They are not native-amd64 qualification.
+
 ## Ground truth now recorded
 
 - `Docs/PROJECT_CONTRACT.md` is the Stage 1 behavioral authority.
@@ -127,17 +140,16 @@ The hidden `.<stem>_output.commit` marker is the pair manifest and commit author
 
 - **Ticket 01 — aligned.** The semantic validator preserves identity, immutable fields, omission/default semantics, serialized integer geometry, AABB containment, bleed, ratios, rigid groups, source-separated overlap, and typed failures. Its geometry predicates are intentionally shared with Ticket 04; the remaining evidence risk is that tests do not independently duplicate every predicate calculation.
 - **Ticket 02 — corrected and locally aligned.** The audit found and fixed CRLF rendering as two transient newlines and inconsistent non-integer font-size handling. The adapter now collapses CRLF to one transient break, projects style maps onto that transient text, and requires the staging-serialized integer font size. Native `cr-renderer` goldens, repeated PNG hashes, and native-amd64 parity remain unverified.
-- **Ticket 03 — partially aligned by design.** Atomic staging, marker-gated pair publication, cleanup/quarantine, exact ingress, typed dispatch, continuation, and aggregate exit are locally evidenced. The audit added rejection of symlinked inspection paths, including parent components. The current runtime has no producer distinction between cutoff and exhausted search; injected runner status tests do not prove that missing producer semantics.
+- **Ticket 03 — partially aligned by design.** Atomic staging, marker-gated pair publication, cleanup/quarantine, exact ingress, typed dispatch, continuation, and aggregate exit are locally evidenced. The audit added rejection of symlinked inspection paths, including parent components. The current runner distinguishes `INCOMPLETE_SEARCH` and `INFEASIBLE_LAYOUT`; bounded solver producers must report incomplete search until an approved finite search is exhausted.
 - **Ticket 04 — aligned locally.** Exact ingress, half-even quantization, AABBs, bleed, ratios, positive-area contact, and rigid transforms are integrated into validator/staging paths and covered by geometry/contract tests. Cross-platform/native-amd64 qualification remains pending.
 
 ## Ticket 05 boundary and verification record
 
-Ticket 05 is implemented within its bounded Level 1 near-isomorphic scope through `chameleon/engine/layout/near_isomorphic.py`, `engine/resize.py`, and `tests/layout`. It does not claim the ADR-009 four-topology search, candidate ranking, or cutoff semantics.
-- `make test` — 191 tests passed: 145 project tests plus 46 review-capsule tests. The Makefile sets unittest's top-level directory explicitly (`-t .`) to prevent the `tests/renderer` package from shadowing the production `renderer` package.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 11 focused layout tests passed, including grouped cover feasibility, source-bleed edge relocation, and font-size preference regressions.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — 145 tests passed in the current source tree.
+Ticket 05 is implemented within its bounded Level 1 near-isomorphic scope through `chameleon/engine/layout/near_isomorphic.py`, `engine/resize.py`, and `tests/layout`. It does not claim the ADR-009 four-topology search, candidate ranking, or exhausted-search infeasibility.
+- `make test` — passed.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 11 focused tests passed, including grouped cover feasibility, source-bleed edge relocation, font-size preference, and bounded-search status regressions.
 - `python3 scripts/verify_repository.py`, changed-file `py_compile`, and `git diff --check` — passed.
-- `cd chameleon && ../.venv/bin/python -m engine.main` — Level 1 committed a valid JSON/PNG pair; Level 2 and Level 3 failed closed with `NO_HARD_VALID_CANDIDATE`, leaving only the Level 1 pair and `.gitkeep`.
+- `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1 as expected for the mixed sample batch; Level 1 returned `SUCCESS`, while bounded Level 2/3 failures returned `INCOMPLETE_SEARCH` and published no failed-task artifacts.
 - The committed Level 1 PNG is `1080 × 1350` RGBA; its serialized JSON passes `validate_response()`.
 
 
@@ -155,4 +167,4 @@ docker run --rm --network none \
   chameleon-stage1
 ```
 
-The warning-only self-check remains non-authoritative; Ticket 05 has only local Level 1 evidence and does not complete Gate 1. Accepted cutoff/search-status integration, renderer goldens/native-library parity, clean native amd64 run, and the full ADR-009 solver remain pending.
+The warning-only self-check remains non-authoritative; Ticket 05 has only local Level 1 evidence and does not complete Gate 1. Bounded `INCOMPLETE_SEARCH` reporting is implemented, while full accepted cutoff/exhaustion semantics, renderer goldens/native-library parity, clean native amd64 run, and the full ADR-009 solver remain pending.

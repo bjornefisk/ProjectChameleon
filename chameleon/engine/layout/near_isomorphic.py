@@ -38,8 +38,11 @@ _GEOMETRY_FIELDS = ("x", "y", "width", "height")
 
 
 def _fail(message: str, **details: Any) -> NoReturn:
+    """Fail as incomplete because this solver does not exhaust ADR-009 search."""
+
+    details = {"search_kind": "near_isomorphic", "search_exhausted": False, **details}
     raise InfeasibleLayoutError(
-        InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE,
+        InfeasibleReasonCode.INCOMPLETE_SEARCH,
         message,
         details,
     )
