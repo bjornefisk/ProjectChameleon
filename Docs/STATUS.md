@@ -1,6 +1,6 @@
 # Project Chameleon status
 
-**Date:** 2026-10-14
+**Date:** 2026-10-16
 
 **Phase:** Tickets 01, 02, 03, 04, and 05 implementation complete within bounded scopes; full Gate 1 qualification and later solver gates remain pending.
 **Decision status:** Tickets 01–05 have local implementation evidence. Ticket 05 covers only the deterministic Level 1 near-isomorphic path; deterministic cutoff/full-search semantics, later topology families, ranking, and full runtime qualification remain pending.
@@ -17,6 +17,31 @@ PR12 MUST remain unmerged until the repository records:
 - accepted phase ownership through the repository change-control process, if the project advances before all planned gates close.
 
 Local tests and arm64-host Docker emulation are supplemental evidence. They are not native-amd64 qualification.
+
+## PR12 next-review handoff
+
+### Resolved review finding
+
+- The review capsule hid Docker CLI plugins inside its isolated `DOCKER_CONFIG`; `docker buildx` then failed before image build with `unknown flag: --platform`.
+- Commit `549a3af` exposes host CLI plugins without exposing host Docker configuration.
+- GitHub Actions run [38948474038](https://github.com/bjornefisk/ProjectChameleon/actions/runs/38948474038) passed Buildx detection, the `linux/amd64` image build, and image-architecture verification.
+- CI now catches Docker build regressions. It does not claim native-amd64 or runtime qualification.
+
+### Open review findings
+
+1. Level 2 currently fails closed with `INFEASIBLE_LAYOUT: NO_HARD_VALID_CANDIDATE: candidate failed serialized hard validation`.
+2. Level 3 currently fails closed with `INFEASIBLE_LAYOUT: NO_HARD_VALID_CANDIDATE: no integer text size fits the renderer bounds`.
+3. The bounded Ticket 05 path still lacks column-pivot, horizontal-ribbon, vertical-restack, candidate ranking, cutoff/exhaustion, and held-out evaluation behavior.
+4. Renderer goldens, repeated render hashes, native-library parity, and a clean native-amd64 `--network none` run remain unverified.
+5. `make docker-test` remains aggregate-nonzero for the current bounded sample batch because Levels 2 and 3 fail; this is a product-scope finding, not a Docker daemon failure.
+6. The Docker build retains the non-blocking `FromPlatformFlagConstDisallowed` warning.
+
+### Next review acceptance
+
+- Review Level 2 and Level 3 candidates against serialized hard validation before any soft scoring.
+- Verify every successful sample produces a committed JSON/PNG pair and every failed sample publishes neither artifact.
+- Add renderer golden, repeated-hash, native-library, and native-amd64 evidence before clearing the PR12 merge gate.
+- Keep arm64-host Buildx output labeled supplemental evidence.
 
 ## Ground truth now recorded
 

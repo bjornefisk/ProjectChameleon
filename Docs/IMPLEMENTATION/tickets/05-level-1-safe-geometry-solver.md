@@ -16,12 +16,14 @@ The current tree contains a narrow deterministic near-isomorphic candidate path,
 The merge gate requires Gate 1 exit evidence, renderer goldens/native-library parity, and a clean native-amd64 offline run. The local Buildx build and offline run used amd64 emulation on the arm64 workstation, so native qualification remains unverified.
 
 **Observed evidence:**
-- `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 18 layout tests passed.
-- `make test` — 148 project tests and 46 review tests passed.
+- `.venv/bin/python -m unittest discover -s chameleon/tests/layout -t chameleon -p 'test_*.py' -v` — 18 layout tests passed.
+- `make test` — 148 project tests and 47 review tests passed.
 - `make verify` — repository governance and implementation wiring passed.
-- `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m engine.main` — Level 1 committed a JSON/PNG pair; Level 2 and Level 3 failed closed with typed `NO_HARD_VALID_CANDIDATE`, leaving no failed-task artifacts.
-- `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — passed with the existing `FromPlatformFlagConstDisallowed` warning.
-- `cd chameleon && docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — Level 1 succeeded and Levels 2–3 failed closed with typed `NO_HARD_VALID_CANDIDATE`; exit 1 is expected for the intentionally infeasible batch.
+- `make run` — Level 1 committed a JSON/PNG pair; Level 2 failed closed with `NO_HARD_VALID_CANDIDATE: candidate failed serialized hard validation`; Level 3 failed closed with `NO_HARD_VALID_CANDIDATE: no integer text size fits the renderer bounds`.
+- `make docker-build` — passed with the existing `FromPlatformFlagConstDisallowed` warning; the loaded image reports `linux/amd64` on the arm64 host.
+- `make docker-test` — exited 2 after the offline container run; Level 1 succeeded, Levels 2–3 failed closed, and failed-task artifacts were not published.
+- `.venv/bin/python scripts/review_pr.py --pr 12 --run-checks --docker --timeout 600` — Docker build passed inside the isolated review environment; runtime reached the container and reported the same bounded failures.
+- GitHub Actions run [38948474038](https://github.com/bjornefisk/ProjectChameleon/actions/runs/38948474038) — all CI steps passed, including Docker Buildx and image architecture checks.
 - The Level 1 PNG was `1080 × 1350` RGBA and the JSON passed `validate_response()`.
 
 - [x] Implement `chameleon/engine/layout/near_isomorphic.py` to generate safe near-isomorphic layouts for moderate aspect-ratio changes.
