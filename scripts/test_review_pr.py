@@ -1008,6 +1008,28 @@ class ReviewCapsuleTests(unittest.TestCase):
             environment["PATH"].split(os.pathsep),
         )
 
+    def test_isolated_environment_exposes_docker_cli_plugins(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            plugin_dir = root / "host-cli-plugins"
+            plugin_dir.mkdir()
+            (plugin_dir / "docker-buildx").write_text("plugin", encoding="utf-8")
+            report_dir = root / "report"
+
+            with patch.object(
+                review_pr,
+                "docker_cli_plugin_directories",
+                return_value=(plugin_dir,),
+            ):
+                environment = review_pr.isolated_environment(report_dir)
+
+            exposed = Path(environment["DOCKER_CONFIG"]) / "cli-plugins"
+            self.assertTrue((exposed / "docker-buildx").is_symlink())
+            self.assertEqual(
+                (exposed / "docker-buildx").resolve(),
+                (plugin_dir / "docker-buildx").resolve(),
+            )
+
     def test_submission_requires_complete_checks(self):
         checks = [
             review_pr.CheckResult("contract-sources", "PASS", 0.0, []),

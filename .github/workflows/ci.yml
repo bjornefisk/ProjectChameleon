@@ -38,3 +38,12 @@ jobs:
 
       - name: Run tests
         run: make test
+
+      - name: Verify Docker Buildx
+        run: docker buildx version
+
+      - name: Build linux/amd64 Docker image
+        run: make docker-build
+
+      - name: Verify Docker image architecture
+        run: test "$(docker image inspect chameleon-stage1 --format '{{.Os}}/{{.Architecture}}')" = "linux/amd64"
