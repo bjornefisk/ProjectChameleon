@@ -13,7 +13,7 @@ implemented with local Level 1 solver, resize-time semantic validation, and warm
 The current tree contains a narrow deterministic near-isomorphic candidate path, not the complete ADR-009 four-topology search/ranking implementation. Ticket 05 is complete within its Level 1 scope without changing the public schema, renderer contract, dependency baseline, or runner publication protocol.
 
 **Merge gate:**
-The merge gate requires Gate 1 exit evidence, renderer goldens/native-library parity, and a clean native-amd64 offline run. The local Buildx build and offline run used amd64 emulation on the arm64 workstation, so native qualification remains unverified.
+The merge gate requires Gate 1 exit evidence and renderer goldens/native-library parity. The native `x86_64` GitHub Actions smoke now passes the bounded offline batch, while local Buildx evidence remains amd64 emulation on the arm64 workstation; full native qualification and Gate 1 exit remain unverified.
 
 **Observed evidence:**
 - `.venv/bin/python -m unittest discover -s chameleon/tests/layout -t chameleon -p 'test_*.py' -v` — 19 layout tests passed, including the grouped source-separation regression and repeated render-hash check.
@@ -22,8 +22,8 @@ The merge gate requires Gate 1 exit evidence, renderer goldens/native-library pa
 - `make run` — Levels 1 and 2 committed validated JSON/PNG pairs; Level 3 failed closed with `NO_HARD_VALID_CANDIDATE: explicit group cannot be represented by one positive integer transform`.
 - `make docker-build` — passed with the existing `FromPlatformFlagConstDisallowed` warning; the loaded image reports `linux/amd64` on the arm64 host.
 - `make docker-test` — exited nonzero after the offline container run; Levels 1 and 2 succeeded, Level 3 failed closed, and failed-task artifacts were not published.
-- `.venv/bin/python scripts/review_pr.py --pr 12 --run-checks --docker --timeout 600` — Docker build passed inside the isolated review environment; runtime reached the container and reported the same bounded failures.
-- GitHub Actions run [38948474038](https://github.com/bjornefisk/ProjectChameleon/actions/runs/38948474038) — all CI steps passed, including Docker Buildx and image architecture checks.
+- `./.venv/bin/python scripts/review_pr.py --pr 12 --repo bjornefisk/ProjectChameleon --run-checks --docker --timeout 600` — capsule `pr-12-c394c649674e4796bb540b1d4d4088c2` passed diff-check, verify, tests, and Docker build; its expected aggregate `run`/`docker-test` failures are the Level 3 typed infeasibility with no failed-task artifacts, while Levels 1 and 2 succeeded.
+- GitHub Actions run [39165434665](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39165434665) — native `x86_64` CI passed Docker Buildx, image architecture, bounded offline runtime, failed-task cleanup, and offline renderer imports.
 - The Level 1 PNG was `1080 × 1350` RGBA and the JSON passed `validate_response()`.
 
 - [x] Implement `chameleon/engine/layout/near_isomorphic.py` to generate safe near-isomorphic layouts for moderate aspect-ratio changes.

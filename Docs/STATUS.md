@@ -24,10 +24,10 @@ Local tests and arm64-host Docker emulation are supplemental evidence. They are 
 
 - The review capsule hid Docker CLI plugins inside its isolated `DOCKER_CONFIG`; `docker buildx` then failed before image build with `unknown flag: --platform`.
 - Commit `549a3af` exposes host CLI plugins without exposing host Docker configuration.
-- GitHub Actions run [38948474038](https://github.com/bjornefisk/ProjectChameleon/actions/runs/38948474038) passed Buildx detection, the `linux/amd64` image build, and image-architecture verification.
-- CI now catches Docker build regressions. It does not claim native-amd64 or runtime qualification.
+- GitHub Actions run [39165434665](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39165434665) passed the native `x86_64` Docker Buildx build, image-architecture check, bounded offline sample batch, failed-task cleanup checks, and offline `cr_renderer`/`skia` imports.
+- CI now catches Docker build and bounded runtime regressions. This is native GitHub-host evidence, not renderer golden or full Gate 1 qualification.
 - Grouped non-background records now try the source-relative transform before centering and reject legal translations that create source-separated AABB collisions; the Level 2 sample now commits a validated JSON/PNG pair locally.
-- The CI workflow now exercises the bounded sample batch in a native `x86_64` runner, verifies the expected failed-task cleanup, and imports the pinned renderer libraries with runtime networking disabled; the resulting run is still required before evidence is recorded.
+- The Level 1 integration test now checks repeated render hashes; renderer goldens and broader native-library parity remain unverified.
 
 
 ### Open review findings
@@ -35,7 +35,7 @@ Local tests and arm64-host Docker emulation are supplemental evidence. They are 
 1. Level 3 currently fails closed with `INFEASIBLE_LAYOUT: NO_HARD_VALID_CANDIDATE: explicit group cannot be represented by one positive integer transform`.
 2. The bounded Ticket 05 path still lacks column-pivot, horizontal-ribbon, vertical-restack, candidate ranking, cutoff/exhaustion, and held-out evaluation behavior.
 3. Renderer goldens and native-library parity remain unverified; the Level 1 integration test now checks repeated render hashes.
-4. A clean native-amd64 `--network none` run remains unverified; `make docker-test` remains aggregate-nonzero because Level 3 is intentionally outside the bounded path.
+4. Native `x86_64` CI smoke now passes the bounded sample batch; renderer golden/native-parity qualification beyond the import check remains unverified, and `make docker-test` remains aggregate-nonzero because Level 3 is intentionally outside the bounded path.
 5. The Docker build retains the non-blocking `FromPlatformFlagConstDisallowed` warning.
 
 
@@ -43,7 +43,7 @@ Local tests and arm64-host Docker emulation are supplemental evidence. They are 
 
 - Review the Level 3 candidate against serialized hard validation before any soft scoring; do not expand Ticket 05 into the later topology tickets without the Gate 1 decision.
 - Verify every successful sample produces a committed JSON/PNG pair and every failed sample publishes neither artifact.
-- Run the native-amd64 CI smoke and record renderer/native-library evidence before clearing the PR12 merge gate.
+- Confirm renderer golden/native-parity evidence and preserve the successful native-amd64 CI run before clearing the PR12 merge gate.
 - Keep arm64-host Buildx output labeled supplemental evidence.
 
 
@@ -110,7 +110,7 @@ These are intentionally visible; none is silently promoted to contract behavior:
 - Final model allowlist and model-size cap.
 - Official scoring threshold details and complete target catalogue.
 - Font licenses/embedded metadata and final Adobe Express font availability.
-- Clean native-amd64 build, PNG determinism, native-library closure, and Apple Silicon Buildx parity.
+- Native GitHub `x86_64` smoke is observed for the bounded sample batch; official deployment qualification, renderer/native parity beyond imports, and Apple Silicon Buildx parity remain unverified.
 - Final Adobe Express deployment/backend topology.
 
 These are not unresolved internal design choices. They require external facts or the implementation/conformance phase.
@@ -179,4 +179,4 @@ docker run --rm --network none \
   chameleon-stage1
 ```
 
-The warning-only baseline self-check remains non-authoritative; Ticket 05 has only bounded near-isomorphic evidence and does not complete Gate 1. Accepted cutoff/search-status integration, renderer goldens/native-library parity, clean native amd64 run, and the full ADR-009 solver remain pending, so PR12 remains blocked.
+The warning-only baseline self-check remains non-authoritative; Ticket 05 has only bounded near-isomorphic evidence and does not complete Gate 1. Accepted cutoff/search-status integration, renderer goldens/native-library parity beyond imports, and the full ADR-009 solver remain pending, so PR12 remains blocked.
