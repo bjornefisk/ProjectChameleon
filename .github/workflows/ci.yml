@@ -60,7 +60,7 @@ jobs:
           test "$status" -ne 0
           grep -F "[chameleon_sample_level1_warmup.json] status=SUCCESS" "$RUNNER_TEMP/docker-test.log"
           grep -F "[chameleon_sample_level2_core.json] status=SUCCESS" "$RUNNER_TEMP/docker-test.log"
-          grep -F "[chameleon_sample_level3_advanced.json] status=INFEASIBLE_LAYOUT" "$RUNNER_TEMP/docker-test.log"
+          grep -F "[chameleon_sample_level3_advanced.json] status=INCOMPLETE_SEARCH" "$RUNNER_TEMP/docker-test.log"
           test -f chameleon/output/chameleon_sample_level1_warmup_output.json
           test -f chameleon/output/chameleon_sample_level1_warmup_output.png
           test -f chameleon/output/chameleon_sample_level2_core_output.json
