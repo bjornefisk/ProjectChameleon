@@ -47,7 +47,7 @@ preflight:
 
 test:
 	@echo "Running unit tests..."
-	@cd chameleon && $(PYTHON) -m unittest discover -s tests -p 'test_*.py' -v
+	@cd chameleon && $(PYTHON) -m unittest discover -s tests -t . -p 'test_*.py' -v
 	@$(PYTHON) -m unittest scripts.test_review_pr -v
 
 run:

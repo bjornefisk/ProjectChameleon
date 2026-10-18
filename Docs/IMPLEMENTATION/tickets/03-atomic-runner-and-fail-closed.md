@@ -7,7 +7,7 @@ A resilient batch orchestrator and task execution harness in `chameleon/engine/m
 `01: Semantic Contract Validator and Failure Reason Codes`
 
 **Status:**  
-implemented — focused runner integration evidence recorded below
+implemented — focused runner/staging integration evidence recorded below; deterministic cutoff producer integration remains pending with the solver
 
 - [x] Create `chameleon/engine/staging.py` providing task-private staging primitives, JSON/PNG validation, and a hidden commit manifest with both staged-file hashes; publish the marker last, and treat final files without a matching marker as uncommitted.
 - [x] Implement stale artifact cleanup and quarantine in `staging.py`: if a task fails or raises an error, remove or move pre-existing final, temporary, commit-manifest, and private staging paths so stale outputs are never scored.
@@ -20,9 +20,9 @@ implemented — focused runner integration evidence recorded below
 
 **Verification evidence:**
 
-- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 68 tests passed.
-- `cd chameleon && /tmp/chameleon-venv312/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 118 tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 70 tests passed, including the audit regression rejecting symlinked inspection roots.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — 140 tests passed; the first-four focused suites account for 132 tests and the eight layout tests are Ticket 05 coverage.
 - `python3 scripts/verify_repository.py`, `make verify`, `git diff --check`, and changed-file `py_compile` — passed.
-- `cd chameleon && /tmp/chameleon-venv312/bin/python -m engine.main` — exited 1 and failed closed for all three sample tasks (`IMAGE_RATIO_VIOLATION` for Levels 1–2 and `CONTAINMENT_VIOLATION` for Level 3); output remained limited to `.gitkeep`.
-- `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — passed with the existing constant-platform warning; the matching offline container run exited 1 with the same typed baseline failures and left only `.gitkeep` (amd64 emulation on the arm64 workstation, not native-amd64 qualification).
+- `cd chameleon && ../.venv/bin/python -m engine.main` — exited 1; Level 1 committed a valid JSON/PNG pair, while Levels 2–3 failed closed with `NO_HARD_VALID_CANDIDATE`; no failed-task artifacts were published.
+- `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — passed with the existing constant-platform warning; the matching offline container run reproduced the Level 1 success and typed Level 2/3 failures, leaving no failed-task artifacts (amd64 emulation on the arm64 workstation, not native-amd64 qualification).
 - Coverage includes marker-gated JSON/PNG publication, post-publish manifest verification, interrupted-commit cleanup, stale final/temp/marker cleanup and quarantine (including invalid stems), quarantine continuation for independent current tasks, invalid-filename continuation, renderer import and PNG failures, typed infeasibility/search statuses, malformed/non-finite input, exact target validation, Decimal decimal/exponent ingress including integral-exponent immutable tokens, half-even serialization, input/output/final-artifact symlink rejection, direct staging output-root boundary checks, task-name boundary checks, asset-root containment, source-qualified background inspection, positive-area collision inspection, orphan and temporary-artifact rejection, escaped diagnostics, and aggregate exit status.

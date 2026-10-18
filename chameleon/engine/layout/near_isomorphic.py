@@ -2,14 +2,14 @@
 
 The solver deliberately generates one finite candidate. It does not rank
 alternatives: if the candidate cannot satisfy the hard geometry invariants it
-fails closed with ``NO_HARD_VALID_CANDIDATE``.
+reports ``INCOMPLETE_SEARCH`` because the bounded path does not exhaust the
+full candidate space.
 """
 
 from __future__ import annotations
 
 import logging
 from functools import lru_cache
-
 from collections.abc import Mapping
 from fractions import Fraction
 from math import gcd
@@ -81,8 +81,9 @@ def _serialize_box(
 
 
 def _fail(message: str, **details: Any) -> NoReturn:
+    details = {"search_kind": "near_isomorphic", "search_exhausted": False, **details}
     raise InfeasibleLayoutError(
-        InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE,
+        InfeasibleReasonCode.INCOMPLETE_SEARCH,
         message,
         details,
     )
@@ -149,6 +150,7 @@ def _transformed_box(element: Mapping[str, Any], scale: Fraction, tx: Fraction, 
     center_x = (to_fraction(element["x"]) + to_fraction(element["width"]) / 2) * scale + tx
     center_y = (to_fraction(element["y"]) + to_fraction(element["height"]) / 2) * scale + ty
     return center_x - width / 2, center_y - height / 2, width, height
+
 
 def _bleed_position_candidates(
     element: Mapping[str, Any],
@@ -244,7 +246,6 @@ def _preserves_source_separation(
                 return False
     return True
 
-
 def _choose_ratio_dimensions(
     element: Mapping[str, Any],
     raw_width: Fraction,
@@ -317,6 +318,7 @@ def _group_candidate(
             ]
         )
     unit = _smallest_integral_scale(values)
+
     cover_element = next(
         (element for element in elements if element["id"] == cover_element_id),
         None,
@@ -648,7 +650,6 @@ def solve_near_isomorphic(
         geometries, _group_scale = group
         for index in indices:
             transformed[index] = geometries[source_elements[index]["id"]]
-
     for index, geometry in transformed.items():
         response_elements[index].update(dict(zip(_GEOMETRY_FIELDS, geometry)))
 

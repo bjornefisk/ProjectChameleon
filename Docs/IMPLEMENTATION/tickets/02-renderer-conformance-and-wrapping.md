@@ -7,7 +7,9 @@ Renderer adapter fixes that bring text measurement, wrapping, and shape rasteriz
 None (can start immediately).
 
 **Status:**  
-implemented with local renderer-conformance evidence
+implemented with local renderer-conformance evidence; pinned native/golden qualification remains pending
+
+The audit pass closed two adapter defects: CRLF now becomes one transient mandatory line break, and the renderer rejects non-integer `font_size` values unless the staging serializer has already produced the required serialized integer. The public source text and style-run indices remain unchanged; the transient renderer representation may be shorter for CRLF.
 
 - [x] Update `chameleon/renderer/converter/wrap.py` to use Unicode UAX #29 extended grapheme clusters as atomic units intersected with UAX #14 line-break opportunities, including Indic_Conjunct_Break, emoji tag sequences, and regional-indicator flag pairs. A break must never split an extended grapheme cluster and must remain available between adjacent flag pairs.
 - [x] Measure text widths per span using the effective typeface (accounting for bold/italic overrides in `style_runs`) and span-local `letter_spacing`, matching Skia and upstream `cr-renderer` rendering behavior.

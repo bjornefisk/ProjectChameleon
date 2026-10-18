@@ -9,7 +9,6 @@ from pathlib import Path
 
 from PIL import UnidentifiedImageError
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
@@ -129,10 +128,20 @@ class NearIsomorphicTests(unittest.TestCase):
                 },
             ],
         }
-        response = solve_near_isomorphic(source, {"width": 100, "height": 150})
+
+        target_canvas = {"width": 100, "height": 150}
+        response = solve_near_isomorphic(source, target_canvas)
+
+        validate_response(source, target_canvas, response)
         background, label = response["elements"]
-        self.assertEqual((background["x"], background["y"], background["width"], background["height"]), (-15, 0, 150, 150))
-        self.assertEqual((label["x"], label["y"], label["width"], label["height"]), (0, 15, 30, 30))
+        self.assertEqual(
+            (background["x"], background["y"], background["width"], background["height"]),
+            (-15, 0, 150, 150),
+        )
+        self.assertEqual(
+            (label["x"], label["y"], label["width"], label["height"]),
+            (0, 15, 30, 30),
+        )
 
     def test_grouped_background_fails_closed_when_sibling_cannot_fit_cover(self):
         source = {
@@ -162,9 +171,10 @@ class NearIsomorphicTests(unittest.TestCase):
                 },
             ],
         }
+
         with self.assertRaises(InfeasibleLayoutError) as raised:
             solve_near_isomorphic(source, {"width": 100, "height": 150})
-        self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE)
+        self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.INCOMPLETE_SEARCH)
 
     def test_source_bleed_follows_target_edge_when_canvas_widens(self):
         source = {
@@ -375,7 +385,6 @@ class NearIsomorphicTests(unittest.TestCase):
             any("Missing asset 'missing.png'" in message for message in captured.output)
         )
 
-
     def test_foreground_image_uses_dynamic_asset_and_ratio_lattice(self):
         source = {
             "canvas": {"width": 200, "height": 100},
@@ -423,6 +432,30 @@ class NearIsomorphicTests(unittest.TestCase):
         for field in ("x", "y", "width", "height"):
             self.assertIs(type(response["elements"][0][field]), int)
 
+    def test_small_source_text_is_not_enlarged_on_larger_canvas(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                text_element(
+                    x=10,
+                    y=10,
+                    width=80,
+                    height=30,
+                    content="A",
+                    font_size=8,
+                    text_align="center",
+                )
+            ],
+        }
+        manager = load_brand_font_manager(str(FONTS))
+
+        response = solve_near_isomorphic(
+            source,
+            {"width": 200, "height": 200},
+            font_manager=manager,
+        )
+
+        self.assertEqual(response["elements"][0]["font_size"], 8)
     def test_text_measurement_selects_smaller_fitting_integer(self):
         source = {
             "canvas": {"width": 200, "height": 100},
@@ -441,7 +474,7 @@ class NearIsomorphicTests(unittest.TestCase):
         manager = load_brand_font_manager(str(FONTS))
         with self.assertRaises(InfeasibleLayoutError) as raised:
             solve_near_isomorphic(source, source["canvas"], font_manager=manager)
-        self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE)
+        self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.INCOMPLETE_SEARCH)
 
 
     def test_non_image_geometry_is_not_forced_to_image_ratio_lattice(self):
@@ -494,6 +527,5 @@ import engine.resize
             text=True,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-
 if __name__ == "__main__":
     unittest.main()

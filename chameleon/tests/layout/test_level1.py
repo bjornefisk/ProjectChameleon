@@ -85,5 +85,6 @@ class Level1IntegrationTests(unittest.TestCase):
                 self.assertEqual(image.format, "PNG")
                 self.assertEqual(image.size, (1080, 1350))
 
+
 if __name__ == "__main__":
     unittest.main()
