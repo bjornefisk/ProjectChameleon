@@ -23,6 +23,7 @@ from ..geometry.bounds import (
     clipped_sides,
     intersects_canvas,
     is_contained_in_canvas,
+    positive_aabb_intersection,
     rotated_aabb,
     source_bleed_sides,
 )
@@ -219,6 +220,31 @@ def _safe_geometry(
     return is_contained_in_canvas(aabb, target)
 
 
+def _preserves_source_separation(
+    source_elements: list[Mapping[str, Any]],
+    response_elements: list[Mapping[str, Any]],
+) -> bool:
+    source_aabbs = [rotated_aabb(element) for element in source_elements]
+    response_aabbs = [rotated_aabb(element) for element in response_elements]
+    for left in range(len(source_elements)):
+        if (
+            to_fraction(response_elements[left]["width"]) <= 0
+            or to_fraction(response_elements[left]["height"]) <= 0
+        ):
+            continue
+        for right in range(left + 1, len(source_elements)):
+            if (
+                to_fraction(response_elements[right]["width"]) <= 0
+                or to_fraction(response_elements[right]["height"]) <= 0
+            ):
+                continue
+            if positive_aabb_intersection(source_aabbs[left], source_aabbs[right]):
+                continue
+            if positive_aabb_intersection(response_aabbs[left], response_aabbs[right]):
+                return False
+    return True
+
+
 def _choose_ratio_dimensions(
     element: Mapping[str, Any],
     raw_width: Fraction,
@@ -274,6 +300,8 @@ def _group_candidate(
     target: Mapping[str, Any],
     *,
     cover_element_id: Any | None = None,
+    preferred_translation: tuple[Fraction, Fraction] | None = None,
+    occupied: list[tuple[Mapping[str, Any], Mapping[str, Any]]] | None = None,
 ) -> tuple[dict[str, tuple[int, int, int, int]], Fraction] | None:
     first = elements[0]
     first_x = to_fraction(first["x"])
@@ -348,6 +376,7 @@ def _group_candidate(
         axis: int,
         first_coordinate: Fraction,
         target_size: Fraction,
+        preferred_translation: Fraction | None = None,
     ) -> list[Fraction]:
         source_center = (
             min(aabb[axis] for aabb in source_aabbs)
@@ -378,13 +407,21 @@ def _group_candidate(
             - group_scale * source_center
             + group_scale * first_coordinate
         )
+        proposed_anchors: list[int] = []
+        if preferred_translation is not None:
+            proposed_anchors.append(
+                quantize_to_int(group_scale * first_coordinate + preferred_translation)
+            )
+        proposed_anchors.extend(
+            (
+                _floor_fraction(desired_anchor),
+                _ceil_fraction(desired_anchor),
+                minimum_anchor,
+                maximum_anchor,
+            )
+        )
         anchors: list[int] = []
-        for proposed in (
-            _floor_fraction(desired_anchor),
-            _ceil_fraction(desired_anchor),
-            minimum_anchor,
-            maximum_anchor,
-        ):
+        for proposed in proposed_anchors:
             anchor = min(maximum_anchor, max(minimum_anchor, proposed))
             if anchor not in anchors:
                 anchors.append(anchor)
@@ -396,12 +433,18 @@ def _group_candidate(
             0,
             first_x,
             to_fraction(target["width"]),
+            preferred_translation=(
+                preferred_translation[0] if preferred_translation is not None else None
+            ),
         )
         y_translations = _translation_candidates(
             group_scale,
             1,
             first_y,
             to_fraction(target["height"]),
+            preferred_translation=(
+                preferred_translation[1] if preferred_translation is not None else None
+            ),
         )
         for tx in x_translations:
             for ty in y_translations:
@@ -434,7 +477,22 @@ def _group_candidate(
                         break
                     result[element["id"]] = geometry
                 if valid:
-                    return result, group_scale
+                    candidate_elements = []
+                    for element in elements:
+                        candidate = dict(element)
+                        candidate.update(
+                            dict(zip(_GEOMETRY_FIELDS, result[element["id"]]))
+                        )
+                        candidate_elements.append(candidate)
+                    source_for_check = list(elements)
+                    response_for_check = candidate_elements
+                    if occupied:
+                        source_for_check.extend(source for source, _ in occupied)
+                        response_for_check.extend(response for _, response in occupied)
+                    if _preserves_source_separation(
+                        source_for_check, response_for_check
+                    ):
+                        return result, group_scale
     return None
 
 
@@ -519,50 +577,17 @@ def solve_near_isomorphic(
             group_indices.setdefault(element["group_id"], []).append(index)
 
     transformed: dict[int, tuple[int, int, int, int]] = {}
-    handled_groups: set[Any] = set()
-    for group_id, indices in group_indices.items():
-        cover_element_id = (
-            source_elements[background_index]["id"]
-            if background_index in indices
-            else None
-        )
-        group = _group_candidate(
-            [source_elements[index] for index in indices],
-            scale,
-            target_canvas,
-            cover_element_id=cover_element_id,
-        )
-        if group is None:
-            _fail("explicit group cannot be represented by one positive integer transform", group_id=group_id)
-        geometries, _group_scale = group
-        for index in indices:
-            transformed[index] = geometries[source_elements[index]["id"]]
-        handled_groups.add(group_id)
-
     target_width = to_fraction(target_canvas["width"])
     target_height = to_fraction(target_canvas["height"])
+
+    # Place ungrouped records first. Group placement can then choose among
+    # several legal translations without creating a new collision with the
+    # already transformed source topology.
     for index, element in enumerate(source_elements):
-        if index == background_index:
-            if element.get("group_id") is None:
-                transformed[index] = (0, 0, int(target_width), int(target_height))
-                continue
-            if index not in transformed:
-                _fail("grouped background has no rigid candidate", element_id=element["id"])
-            grouped_background = dict(element)
-            grouped_background.update(dict(zip(_GEOMETRY_FIELDS, transformed[index])))
-            background_aabb = rotated_aabb(grouped_background)
-            if not (
-                background_aabb[0] <= 0
-                and background_aabb[1] <= 0
-                and background_aabb[2] >= target_width
-                and background_aabb[3] >= target_height
-            ):
-                _fail(
-                    "rigid grouped background does not cover the target canvas",
-                    element_id=element["id"],
-                )
+        if element.get("group_id") is not None:
             continue
-        if element.get("group_id") in handled_groups:
+        if index == background_index:
+            transformed[index] = (0, 0, int(target_width), int(target_height))
             continue
         raw_x, raw_y, raw_width, raw_height = _transformed_box(element, scale, tx, ty)
         expected_bleed = source_bleed_sides(element, source_aabbs[index], source["canvas"])
@@ -590,8 +615,39 @@ def solve_near_isomorphic(
             raw_positions=raw_positions,
         )
         if geometry is None:
-            _fail("foreground geometry cannot be represented as safe integer bounds", element_id=element["id"])
+            _fail(
+                "foreground geometry cannot be represented as safe integer bounds",
+                element_id=element["id"],
+            )
         transformed[index] = geometry
+
+    for group_id, indices in group_indices.items():
+        cover_element_id = (
+            source_elements[background_index]["id"]
+            if background_index in indices
+            else None
+        )
+        occupied = []
+        for occupied_index, geometry in transformed.items():
+            occupied_element = dict(source_elements[occupied_index])
+            occupied_element.update(dict(zip(_GEOMETRY_FIELDS, geometry)))
+            occupied.append((source_elements[occupied_index], occupied_element))
+        group = _group_candidate(
+            [source_elements[index] for index in indices],
+            scale,
+            target_canvas,
+            cover_element_id=cover_element_id,
+            preferred_translation=(tx, ty) if cover_element_id is None else None,
+            occupied=occupied,
+        )
+        if group is None:
+            _fail(
+                "explicit group cannot be represented by one positive integer transform",
+                group_id=group_id,
+            )
+        geometries, _group_scale = group
+        for index in indices:
+            transformed[index] = geometries[source_elements[index]["id"]]
 
     for index, geometry in transformed.items():
         response_elements[index].update(dict(zip(_GEOMETRY_FIELDS, geometry)))

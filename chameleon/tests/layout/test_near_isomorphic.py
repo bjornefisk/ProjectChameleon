@@ -224,6 +224,17 @@ class NearIsomorphicTests(unittest.TestCase):
         self.assertEqual(response["elements"][0]["width"], 1)
         self.assertEqual(response["elements"][1]["width"], 1)
 
+    def test_grouped_elements_prefer_source_transform_before_centering(self):
+        task = json.loads(
+            (ROOT / "input" / "chameleon_sample_level2_core.json").read_text(),
+            parse_int=int,
+            parse_float=Decimal,
+        )
+
+        response = solve_near_isomorphic(task["source"], task["target_canvas"])
+
+        validate_response(task["source"], task["target_canvas"], response)
+
     def test_small_source_font_is_not_enlarged_by_target_scale(self):
         source = {
             "canvas": {"width": 100, "height": 100},

@@ -16,12 +16,12 @@ The current tree contains a narrow deterministic near-isomorphic candidate path,
 The merge gate requires Gate 1 exit evidence, renderer goldens/native-library parity, and a clean native-amd64 offline run. The local Buildx build and offline run used amd64 emulation on the arm64 workstation, so native qualification remains unverified.
 
 **Observed evidence:**
-- `.venv/bin/python -m unittest discover -s chameleon/tests/layout -t chameleon -p 'test_*.py' -v` — 18 layout tests passed.
-- `make test` — 148 project tests and 47 review tests passed.
+- `.venv/bin/python -m unittest discover -s chameleon/tests/layout -t chameleon -p 'test_*.py' -v` — 19 layout tests passed, including the grouped source-separation regression and repeated render-hash check.
+- `make test` — 149 project tests and 47 review tests passed.
 - `make verify` — repository governance and implementation wiring passed.
-- `make run` — Level 1 committed a JSON/PNG pair; Level 2 failed closed with `NO_HARD_VALID_CANDIDATE: candidate failed serialized hard validation`; Level 3 failed closed with `NO_HARD_VALID_CANDIDATE: no integer text size fits the renderer bounds`.
+- `make run` — Levels 1 and 2 committed validated JSON/PNG pairs; Level 3 failed closed with `NO_HARD_VALID_CANDIDATE: explicit group cannot be represented by one positive integer transform`.
 - `make docker-build` — passed with the existing `FromPlatformFlagConstDisallowed` warning; the loaded image reports `linux/amd64` on the arm64 host.
-- `make docker-test` — exited 2 after the offline container run; Level 1 succeeded, Levels 2–3 failed closed, and failed-task artifacts were not published.
+- `make docker-test` — exited nonzero after the offline container run; Levels 1 and 2 succeeded, Level 3 failed closed, and failed-task artifacts were not published.
 - `.venv/bin/python scripts/review_pr.py --pr 12 --run-checks --docker --timeout 600` — Docker build passed inside the isolated review environment; runtime reached the container and reported the same bounded failures.
 - GitHub Actions run [38948474038](https://github.com/bjornefisk/ProjectChameleon/actions/runs/38948474038) — all CI steps passed, including Docker Buildx and image architecture checks.
 - The Level 1 PNG was `1080 × 1350` RGBA and the JSON passed `validate_response()`.

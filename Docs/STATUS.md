@@ -26,22 +26,26 @@ Local tests and arm64-host Docker emulation are supplemental evidence. They are 
 - Commit `549a3af` exposes host CLI plugins without exposing host Docker configuration.
 - GitHub Actions run [38948474038](https://github.com/bjornefisk/ProjectChameleon/actions/runs/38948474038) passed Buildx detection, the `linux/amd64` image build, and image-architecture verification.
 - CI now catches Docker build regressions. It does not claim native-amd64 or runtime qualification.
+- Grouped non-background records now try the source-relative transform before centering and reject legal translations that create source-separated AABB collisions; the Level 2 sample now commits a validated JSON/PNG pair locally.
+- The CI workflow now exercises the bounded sample batch in a native `x86_64` runner, verifies the expected failed-task cleanup, and imports the pinned renderer libraries with runtime networking disabled; the resulting run is still required before evidence is recorded.
+
 
 ### Open review findings
 
-1. Level 2 currently fails closed with `INFEASIBLE_LAYOUT: NO_HARD_VALID_CANDIDATE: candidate failed serialized hard validation`.
-2. Level 3 currently fails closed with `INFEASIBLE_LAYOUT: NO_HARD_VALID_CANDIDATE: no integer text size fits the renderer bounds`.
-3. The bounded Ticket 05 path still lacks column-pivot, horizontal-ribbon, vertical-restack, candidate ranking, cutoff/exhaustion, and held-out evaluation behavior.
-4. Renderer goldens, repeated render hashes, native-library parity, and a clean native-amd64 `--network none` run remain unverified.
-5. `make docker-test` remains aggregate-nonzero for the current bounded sample batch because Levels 2 and 3 fail; this is a product-scope finding, not a Docker daemon failure.
-6. The Docker build retains the non-blocking `FromPlatformFlagConstDisallowed` warning.
+1. Level 3 currently fails closed with `INFEASIBLE_LAYOUT: NO_HARD_VALID_CANDIDATE: explicit group cannot be represented by one positive integer transform`.
+2. The bounded Ticket 05 path still lacks column-pivot, horizontal-ribbon, vertical-restack, candidate ranking, cutoff/exhaustion, and held-out evaluation behavior.
+3. Renderer goldens and native-library parity remain unverified; the Level 1 integration test now checks repeated render hashes.
+4. A clean native-amd64 `--network none` run remains unverified; `make docker-test` remains aggregate-nonzero because Level 3 is intentionally outside the bounded path.
+5. The Docker build retains the non-blocking `FromPlatformFlagConstDisallowed` warning.
+
 
 ### Next review acceptance
 
-- Review Level 2 and Level 3 candidates against serialized hard validation before any soft scoring.
+- Review the Level 3 candidate against serialized hard validation before any soft scoring; do not expand Ticket 05 into the later topology tickets without the Gate 1 decision.
 - Verify every successful sample produces a committed JSON/PNG pair and every failed sample publishes neither artifact.
-- Add renderer golden, repeated-hash, native-library, and native-amd64 evidence before clearing the PR12 merge gate.
+- Run the native-amd64 CI smoke and record renderer/native-library evidence before clearing the PR12 merge gate.
 - Keep arm64-host Buildx output labeled supplemental evidence.
+
 
 ## Ground truth now recorded
 
@@ -175,4 +179,4 @@ docker run --rm --network none \
   chameleon-stage1
 ```
 
-The warning-only baseline self-check remains non-authoritative; Ticket 05 has only local Level 1 evidence and does not complete Gate 1. Accepted cutoff/search-status integration, renderer goldens/native-library parity, clean native amd64 run, and the full ADR-009 solver remain pending, so PR12 remains blocked.
+The warning-only baseline self-check remains non-authoritative; Ticket 05 has only bounded near-isomorphic evidence and does not complete Gate 1. Accepted cutoff/search-status integration, renderer goldens/native-library parity, clean native amd64 run, and the full ADR-009 solver remain pending, so PR12 remains blocked.
