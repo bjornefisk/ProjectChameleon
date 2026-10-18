@@ -40,6 +40,33 @@ class _Cluster:
     end: int
 
 
+def _collapse_crlf(text: str) -> tuple[str, List[int]]:
+    """Return one transient line-feed code point for each CRLF pair.
+
+    CRLF is one UAX #14 mandatory break.  The renderer receives transient
+    text, so collapsing the pair prevents the upstream explicit-line path
+    from rendering an extra empty line.  The returned source indices let the
+    converter project style maps back onto the shortened transient string.
+    """
+    if "\r\n" not in text:
+        return text, list(range(len(text)))
+
+    chars: List[str] = []
+    source_indices: List[int] = []
+    index = 0
+    while index < len(text):
+        if text[index] == "\r" and index + 1 < len(text) and text[index + 1] == "\n":
+            chars.append("\n")
+            source_indices.append(index)
+            index += 2
+            continue
+        chars.append(text[index])
+        source_indices.append(index)
+        index += 1
+    return "".join(chars), source_indices
+
+
+
 def char_widths(
     font_manager: FontManager, family: str, weight: str, style: str, size: float, text: str
 ) -> List[float]:
@@ -492,13 +519,43 @@ def wrap_text_with_line_map(
 ) -> Tuple[str, List[int], int]:
     """Return transient text, its upstream line map, and visual line count.
 
-    The text keeps one code point per source code point. A breakable source
-    space and a mandatory line separator may become ``"\\n"`` for the
-    renderer, while non-space UAX #14 breaks stay in place and are represented
-    only by the line map.
+    The text preserves source code points except that a CRLF pair becomes one
+    transient line-feed code point. Breakable spaces and mandatory separators
+    may become ``"\\n"`` for the renderer, while non-space UAX #14 breaks stay
+    in place and are represented only by the line map.
     """
     if not text:
         return text, [0], 1
+
+    original_text = text
+    if measure is None and len(widths) != len(original_text):
+        raise ValueError("widths must contain one advance per text code point")
+
+    text, source_indices = _collapse_crlf(original_text)
+    if text != original_text:
+        if measure is not None:
+            original_measure = measure
+
+            def normalized_measure(start: int, end: int) -> float:
+                if start >= end:
+                    return 0.0
+                return original_measure(source_indices[start], source_indices[end - 1] + 1)
+
+            measure = normalized_measure
+        if len(widths) == len(original_text):
+            widths = [
+                widths[index] + (
+                    widths[index + 1]
+                    if index + 1 < len(original_text)
+                    and original_text[index] == "\r"
+                    and original_text[index + 1] == "\n"
+                    else 0
+                )
+                for index in source_indices
+            ]
+        else:
+            widths = ()
+
     if measure is None:
         if len(widths) != len(text):
             raise ValueError("widths must contain one advance per text code point")

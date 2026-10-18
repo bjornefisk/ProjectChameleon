@@ -236,9 +236,16 @@ class RendererConformanceTests(unittest.TestCase):
             [4.0] * 4,
             100.0,
         )
-        self.assertEqual(wrapped, "A\n\nB")
-        self.assertEqual(line_indices, [0, 1, 1, 1])
+        self.assertEqual(wrapped, "A\nB")
+        self.assertEqual(line_indices, [0, 1, 1])
         self.assertEqual(line_count, 2)
+        converted = self.convert_text(content="A\r\nB")
+        self.assertEqual(converted["text"][0], "A\nB")
+        self.assertEqual(converted["text_line"][0], [0, 1, 1])
+
+    def test_renderer_requires_serialized_integer_font_size(self):
+        with self.assertRaises(MalformedTextError):
+            self.convert_text(font_size=24.9)
 
     def test_non_breaking_line_classes_are_not_wrappable(self):
         for text in ("A\u2007B", "A\u2060B"):
