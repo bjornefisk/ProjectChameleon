@@ -18,7 +18,7 @@ Authority/ADR impact:
 No contract or Accepted ADR is changed. AGENTS.md, Docs/STATUS.md, and the implementation frontier preserve source identity, immutable fields, finite integer serialization, exact ratios, rotated bounds, group rigidity, source-separated overlap, text/render bounds, missing assets, fail-closed behavior, offline runtime, and no generated/replaced pixels. No model, model weights/runtime, CP-SAT, OR-Tools, unapproved dependency/schema/API, shedding/hiding, opacity-zero/zero-size workaround, copy revision, font substitution, finale, horizontal ribbon, vertical restack, full ranking, or held-out evaluation is authorized by this run.
 
 Risk/data classification:
-High-risk contract/process documentation and dispatch metadata; repository source-design metadata only; no secrets or personal data. Security review found no secrets. Residual bounded relationship materialization, unbounded schema/render dimensions, and bounded font-search cutoff diagnostics are non-blocking, unchanged by this ticket, and owned by @bjornefisk; no silent resource limit or contract change is authorized.
+High-risk contract/process documentation and dispatch metadata; repository source-design metadata only; no secrets or personal data. Security review found no secrets. Residual bounded relationship materialization, unbounded schema/render dimensions, and bounded font-search cutoff diagnostics are non-blocking risks recorded by this ticket and owned by @bjornefisk; no silent resource limit or contract change is authorized.
 
 Integration owner:
 Main. The lead owns sibling-slice integration, shared verification, review coordination, and any later status transition.
