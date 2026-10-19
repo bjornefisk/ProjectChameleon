@@ -38,6 +38,12 @@ jobs:
 
       - name: Run tests
         run: make test
+      - name: Record native renderer qualification
+        run: |
+          uname -a
+          .venv/bin/python -m pip freeze
+          .venv/bin/python -m unittest discover \
+            -s chameleon/tests/renderer -t . -p 'test_renderer_golden.py' -v
 
       - name: Verify Docker Buildx
         run: docker buildx version
@@ -67,6 +73,15 @@ jobs:
           test -f chameleon/output/chameleon_sample_level2_core_output.png
           test ! -e chameleon/output/chameleon_sample_level3_advanced_output.json
           test ! -e chameleon/output/chameleon_sample_level3_advanced_output.png
+      - name: Record native sample artifact hashes
+        run: |
+          sha256sum \
+            chameleon/output/chameleon_sample_level1_warmup_output.json \
+            chameleon/output/chameleon_sample_level1_warmup_output.png \
+            chameleon/output/chameleon_sample_level2_core_output.json \
+            chameleon/output/chameleon_sample_level2_core_output.png
+          cat chameleon/output/chameleon_sample_level1_warmup_output.commit
+          cat chameleon/output/chameleon_sample_level2_core_output.commit
 
       - name: Verify offline native renderer imports
         run: docker run --rm --network none --entrypoint python chameleon-stage1 -c "import cr_renderer; import skia"

@@ -175,13 +175,33 @@ class RendererGoldenTests(unittest.TestCase):
         renderer.features = {key: None for key in reference}
         renderer.font_manager = self.font_manager
         reference_png = renderer.render(reference, max_size=2048, format="png")
+        adapter_sha256 = hashlib.sha256(actual_png).hexdigest()
+        reference_sha256 = hashlib.sha256(reference_png).hexdigest()
+        font_digest = hashlib.sha256()
+        for font_path in sorted(
+            path
+            for path in FONT_DIR.rglob("*")
+            if path.is_file() and path.suffix.lower() in {".otf", ".ttf"}
+        ):
+            font_digest.update(
+                font_path.relative_to(FONT_DIR).as_posix().encode("utf-8")
+            )
+            font_digest.update(font_path.read_bytes())
+        print(
+            "renderer_golden "
+            f"renderer_commit={direct_url['vcs_info']['commit_id']} "
+            f"renderer_version={distribution('cr-renderer').version} "
+            f"skia_version={distribution('skia-python').version} "
+            f"adapter_sha256={adapter_sha256} "
+            f"reference_sha256={reference_sha256} "
+            f"font_tree_sha256={font_digest.hexdigest()} "
+            "png_size=96x64"
+        )
+
 
         # Hash equality compares the real project adapter's output to a
         # separately assembled call into the pinned native Skia renderer.
-        self.assertEqual(
-            hashlib.sha256(actual_png).hexdigest(),
-            hashlib.sha256(reference_png).hexdigest(),
-        )
+        self.assertEqual(adapter_sha256, reference_sha256)
         self.assertEqual(Image.open(io.BytesIO(actual_png)).size, (96, 64))
         self.assertEqual(Image.open(io.BytesIO(reference_png)).size, (96, 64))
 
