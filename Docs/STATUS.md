@@ -27,16 +27,35 @@ Local tests and arm64-host Docker emulation are supplemental evidence. They are 
 - GitHub Actions run [39165434665](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39165434665) passed the native `x86_64` Docker Buildx build, image-architecture check, bounded offline sample batch, failed-task cleanup checks, and offline `cr_renderer`/`skia` imports.
 - CI now catches Docker build and bounded runtime regressions. This is native GitHub-host evidence, not renderer golden or full Gate 1 qualification.
 - Grouped non-background records now try the source-relative transform before centering and reject legal translations that create source-separated AABB collisions; the Level 2 sample now commits a validated JSON/PNG pair locally.
-- The Level 1 integration test checks repeated render hashes; the new adapter-to-pinned-renderer seam passes in refreshed CI, while broader renderer goldens and native-library parity remain unverified.
-- Commit `0f3d9ab` adds an independent adapter-to-pinned-renderer golden seam; refreshed native GitHub Actions run [39183646457](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39183646457) passes it, but cross-runtime PNG parity remains unverified.
+- The Level 1 integration test checks repeated render hashes; the native x86_64 qualification run now records the representative golden and sample artifact hashes below.
+- Commit `0f3d9ab` adds the independent adapter-to-pinned-renderer golden seam; run [39184874691](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39184874691) passes it on the x86_64 runner, while broader corpus and cross-runtime parity remain open.
+
+### Native x86_64 evidence — run 39184874691
+
+- Runner: `Linux runnervm8k3b6 6.17.0-1022-azure #22-Ubuntu SMP Mon Jul 27 17:24:03 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux`.
+- Pinned renderer: `cr-renderer` commit `a17e1fb9a732959dd6c21ae168d5ee09d74bd64f`, version `0.1.0`.
+- Native renderer binding: `skia-python==132.0b11`.
+- Packaged font tree hash: `c9b22d1fe1dcccea9035bd23fd5fb0ac3aec1cd3ad1b3b6e68eb06d76e8dc0fa`.
+- Representative adapter/reference PNG hash: `19a11e30c2dc2dcd7a63c1076b3e98c87c7b3727878866e35a330a3d7ba6049c`; dimensions `96x64`; adapter and direct pinned-renderer hashes match.
+- `--network none` sample run committed Level 1 and Level 2 pairs, left no Level 3 pair, and the commit manifests matched the final JSON/PNG hashes.
+
+| Sample artifact | Local arm64 host | Native amd64 image |
+| --- | --- | --- |
+| Level 1 JSON | `237a8a9eeeeae02ab954bf820fc0294b2501890097c390b3bb6c0c148d2744ba` | `237a8a9eeeeae02ab954bf820fc0294b2501890097c390b3bb6c0c148d2744ba` |
+| Level 1 PNG | `e04df5d20fb99784765fe3dc5d67268b73c34e7ac7a8c631b4907117f3ff4b9e` | `71e0be9ea2ae55ab860100fed77ce870e1f531da8f74df05adb67414cf27cea0` |
+| Level 2 JSON | `49b17c7ea73c8e17853bf52cbbe9ea41b2180ac55ac4801a5b25f3334b01a2ae` | `36d0021a66234fb56e8a65b27e8756055c03dba868d388679a933c415470af3c` |
+| Level 2 PNG | `f180d57e81c7d7ec2e72bf823d50df75a92e274bc5775f8255311fda273ce102` | `5a8b63e64a6191e78a242c69ccf6ab7219c843874f18d72d63f40f5fd2b49925` |
+
+The Level 2 JSON semantic diff is `badge_label.font_size`: `6` on the arm64 host and `5` in the amd64 image. This is an observed cross-runtime measurement difference; it is recorded, not normalized away.
+
 
 
 ### Open review findings
 
 1. Level 3 currently fails closed with `INCOMPLETE_SEARCH: explicit group cannot be represented by one positive integer transform`.
 2. The bounded Ticket 05 path still lacks column-pivot, horizontal-ribbon, vertical-restack, candidate ranking, cutoff/exhaustion, and held-out evaluation behavior.
-3. The adapter-to-pinned-renderer golden seam now exists and passes in refreshed CI; cross-platform/native-library parity and the complete renderer corpus remain unverified.
-4. Native `x86_64` CI smoke now passes the bounded sample batch and the new adapter-to-pinned-renderer seam; broader renderer/native-parity qualification remains unverified, and `make docker-test` remains aggregate-nonzero because Level 3 is intentionally outside the bounded path.
+3. The representative adapter-to-pinned-renderer seam and native sample hashes now pass in run `39184874691`; broader renderer corpus coverage and cross-runtime/native-library parity remain unverified.
+4. Native `x86_64` CI now records exact bounded sample artifacts and passes offline imports; the host/image `badge_label.font_size` difference and PNG hash divergence remain unresolved, and `make docker-test` remains aggregate-nonzero because Level 3 is intentionally outside the bounded path.
 5. The Docker build retains the non-blocking `FromPlatformFlagConstDisallowed` warning.
 
 
@@ -44,7 +63,7 @@ Local tests and arm64-host Docker emulation are supplemental evidence. They are 
 
 - Review the Level 3 candidate against serialized hard validation before any soft scoring; do not expand Ticket 05 into the later topology tickets without the Gate 1 decision.
 - Verify every successful sample produces a committed JSON/PNG pair and every failed sample publishes neither artifact.
-- Confirm renderer golden/native-parity evidence and preserve the successful native-amd64 CI run before clearing the PR12 merge gate.
+- Confirm broader renderer corpus coverage and resolve or formally accept the observed host/image parity differences before clearing the PR12 merge gate.
 - Keep arm64-host Buildx output labeled supplemental evidence.
 
 ## Ticket 06 preflight gate
@@ -195,6 +214,7 @@ Ticket 05 is implemented within its bounded Level 1 near-isomorphic scope throug
 - `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 20 focused tests passed, including grouped cover feasibility, source-bleed edge relocation, font-size preference, bounded-search status, renderer-gate, and repeated render-hash checks.
 - `./.venv/bin/python -m unittest discover -s chameleon/tests/renderer -t . -p 'test_renderer_golden.py' -v` — 1 adapter-to-pinned-renderer golden test passed locally; the test also asserts the installed renderer commit.
 - GitHub Actions run [39183646457](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39183646457) — refreshed native `x86_64` CI passed the golden seam, bounded runtime, and offline import checks.
+- GitHub Actions run [39184874691](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39184874691) — native `x86_64` runner recorded the pinned renderer/font provenance, representative golden hash, sample JSON/PNG hashes, and commit manifests; see the evidence table above.
 - `python3 scripts/verify_repository.py`, changed-file `py_compile`, and `git diff --check` — passed.
 - `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1 as expected for the mixed sample batch; Levels 1 and 2 returned `SUCCESS` and committed valid JSON/PNG pairs, while Level 3 returned `INCOMPLETE_SEARCH` and published no failed-task artifacts.
 - The Level 2 success is still produced by Ticket 05's near-isomorphic candidate; it is not column-pivot or role-inference evidence.
@@ -215,4 +235,4 @@ docker run --rm --network none \
   chameleon-stage1
 ```
 
-The warning-only self-check remains non-authoritative. Ticket 05 has local bounded evidence but does not complete Gate 1. The adapter-to-pinned-renderer golden seam passes locally and in refreshed native CI; cross-runtime/native-library parity, the broader renderer corpus, full accepted cutoff/exhaustion semantics, and clean native amd64 deployment qualification remain pending. The full ADR-009 search is later solver work, not a prerequisite to begin Ticket 06 after the gate is formally cleared.
+The warning-only self-check remains non-authoritative. Ticket 05 has local bounded evidence but does not complete Gate 1. The representative adapter-to-pinned-renderer golden and bounded native x86_64 sample evidence are now recorded; the observed host/image `badge_label.font_size` difference, cross-runtime PNG divergence, broader renderer corpus, full accepted cutoff/exhaustion semantics, and explicit phase-frontier approval remain pending. The full ADR-009 search is later solver work, not a prerequisite to begin Ticket 06 after the gate is formally cleared.
