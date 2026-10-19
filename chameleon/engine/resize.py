@@ -60,7 +60,10 @@ def resize(
                 raise
             try:
                 response = solve_near_isomorphic(source, target_canvas)
-            except InfeasibleLayoutError as near_error:
+            except Exception as raw_near_error:
+                near_error = _coerce_layout_error(raw_near_error)
+                if near_error is None:
+                    raise
                 raise InfeasibleLayoutError(
                     near_error.reason_code,
                     "bounded candidate families failed",
@@ -80,7 +83,13 @@ def resize(
                     },
                 ) from near_error
     else:
-        response = solve_near_isomorphic(source, target_canvas)
+        try:
+            response = solve_near_isomorphic(source, target_canvas)
+        except Exception as raw_near_error:
+            near_error = _coerce_layout_error(raw_near_error)
+            if near_error is None:
+                raise
+            raise near_error from raw_near_error
 
     try:
         validate_response(source, target_canvas, response)
