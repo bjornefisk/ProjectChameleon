@@ -505,6 +505,7 @@ def render_design_to_png(
     png_path: Union[str, Path],
     fonts_dir: Optional[Union[str, Path]] = None,
     max_size: Optional[int] = None,
+    font_manager=None,
 ) -> List[str]:
     """Render a CHAMELEON design (flat `{"canvas", "elements"}` shape) to a
     PNG file. This is what `engine/main.py` calls
@@ -512,13 +513,19 @@ def render_design_to_png(
 
     `fonts_dir` defaults to a `fonts/` folder next to `assets_dir` (i.e.
     `brand_kit/assets` + `brand_kit/fonts`), matching this repo's layout.
-    Returns the list of conversion warnings (missing assets, unknown
-    element types, etc.) for the caller to log.
+    Pass `font_manager` when conversion and rendering must share a caller-owned
+    font registry. Returns conversion warnings (missing assets, unknown element
+    types, etc.) for the caller to log.
     """
     assets_dir = str(assets_dir)
     fonts_dir = str(fonts_dir) if fonts_dir is not None else str(Path(assets_dir).parent / "fonts")
 
-    renderer = _get_renderer(fonts_dir)
+    if font_manager is None:
+        renderer = _get_renderer(fonts_dir)
+    else:
+        renderer = CrelloV5Renderer.__new__(CrelloV5Renderer)
+        renderer.features = _STUB_FEATURES
+        renderer.font_manager = font_manager
     example, warnings = convert_chameleon_to_crello(design, renderer.font_manager, assets_dir)
     image_bytes = renderer.render(example, max_size=max_size or 2048, format="png")
     Path(png_path).write_bytes(image_bytes)

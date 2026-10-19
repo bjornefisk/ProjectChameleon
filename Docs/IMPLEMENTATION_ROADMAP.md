@@ -4,7 +4,7 @@
 
 ## Ratified delivery plan
 
-Decision ratification is complete and documentation-only. Do not claim implementation, conformance, or runtime qualification until the gates below have evidence. Do not start the solver until each gate below has evidence. The order protects the score: structural validity first, rendered quality second, finale polish last.
+Decision ratification is complete and documentation-only. Do not claim implementation, conformance, or runtime qualification until the gates below have evidence. Do not dispatch or merge solver work until Gate 1 evidence and its status update are complete. Later gates govern later solver capabilities and offline qualification. The order protects the score: structural validity first, rendered quality second, finale polish last.
 
 ### Gate 0 — Contract and evidence (complete; documentation only)
 
@@ -14,7 +14,7 @@ Decision ratification is complete and documentation-only. Do not claim implement
 - Treat the three shipped samples plus the contract fixtures as regression inputs, not as the whole hidden-test universe.
 - Gate 0 acceptance records decisions only; it is not implementation or qualification evidence.
 
-### Gate 1 — Renderer and validator qualification (pending; no layout solver yet)
+### Gate 1 — Renderer and validator qualification (pending; solver work blocked from merge)
 
 - Build the pinned `linux/amd64` environment and prove local fonts/assets work with `--network none`.
 - Establish the semantic validator around identity/order/fixed fields, finite integer geometry, rotated AABB, exact foreground image ratio, group/overlap policy, text bounds, and missing-asset preservation.
@@ -94,7 +94,7 @@ The original design review identified five corrections; all are resolved or supe
 
 The pinned `cr-renderer` source also changes the typography assumptions in the earlier proposal. It renders explicit `lineMap` entries and does not insert width-based line breaks. `lineHeight` multiplies the font size for each line's vertical offset, `letterSpacing` is added between glyph positions, images are drawn by stretching the full source rectangle into the destination rectangle, and rotation is applied around the element's local center. The relevant immutable sources are [schema.py](https://raw.githubusercontent.com/CyberAgentAILab/cr-renderer/a17e1fb9a732959dd6c21ae168d5ee09d74bd64f/src/cr_renderer/schema.py), [text_utils.py](https://raw.githubusercontent.com/CyberAgentAILab/cr-renderer/a17e1fb9a732959dd6c21ae168d5ee09d74bd64f/src/cr_renderer/text_utils.py), and [renderer.py](https://raw.githubusercontent.com/CyberAgentAILab/cr-renderer/a17e1fb9a732959dd6c21ae168d5ee09d74bd64f/src/cr_renderer/renderer.py).
 
-The following review notes are retained for rationale and are subordinate to the ratified contract above. The repository now includes schema, dependency, fixture, and contract-document changes; the engine and solver remain intentionally unimplemented.
+The following review notes are retained for rationale and are subordinate to the ratified contract above. The repository now includes schema, dependency, fixture, contract, renderer, validator, runner, geometry, and bounded Level 1 implementation work; full architecture implementation and qualification remain unclaimed.
 
 ## Historical review notes (non-normative)
 

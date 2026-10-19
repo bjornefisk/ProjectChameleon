@@ -1,22 +1,86 @@
 # Project Chameleon status
 
-**Date:** 2026-10-14
+**Date:** 2026-10-18
 
-**Phase:** Tickets 01, 02, 03, 04, and 05 implementation complete within their bounded scopes; full Gate 1 qualification and later solver gates remain pending.
+**Phase:** Tickets 01, 02, 03, 04, and 05 implementation complete within bounded scopes; full Gate 1 qualification and later solver gates remain pending.
 **Decision status:** Tickets 01–05 have local implementation evidence. Ticket 05 covers only the deterministic Level 1 near-isomorphic path; deterministic cutoff/full-search semantics, later topology families, ranking, and full runtime qualification remain pending.
 
 ## PR12 merge gate
 
-The bounded Ticket 05 implementation exists on a blocked review branch. It does not advance the project phase or complete Gate 1.
+The bounded Ticket 05 implementation is present on this branch for review. It does not advance the project phase or complete Gate 1.
 
 PR12 MUST remain unmerged until the repository records:
 
-- renderer goldens, repeated render hashes, and native-library parity;
+- renderer golden/parity evidence, recorded repeated render hashes, and native-library parity;
 - a clean native `linux/amd64` build and `--network none` run;
 - synchronized status and implementation-frontier documentation;
 - accepted phase ownership through the repository change-control process, if the project advances before all planned gates close.
 
 Local tests and arm64-host Docker emulation are supplemental evidence. They are not native-amd64 qualification.
+
+## PR12 next-review handoff
+
+### Resolved review finding
+
+- The review capsule hid Docker CLI plugins inside its isolated `DOCKER_CONFIG`; `docker buildx` then failed before image build with `unknown flag: --platform`.
+- Commit `549a3af` exposes host CLI plugins without exposing host Docker configuration.
+- GitHub Actions run [39165434665](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39165434665) passed the native `x86_64` Docker Buildx build, image-architecture check, bounded offline sample batch, failed-task cleanup checks, and offline `cr_renderer`/`skia` imports.
+- CI now catches Docker build and bounded runtime regressions. This is native GitHub-host evidence, not renderer golden or full Gate 1 qualification.
+- Grouped non-background records now try the source-relative transform before centering and reject legal translations that create source-separated AABB collisions; the Level 2 sample now commits a validated JSON/PNG pair locally.
+- The Level 1 integration test checks repeated render hashes; the native x86_64 qualification run now records the representative golden and sample artifact hashes below.
+- Commit `0f3d9ab` adds the independent adapter-to-pinned-renderer golden seam; run [39184874691](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39184874691) passes it on the x86_64 runner, while broader corpus and cross-runtime parity remain open.
+
+### Native x86_64 evidence — run 39184874691
+
+- Runner: `Linux runnervm8k3b6 6.17.0-1022-azure #22-Ubuntu SMP Mon Jul 27 17:24:03 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux`.
+- Pinned renderer: `cr-renderer` commit `a17e1fb9a732959dd6c21ae168d5ee09d74bd64f`, version `0.1.0`.
+- Native renderer binding: `skia-python==132.0b11`.
+- Packaged font tree hash: `c9b22d1fe1dcccea9035bd23fd5fb0ac3aec1cd3ad1b3b6e68eb06d76e8dc0fa`.
+- Representative adapter/reference PNG hash: `19a11e30c2dc2dcd7a63c1076b3e98c87c7b3727878866e35a330a3d7ba6049c`; dimensions `96x64`; adapter and direct pinned-renderer hashes match.
+- `--network none` sample run committed Level 1 and Level 2 pairs, left no Level 3 pair, and the commit manifests matched the final JSON/PNG hashes.
+
+| Sample artifact | Local arm64 host | Native amd64 image |
+| --- | --- | --- |
+| Level 1 JSON | `237a8a9eeeeae02ab954bf820fc0294b2501890097c390b3bb6c0c148d2744ba` | `237a8a9eeeeae02ab954bf820fc0294b2501890097c390b3bb6c0c148d2744ba` |
+| Level 1 PNG | `e04df5d20fb99784765fe3dc5d67268b73c34e7ac7a8c631b4907117f3ff4b9e` | `71e0be9ea2ae55ab860100fed77ce870e1f531da8f74df05adb67414cf27cea0` |
+| Level 2 JSON | `49b17c7ea73c8e17853bf52cbbe9ea41b2180ac55ac4801a5b25f3334b01a2ae` | `36d0021a66234fb56e8a65b27e8756055c03dba868d388679a933c415470af3c` |
+| Level 2 PNG | `f180d57e81c7d7ec2e72bf823d50df75a92e274bc5775f8255311fda273ce102` | `5a8b63e64a6191e78a242c69ccf6ab7219c843874f18d72d63f40f5fd2b49925` |
+
+The Level 2 JSON semantic diff is `badge_label.font_size`: `6` on the arm64 host and `5` in the amd64 image. This is an observed cross-runtime measurement difference; it is recorded, not normalized away.
+
+
+
+### Open review findings
+
+1. Level 3 currently fails closed with `INCOMPLETE_SEARCH: explicit group cannot be represented by one positive integer transform`.
+2. The bounded Ticket 05 path still lacks column-pivot, horizontal-ribbon, vertical-restack, candidate ranking, cutoff/exhaustion, and held-out evaluation behavior.
+3. The representative adapter-to-pinned-renderer seam and native sample hashes now pass in run `39184874691`; broader renderer corpus coverage and cross-runtime/native-library parity remain unverified.
+4. Native `x86_64` CI now records exact bounded sample artifacts and passes offline imports; the host/image `badge_label.font_size` difference and PNG hash divergence remain unresolved, and `make docker-test` remains aggregate-nonzero because Level 3 is intentionally outside the bounded path.
+5. The Docker build retains the non-blocking `FromPlatformFlagConstDisallowed` warning.
+
+
+### Next review acceptance
+
+- Review the Level 3 candidate against serialized hard validation before any soft scoring; do not expand Ticket 05 into the later topology tickets without the Gate 1 decision.
+- Verify every successful sample produces a committed JSON/PNG pair and every failed sample publishes neither artifact.
+- Confirm broader renderer corpus coverage and resolve or formally accept the observed host/image parity differences before clearing the PR12 merge gate.
+- Keep arm64-host Buildx output labeled supplemental evidence.
+
+## Ticket 06 preflight gate
+
+Ticket 06 is not dispatchable yet. It is blocked by the Gate 1 phase gate in addition to its Ticket 05 dependency. The current Level 2 pair is bounded Ticket 05 near-isomorphic output, not column-pivot evidence.
+
+Before dispatch, the project must record:
+
+- **Gate 1 renderer/validator qualification:** serialized hard-validation and renderer-edge evidence, including deterministic renderer goldens and native-library parity.
+- **Native/offline runtime:** a clean `linux/amd64` build and `--network none` run with packaged fonts/assets, renderer imports, pair publication, and failed-task cleanup. Arm64-host emulation remains supplemental.
+- **Ticket 05 acceptance:** owner/reviewer acceptance of the bounded Level 1 path and its fail-closed Level 3 behavior; the Ticket 05 PR and phase state must be updated accordingly.
+- **Frontier/change control:** synchronized status, implementation-frontier, and ticket state, plus approved phase ownership before solver work is dispatched.
+- **Cutoff semantics disposition:** explicitly record whether producer-level cutoff/exhaustion behavior is a Gate 1 exit criterion or a later search-ticket dependency; neither interpretation may be silently assumed.
+
+Ticket 06 does not require Ticket 07 or Ticket 08 to be implemented first. Level 3 may remain `INCOMPLETE_SEARCH`; full macro-search/ranking belongs to Ticket 08. Ticket 06 must preserve those future seams and must not add a fixed aspect-ratio routing contract.
+
+
 
 ## Ground truth now recorded
 
@@ -69,8 +133,8 @@ These are intentionally visible; none is silently promoted to contract behavior:
 
 1. Ticket 05 implements only the deterministic near-isomorphic Level 1 candidate; column-pivot, horizontal-ribbon, vertical-re-stack, multi-candidate ranking, cutoff/exhaustion, and held-out evaluation paths remain unimplemented.
 2. `engine/main.py` has a warning-only self-check that checks unrotated rectangles and ID sets; it is not the contract validator.
-3. Renderer goldens and native-amd64 qualification remain; ticket 02 now covers style-run end handling, Unicode-safe wrapping, CRLF as one transient mandatory break, letter-spacing/style-width measurement, mandatory/non-space line-map handling, serialized integer font-size enforcement, positioned glyph-bound rejection, explicit line/max-lines/height enforcement, and rectangle/ellipse stroke rasterization.
-4. The runner's typed-status, private staging, marker-gated pair publication, stale-path quarantine, aggregate exit, exact target validation, exact numeric ingress, and half-even serialization paths are implemented and focused-tested; the inspector now rejects symlinked inspection roots, while deterministic cutoff producer semantics remain absent from the observed solver path.
+3. The adapter-to-pinned-renderer golden seam covers a representative text/shape path and the native amd64 bounded sample is qualified; broader renderer goldens and cross-runtime/native-library parity remain unverified.
+4. The runner's typed-status, private staging, marker-gated pair publication, stale-path quarantine, aggregate exit, exact target validation, exact numeric ingress, and half-even serialization paths are implemented and focused-tested; the inspector now rejects symlinked inspection roots, while full deterministic cutoff/exhaustion producer semantics remain absent from the observed solver path.
 5. The deterministic role-inference and four-topology candidate search, renderer-in-loop ranking, cutoff/exhaustion distinction, and held-out evaluation path have not been implemented beyond the bounded Level 1 near-isomorphic candidate.
 6. The Docker build has no project-owned hash-locked wheelhouse or apt-version lock; the direct compatibility pins are an initial baseline.
 
@@ -81,7 +145,7 @@ These are intentionally visible; none is silently promoted to contract behavior:
 - Final model allowlist and model-size cap.
 - Official scoring threshold details and complete target catalogue.
 - Font licenses/embedded metadata and final Adobe Express font availability.
-- Clean native-amd64 build, PNG determinism, native-library closure, and Apple Silicon Buildx parity.
+- Native GitHub `x86_64` smoke is observed for the bounded sample batch; official deployment qualification, renderer/native parity beyond imports, and Apple Silicon Buildx parity remain unverified.
 - Final Adobe Express deployment/backend topology.
 
 These are not unresolved internal design choices. They require external facts or the implementation/conformance phase.
@@ -146,10 +210,13 @@ The hidden `.<stem>_output.commit` marker is the pair manifest and commit author
 ## Ticket 05 boundary and verification record
 
 Ticket 05 is implemented within its bounded Level 1 near-isomorphic scope through `chameleon/engine/layout/near_isomorphic.py`, `engine/resize.py`, and `tests/layout`. It does not claim the ADR-009 four-topology search, candidate ranking, or exhausted-search infeasibility.
-- `make test` — passed.
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 11 focused tests passed, including grouped cover feasibility, source-bleed edge relocation, font-size preference, and bounded-search status regressions.
+- `make test` — 155 project tests and 47 review tests passed in the current native qualification run.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 20 focused tests passed, including grouped cover feasibility, source-bleed edge relocation, font-size preference, bounded-search status, renderer-gate, and repeated render-hash checks.
+- `./.venv/bin/python -m unittest discover -s chameleon/tests/renderer -t . -p 'test_renderer_golden.py' -v` — 1 adapter-to-pinned-renderer golden test passed locally; the test also asserts the installed renderer commit.
+- GitHub Actions run [39184874691](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39184874691) — native `x86_64` runner recorded the pinned renderer/font provenance, representative golden hash, sample JSON/PNG hashes, and commit manifests; see the evidence table above.
 - `python3 scripts/verify_repository.py`, changed-file `py_compile`, and `git diff --check` — passed.
-- `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1 as expected for the mixed sample batch; Level 1 returned `SUCCESS`, while bounded Level 2/3 failures returned `INCOMPLETE_SEARCH` and published no failed-task artifacts.
+- `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1 as expected for the mixed sample batch; Levels 1 and 2 returned `SUCCESS` and committed valid JSON/PNG pairs, while Level 3 returned `INCOMPLETE_SEARCH` and published no failed-task artifacts.
+- The Level 2 success is still produced by Ticket 05's near-isomorphic candidate; it is not column-pivot or role-inference evidence.
 - The committed Level 1 PNG is `1080 × 1350` RGBA; its serialized JSON passes `validate_response()`.
 
 
@@ -167,4 +234,4 @@ docker run --rm --network none \
   chameleon-stage1
 ```
 
-The warning-only self-check remains non-authoritative; Ticket 05 has only local Level 1 evidence and does not complete Gate 1. Bounded `INCOMPLETE_SEARCH` reporting is implemented, while full accepted cutoff/exhaustion semantics, renderer goldens/native-library parity, clean native amd64 run, and the full ADR-009 solver remain pending.
+The warning-only self-check remains non-authoritative. Ticket 05 has local bounded evidence but does not complete Gate 1. The representative adapter-to-pinned-renderer golden and bounded native x86_64 sample evidence are now recorded; the observed host/image `badge_label.font_size` difference, cross-runtime PNG divergence, broader renderer corpus, full accepted cutoff/exhaustion semantics, and explicit phase-frontier approval remain pending. The full ADR-009 search is later solver work, not a prerequisite to begin Ticket 06 after the gate is formally cleared.

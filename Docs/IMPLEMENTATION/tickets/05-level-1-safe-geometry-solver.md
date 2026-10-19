@@ -8,16 +8,25 @@ The first end-to-end working layout solver in `chameleon/engine/resize.py` that 
 - `03: Atomic Batch Staging and Fail-Closed Runner`
 - `04: Exact Rational Geometry, Bounds, and Group Transforms`
 **Status:**  
-implemented with local Level 1 solver, resize-time semantic validation, and warmup render evidence; bounded failures now report `INCOMPLETE_SEARCH`; full Gate 1 qualification, later topology families, ranking, and exhausted-search infeasibility remain pending
+implemented with local Level 1 solver, resize-time semantic validation, and warmup render evidence; bounded failures report `INCOMPLETE_SEARCH`; full Gate 1 qualification, later topology families, ranking, and exhausted-search infeasibility remain pending
 **Merge status:**
 Blocked until Gate 1 exit evidence and native-amd64 qualification are accepted. This bounded implementation remains phase-gated review work and does not advance the project frontier.
-
 The current tree contains a narrow deterministic near-isomorphic candidate path, not the complete ADR-009 four-topology search/ranking implementation. Ticket 05 is complete within its Level 1 scope without changing the public schema, renderer contract, dependency baseline, or runner publication protocol.
 
+**Merge gate:**
+The merge gate requires Gate 1 exit evidence and renderer goldens/native-library parity. Commit `0f3d9ab` adds an independent adapter-to-pinned-renderer golden seam, and native `x86_64` CI run [39184874691](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39184874691) records matching adapter/reference hashes, pinned renderer/font provenance, and bounded sample artifact hashes. The broader renderer corpus, host/image parity difference, and full phase gate remain unverified; local Buildx evidence is amd64 emulation on the arm64 workstation.
+
 **Observed evidence:**
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 11 focused tests passed, including bounded-search status regressions.
-- `make test` — passed.
-- `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1 as expected for the mixed sample batch; Level 1 returned `SUCCESS`, while bounded Level 2/3 failures returned `INCOMPLETE_SEARCH` and published no failed-task artifacts.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 20 layout tests passed, including the grouped source-separation regression, bounded-search status, renderer-gate, and repeated render-hash checks.
+- `make test` — 155 project tests and 47 review tests passed in the current qualification run.
+- `make verify` — repository governance and implementation wiring passed.
+- `make run` — Levels 1 and 2 committed validated JSON/PNG pairs; Level 3 failed closed with `INCOMPLETE_SEARCH: explicit group cannot be represented by one positive integer transform`.
+- `make docker-build` — passed with the existing `FromPlatformFlagConstDisallowed` warning; the loaded image reports `linux/amd64` on the arm64 host.
+- `make docker-test` — exited nonzero after the offline container run; Levels 1 and 2 succeeded, Level 3 failed closed with `INCOMPLETE_SEARCH`, and failed-task artifacts were not published.
+- `./.venv/bin/python scripts/review_pr.py --pr 12 --repo bjornefisk/ProjectChameleon --run-checks --docker --timeout 600` — capsule `pr-12-c394c649674e4796bb540b1d4d4088c2` passed diff-check, verify, tests, and Docker build; its expected aggregate `run`/`docker-test` failures are the Level 3 `INCOMPLETE_SEARCH` with no failed-task artifacts, while Levels 1 and 2 succeeded.
+- GitHub Actions run [39165434665](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39165434665) — native `x86_64` CI passed Docker Buildx, image architecture, bounded offline runtime, failed-task cleanup, and offline renderer imports.
+- The Level 1 PNG was `1080 × 1350` RGBA and the JSON passed `validate_response()`.
+- The new adapter-to-pinned-renderer golden test passed locally and in native CI, including renderer commit provenance; exact native hashes and the observed host/image `badge_label.font_size` difference are recorded in [`Docs/STATUS.md`](../../STATUS.md).
 
 - [x] Implement `chameleon/engine/layout/near_isomorphic.py` to generate safe near-isomorphic layouts for moderate aspect-ratio changes.
 - [x] Implement background detection: identify full-canvas images with `fit="cover"` and resize them to match the target canvas while preserving cover semantics.

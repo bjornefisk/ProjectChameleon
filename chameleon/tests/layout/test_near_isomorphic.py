@@ -1,9 +1,13 @@
 import copy
 import json
+import subprocess
 import sys
+import tempfile
 import unittest
 from decimal import Decimal
 from pathlib import Path
+
+from PIL import UnidentifiedImageError
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
@@ -190,11 +194,196 @@ class NearIsomorphicTests(unittest.TestCase):
             ],
         }
 
-        target_canvas = {"width": 200, "height": 100}
-        response = solve_near_isomorphic(source, target_canvas)
+        response = solve_near_isomorphic(source, {"width": 200, "height": 100})
 
-        validate_response(source, target_canvas, response)
+        validate_response(source, {"width": 200, "height": 100}, response)
         self.assertEqual(response["elements"][0]["x"], -10)
+
+    def test_group_can_choose_smaller_integral_scale_when_global_scale_does_not_fit(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                {
+                    "id": "left",
+                    "type": "shape",
+                    "x": 0,
+                    "y": 0,
+                    "width": 2,
+                    "height": 2,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(1,2,3,1)",
+                    "group_id": "unit",
+                },
+                {
+                    "id": "right",
+                    "type": "shape",
+                    "x": 88,
+                    "y": 0,
+                    "width": 2,
+                    "height": 2,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(1,2,3,1)",
+                    "group_id": "unit",
+                },
+            ],
+        }
+
+        response = solve_near_isomorphic(source, {"width": 80, "height": 80})
+
+        validate_response(source, {"width": 80, "height": 80}, response)
+        self.assertEqual(response["elements"][0]["width"], 1)
+        self.assertEqual(response["elements"][1]["width"], 1)
+
+    def test_grouped_elements_prefer_source_transform_before_centering(self):
+        task = json.loads(
+            (ROOT / "input" / "chameleon_sample_level2_core.json").read_text(),
+            parse_int=int,
+            parse_float=Decimal,
+        )
+
+        response = solve_near_isomorphic(task["source"], task["target_canvas"])
+
+        validate_response(task["source"], task["target_canvas"], response)
+
+    def test_small_source_font_is_not_enlarged_by_target_scale(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                text_element(
+                    x=10,
+                    y=10,
+                    width=80,
+                    height=30,
+                    content="A",
+                    font_size=5,
+                    text_align="center",
+                )
+            ],
+        }
+        manager = load_brand_font_manager(str(FONTS))
+
+        response = solve_near_isomorphic(
+            source,
+            {"width": 200, "height": 200},
+            font_manager=manager,
+        )
+
+        self.assertLessEqual(response["elements"][0]["font_size"], 5)
+
+    def test_renderer_failure_is_checked_before_candidate_return(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                {
+                    "id": "corrupt",
+                    "type": "image",
+                    "x": 10,
+                    "y": 10,
+                    "width": 20,
+                    "height": 20,
+                    "asset_id": "corrupt.png",
+                    "fit": "contain",
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            corrupt_asset = Path(directory) / "corrupt.png"
+            corrupt_asset.write_text("not a PNG", encoding="utf-8")
+            with self.assertRaises(UnidentifiedImageError):
+                solve_near_isomorphic(
+                    source,
+                    source["canvas"],
+                    assets_dir=directory,
+                    fonts_dir=str(FONTS),
+                )
+
+
+    def test_half_even_font_size_ceiling_is_preserved(self):
+        source = {
+            "canvas": {"width": 200, "height": 100},
+            "elements": [
+                text_element(
+                    x=10,
+                    y=10,
+                    width=160,
+                    height=40,
+                    content="A",
+                    font_size=Decimal("10.6"),
+                    text_align="center",
+                )
+            ],
+        }
+        manager = load_brand_font_manager(str(FONTS))
+
+        response = solve_near_isomorphic(
+            source,
+            source["canvas"],
+            font_manager=manager,
+        )
+
+        self.assertEqual(response["elements"][0]["font_size"], 11)
+
+    def test_renderer_gate_uses_supplied_font_manager(self):
+        source = {
+            "canvas": {"width": 200, "height": 100},
+            "elements": [
+                text_element(
+                    x=10,
+                    y=10,
+                    width=160,
+                    height=40,
+                    content="A",
+                    font_family="Custom Family",
+                    font_size=12,
+                    text_align="center",
+                )
+            ],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            custom_fonts = Path(directory) / "fonts"
+            custom_fonts.mkdir()
+            (
+                custom_fonts / "CustomFamily-Regular.ttf"
+            ).write_bytes((FONTS / "SolsticeSans-Regular.ttf").read_bytes())
+            manager = load_brand_font_manager(str(custom_fonts))
+
+            response = solve_near_isomorphic(
+                source,
+                source["canvas"],
+                font_manager=manager,
+                fonts_dir=str(FONTS),
+            )
+
+        self.assertEqual(response["elements"][0]["font_family"], "Custom Family")
+
+    def test_renderer_warnings_are_logged(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                {
+                    "id": "missing-image",
+                    "type": "image",
+                    "x": 10,
+                    "y": 10,
+                    "width": 20,
+                    "height": 20,
+                    "asset_id": "missing.png",
+                    "fit": "contain",
+                }
+            ],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertLogs(level="WARNING") as captured:
+                solve_near_isomorphic(
+                    source,
+                    source["canvas"],
+                    assets_dir=directory,
+                )
+
+        self.assertTrue(
+            any("Missing asset 'missing.png'" in message for message in captured.output)
+        )
 
     def test_foreground_image_uses_dynamic_asset_and_ratio_lattice(self):
         source = {
@@ -267,7 +456,6 @@ class NearIsomorphicTests(unittest.TestCase):
         )
 
         self.assertEqual(response["elements"][0]["font_size"], 8)
-
     def test_text_measurement_selects_smaller_fitting_integer(self):
         source = {
             "canvas": {"width": 200, "height": 100},
@@ -289,5 +477,55 @@ class NearIsomorphicTests(unittest.TestCase):
         self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.INCOMPLETE_SEARCH)
 
 
+    def test_non_image_geometry_is_not_forced_to_image_ratio_lattice(self):
+        source = {
+            "canvas": {"width": 6, "height": 4},
+            "elements": [
+                {
+                    "id": "shape",
+                    "type": "shape",
+                    "x": 0,
+                    "y": 0,
+                    "width": 3,
+                    "height": 4,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(0,0,0,1)",
+                }
+            ],
+        }
+
+        response = solve_near_isomorphic(source, {"width": 2, "height": 1})
+
+        validate_response(source, {"width": 2, "height": 1}, response)
+        self.assertEqual(
+            (response["elements"][0]["x"], response["elements"][0]["y"]),
+            (0, 0),
+        )
+        self.assertEqual(
+            (response["elements"][0]["width"], response["elements"][0]["height"]),
+            (1, 1),
+        )
+
+    def test_renderer_dependencies_are_lazy_until_candidate_evaluation(self):
+        script = """
+import builtins
+
+real_import = builtins.__import__
+
+def block_renderer_imports(name, *args, **kwargs):
+    if name.split(".", 1)[0] in {"cr_renderer", "skia"}:
+        raise ModuleNotFoundError(name=name)
+    return real_import(name, *args, **kwargs)
+
+builtins.__import__ = block_renderer_imports
+import engine.resize
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
 if __name__ == "__main__":
     unittest.main()

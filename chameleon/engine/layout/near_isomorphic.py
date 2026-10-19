@@ -2,15 +2,19 @@
 
 The solver deliberately generates one finite candidate. It does not rank
 alternatives: if the candidate cannot satisfy the hard geometry invariants it
-fails closed with ``NO_HARD_VALID_CANDIDATE``.
+reports ``INCOMPLETE_SEARCH`` because the bounded path does not exhaust the
+full candidate space.
 """
 
 from __future__ import annotations
 
+import logging
+from functools import lru_cache
 from collections.abc import Mapping
 from fractions import Fraction
 from math import gcd
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, NoReturn
 
 from ..contract import validate_response, validate_source, validate_target_canvas
@@ -19,27 +23,64 @@ from ..geometry.bounds import (
     clipped_sides,
     intersects_canvas,
     is_contained_in_canvas,
+    positive_aabb_intersection,
     rotated_aabb,
     source_bleed_sides,
 )
 from ..geometry.math_util import quantize_to_int, to_fraction
 from ..geometry.ratios import reduced_ratio
-try:
-    from chameleon.renderer.converter.brand_fonts import load_brand_font_manager
-    from chameleon.renderer.converter.convert import convert_chameleon_to_crello
-    from chameleon.renderer.converter.wrap import TextLayoutError
-except ModuleNotFoundError:
-    from renderer.converter.brand_fonts import load_brand_font_manager
-    from renderer.converter.convert import convert_chameleon_to_crello
-    from renderer.converter.wrap import TextLayoutError
+
+
+@lru_cache(maxsize=1)
+def _renderer_components():
+    """Load renderer dependencies only when a candidate is evaluated."""
+
+    try:
+        from chameleon.renderer.converter.brand_fonts import (
+            load_brand_font_manager,
+        )
+        from chameleon.renderer.converter.convert import (
+            convert_chameleon_to_crello,
+            render_design_to_png,
+        )
+        from chameleon.renderer.converter.wrap import TextLayoutError
+    except ModuleNotFoundError:
+        from renderer.converter.brand_fonts import load_brand_font_manager
+        from renderer.converter.convert import (
+            convert_chameleon_to_crello,
+            render_design_to_png,
+        )
+        from renderer.converter.wrap import TextLayoutError
+    return (
+        load_brand_font_manager,
+        convert_chameleon_to_crello,
+        render_design_to_png,
+        TextLayoutError,
+    )
 
 
 _GEOMETRY_FIELDS = ("x", "y", "width", "height")
+logger = logging.getLogger(__name__)
+
+
+def _floor_fraction(value: Fraction) -> int:
+    return value.numerator // value.denominator
+
+
+def _ceil_fraction(value: Fraction) -> int:
+    return -((-value.numerator) // value.denominator)
+
+
+def _serialize_box(
+    raw_box: tuple[Fraction, Fraction, Fraction, Fraction],
+) -> tuple[int, int, int, int]:
+    """Perform the only geometry quantization step for one candidate box."""
+
+    x, y, width, height = (quantize_to_int(value) for value in raw_box)
+    return x, y, width, height
 
 
 def _fail(message: str, **details: Any) -> NoReturn:
-    """Fail as incomplete because this solver does not exhaust ADR-009 search."""
-
     details = {"search_kind": "near_isomorphic", "search_exhausted": False, **details}
     raise InfeasibleLayoutError(
         InfeasibleReasonCode.INCOMPLETE_SEARCH,
@@ -111,33 +152,19 @@ def _transformed_box(element: Mapping[str, Any], scale: Fraction, tx: Fraction, 
     return center_x - width / 2, center_y - height / 2, width, height
 
 
-def _position_candidates(x: Fraction, y: Fraction) -> list[tuple[int, int]]:
-    center_x = quantize_to_int(x)
-    center_y = quantize_to_int(y)
-    candidates: list[tuple[int, int]] = []
-    for radius in range(3):
-        for dx, dy in ((0, 0), (-radius, 0), (radius, 0), (0, -radius), (0, radius)):
-            item = (center_x + dx, center_y + dy)
-            if item not in candidates:
-                candidates.append(item)
-    return candidates
-
-
 def _bleed_position_candidates(
     element: Mapping[str, Any],
     scale: Fraction,
     tx: Fraction,
     ty: Fraction,
     source_canvas: Mapping[str, Any],
-    target: Mapping[str, Any],
+    target_canvas: Mapping[str, Any],
     expected_bleed: frozenset[str],
-) -> list[tuple[int, int]]:
-    """Try source- and target-edge translations for eligible bleed shapes."""
-
+) -> list[tuple[Fraction, Fraction]]:
     source_width = to_fraction(source_canvas["width"])
     source_height = to_fraction(source_canvas["height"])
-    target_width = to_fraction(target["width"])
-    target_height = to_fraction(target["height"])
+    target_width = to_fraction(target_canvas["width"])
+    target_height = to_fraction(target_canvas["height"])
     x_translations = [tx]
     y_translations = [ty]
     if "left" in expected_bleed:
@@ -149,15 +176,25 @@ def _bleed_position_candidates(
     if "bottom" in expected_bleed:
         y_translations.append(target_height - source_height * scale)
 
-    candidates: list[tuple[int, int]] = []
+    candidates: list[tuple[Fraction, Fraction]] = []
     for candidate_tx in x_translations:
         for candidate_ty in y_translations:
             raw_x, raw_y, _raw_width, _raw_height = _transformed_box(
                 element, scale, candidate_tx, candidate_ty
             )
-            for candidate in _position_candidates(raw_x, raw_y):
-                if candidate not in candidates:
-                    candidates.append(candidate)
+            for position in _position_candidates(raw_x, raw_y):
+                if position not in candidates:
+                    candidates.append(position)
+    return candidates
+
+
+def _position_candidates(x: Fraction, y: Fraction) -> list[tuple[Fraction, Fraction]]:
+    candidates: list[tuple[Fraction, Fraction]] = []
+    for radius in range(3):
+        for dx, dy in ((0, 0), (-radius, 0), (radius, 0), (0, -radius), (0, radius)):
+            item = (x + dx, y + dy)
+            if item not in candidates:
+                candidates.append(item)
     return candidates
 
 
@@ -185,6 +222,30 @@ def _safe_geometry(
     return is_contained_in_canvas(aabb, target)
 
 
+def _preserves_source_separation(
+    source_elements: list[Mapping[str, Any]],
+    response_elements: list[Mapping[str, Any]],
+) -> bool:
+    source_aabbs = [rotated_aabb(element) for element in source_elements]
+    response_aabbs = [rotated_aabb(element) for element in response_elements]
+    for left in range(len(source_elements)):
+        if (
+            to_fraction(response_elements[left]["width"]) <= 0
+            or to_fraction(response_elements[left]["height"]) <= 0
+        ):
+            continue
+        for right in range(left + 1, len(source_elements)):
+            if (
+                to_fraction(response_elements[right]["width"]) <= 0
+                or to_fraction(response_elements[right]["height"]) <= 0
+            ):
+                continue
+            if positive_aabb_intersection(source_aabbs[left], source_aabbs[right]):
+                continue
+            if positive_aabb_intersection(response_aabbs[left], response_aabbs[right]):
+                return False
+    return True
+
 def _choose_ratio_dimensions(
     element: Mapping[str, Any],
     raw_width: Fraction,
@@ -193,27 +254,27 @@ def _choose_ratio_dimensions(
     raw_y: Fraction,
     target: Mapping[str, Any],
     expected_bleed: frozenset[str] | None,
-    position_candidates: list[tuple[int, int]] | None = None,
+    *,
+    raw_positions: list[tuple[Fraction, Fraction]] | None = None,
 ) -> tuple[int, int, int, int] | None:
-    ratio = reduced_ratio(element["width"], element["height"])
+    positions = raw_positions or _position_candidates(raw_x, raw_y)
+    ratio = (
+        reduced_ratio(element["width"], element["height"])
+        if element.get("type") == "image"
+        else None
+    )
     if ratio is None:
-        width = quantize_to_int(raw_width)
-        height = quantize_to_int(raw_height)
-        positions = (
-            _position_candidates(raw_x, raw_y)
-            if position_candidates is None
-            else position_candidates
-        )
         for x, y in positions:
-            if _safe_geometry(element, x, y, width, height, target, expected_bleed):
-                return x, y, width, height
+            geometry = _serialize_box((x, y, raw_width, raw_height))
+            if _safe_geometry(element, *geometry, target, expected_bleed):
+                return geometry
         return None
 
     p, q = ratio
     preferred = raw_width / p
-    floor_multiplier = preferred.numerator // preferred.denominator
-    # Nearest lattice point is preferred, then progressively smaller positive
-    # points are considered when the rounded point cannot fit a rotated AABB.
+    floor_multiplier = _floor_fraction(preferred)
+    # Prefer the source-proportional lattice point, then reduce only when
+    # serialized AABB containment rejects that point.
     multipliers: list[int] = []
     for multiplier in (floor_multiplier, floor_multiplier + 1):
         if multiplier >= 1 and multiplier not in multipliers:
@@ -222,18 +283,15 @@ def _choose_ratio_dimensions(
         if multiplier not in multipliers:
             multipliers.append(multiplier)
     for multiplier in multipliers:
-        width, height = multiplier * p, multiplier * q
-        positions = (
-            _position_candidates(
-                raw_x + (raw_width - width) / 2,
-                raw_y + (raw_height - height) / 2,
-            )
-            if position_candidates is None
-            else position_candidates
+        width, height = Fraction(multiplier * p), Fraction(multiplier * q)
+        position_list = raw_positions or _position_candidates(
+            raw_x + (raw_width - width) / 2,
+            raw_y + (raw_height - height) / 2,
         )
-        for x, y in positions:
-            if _safe_geometry(element, x, y, width, height, target, expected_bleed):
-                return x, y, width, height
+        for x, y in position_list:
+            geometry = _serialize_box((x, y, width, height))
+            if _safe_geometry(element, *geometry, target, expected_bleed):
+                return geometry
     return None
 
 
@@ -243,6 +301,8 @@ def _group_candidate(
     target: Mapping[str, Any],
     *,
     cover_element_id: Any | None = None,
+    preferred_translation: tuple[Fraction, Fraction] | None = None,
+    occupied: list[tuple[Mapping[str, Any], Mapping[str, Any]]] | None = None,
 ) -> tuple[dict[str, tuple[int, int, int, int]], Fraction] | None:
     first = elements[0]
     first_x = to_fraction(first["x"])
@@ -258,35 +318,72 @@ def _group_candidate(
             ]
         )
     unit = _smallest_integral_scale(values)
-    minimum_scale = scale
+
     cover_element = next(
         (element for element in elements if element["id"] == cover_element_id),
         None,
     )
     source_aabbs = [rotated_aabb(element) for element in elements]
+    minimum_scale = scale
     if cover_element is not None:
         cover_aabb = rotated_aabb(cover_element)
-        cover_width = cover_aabb[2] - cover_aabb[0]
-        cover_height = cover_aabb[3] - cover_aabb[1]
         minimum_scale = max(
             minimum_scale,
-            to_fraction(target["width"]) / cover_width,
-            to_fraction(target["height"]) / cover_height,
+            to_fraction(target["width"]) / (cover_aabb[2] - cover_aabb[0]),
+            to_fraction(target["height"]) / (cover_aabb[3] - cover_aabb[1]),
         )
-    scale_ratio = minimum_scale / unit
-    minimum_multiplier = scale_ratio.numerator // scale_ratio.denominator
-    if scale_ratio.numerator % scale_ratio.denominator:
-        minimum_multiplier += 1
-    if minimum_multiplier < 1:
-        minimum_multiplier = 1
-    group_scale = unit * minimum_multiplier
 
-    def _translation_for_axis(
-        axis: int, first_coordinate: Fraction, target_size: Fraction
-    ) -> Fraction | None:
-        source_min = min(aabb[axis] for aabb in source_aabbs)
-        source_max = max(aabb[axis + 2] for aabb in source_aabbs)
-        source_center = (source_min + source_max) / 2
+    def _scale_candidates() -> list[Fraction]:
+        if cover_element is not None:
+            return [unit * max(1, _ceil_fraction(minimum_scale / unit))]
+
+        source_min_x = min(aabb[0] for aabb in source_aabbs)
+        source_max_x = max(aabb[2] for aabb in source_aabbs)
+        source_min_y = min(aabb[1] for aabb in source_aabbs)
+        source_max_y = max(aabb[3] for aabb in source_aabbs)
+        max_scale: Fraction | None = None
+        x_span = source_max_x - source_min_x
+        y_span = source_max_y - source_min_y
+        if x_span > 0:
+            max_scale = to_fraction(target["width"]) / x_span
+        if y_span > 0:
+            y_limit = to_fraction(target["height"]) / y_span
+            max_scale = y_limit if max_scale is None else min(max_scale, y_limit)
+
+        desired_multiplier = scale / unit
+        multipliers = {
+            max(1, _floor_fraction(desired_multiplier)),
+            max(1, _ceil_fraction(desired_multiplier)),
+        }
+        if max_scale is not None:
+            maximum_multiplier = _floor_fraction(max_scale / unit)
+            if maximum_multiplier < 1:
+                return []
+            multipliers.add(maximum_multiplier)
+            multipliers = {
+                min(multiplier, maximum_multiplier)
+                for multiplier in multipliers
+                if multiplier >= 1
+            }
+        return [
+            unit * multiplier
+            for multiplier in sorted(
+                multipliers,
+                key=lambda multiplier: (abs(unit * multiplier - scale), -multiplier),
+            )
+        ]
+
+    def _translation_candidates(
+        group_scale: Fraction,
+        axis: int,
+        first_coordinate: Fraction,
+        target_size: Fraction,
+        preferred_translation: Fraction | None = None,
+    ) -> list[Fraction]:
+        source_center = (
+            min(aabb[axis] for aabb in source_aabbs)
+            + max(aabb[axis + 2] for aabb in source_aabbs)
+        ) / 2
         lower: Fraction | None = None
         upper: Fraction | None = None
         for element, aabb in zip(elements, source_aabbs):
@@ -302,53 +399,107 @@ def _group_candidate(
         anchor_lower = lower + group_scale * first_coordinate
         anchor_upper = upper + group_scale * first_coordinate
         if anchor_lower > anchor_upper:
-            return None
-        minimum_anchor = -((-anchor_lower.numerator) // anchor_lower.denominator)
-        maximum_anchor = anchor_upper.numerator // anchor_upper.denominator
+            return []
+        minimum_anchor = _ceil_fraction(anchor_lower)
+        maximum_anchor = _floor_fraction(anchor_upper)
         if minimum_anchor > maximum_anchor:
-            return None
+            return []
         desired_anchor = (
             target_size / 2
             - group_scale * source_center
             + group_scale * first_coordinate
         )
-        anchor = min(
-            maximum_anchor,
-            max(minimum_anchor, quantize_to_int(desired_anchor)),
+        proposed_anchors: list[int] = []
+        if preferred_translation is not None:
+            proposed_anchors.append(
+                quantize_to_int(group_scale * first_coordinate + preferred_translation)
+            )
+        proposed_anchors.extend(
+            (
+                _floor_fraction(desired_anchor),
+                _ceil_fraction(desired_anchor),
+                minimum_anchor,
+                maximum_anchor,
+            )
         )
-        return anchor - group_scale * first_coordinate
+        anchors: list[int] = []
+        for proposed in proposed_anchors:
+            anchor = min(maximum_anchor, max(minimum_anchor, proposed))
+            if anchor not in anchors:
+                anchors.append(anchor)
+        return [anchor - group_scale * first_coordinate for anchor in anchors]
 
-    tx = _translation_for_axis(0, first_x, to_fraction(target["width"]))
-    ty = _translation_for_axis(1, first_y, to_fraction(target["height"]))
-    if tx is None or ty is None:
-        return None
-
-    result: dict[str, tuple[int, int, int, int]] = {}
-    for element in elements:
-        width = quantize_to_int(to_fraction(element["width"]) * group_scale)
-        height = quantize_to_int(to_fraction(element["height"]) * group_scale)
-        x = quantize_to_int(to_fraction(element["x"]) * group_scale + tx)
-        y = quantize_to_int(to_fraction(element["y"]) * group_scale + ty)
-        candidate = dict(element)
-        candidate.update({"x": x, "y": y, "width": width, "height": height})
-        aabb = rotated_aabb(candidate)
-        if element["id"] == cover_element_id:
-            target_width = to_fraction(target["width"])
-            target_height = to_fraction(target["height"])
-            if not (
-                aabb[0] <= 0
-                and aabb[1] <= 0
-                and aabb[2] >= target_width
-                and aabb[3] >= target_height
-            ):
-                return None
-        elif not _safe_geometry(element, x, y, width, height, target, None):
-            return None
-        result[element["id"]] = (x, y, width, height)
-    return result, group_scale
+    for group_scale in _scale_candidates():
+        x_translations = _translation_candidates(
+            group_scale,
+            0,
+            first_x,
+            to_fraction(target["width"]),
+            preferred_translation=(
+                preferred_translation[0] if preferred_translation is not None else None
+            ),
+        )
+        y_translations = _translation_candidates(
+            group_scale,
+            1,
+            first_y,
+            to_fraction(target["height"]),
+            preferred_translation=(
+                preferred_translation[1] if preferred_translation is not None else None
+            ),
+        )
+        for tx in x_translations:
+            for ty in y_translations:
+                result: dict[str, tuple[int, int, int, int]] = {}
+                valid = True
+                for element in elements:
+                    raw_box = (
+                        to_fraction(element["x"]) * group_scale + tx,
+                        to_fraction(element["y"]) * group_scale + ty,
+                        to_fraction(element["width"]) * group_scale,
+                        to_fraction(element["height"]) * group_scale,
+                    )
+                    geometry = _serialize_box(raw_box)
+                    x, y, width, height = geometry
+                    candidate = dict(element)
+                    candidate.update(dict(zip(_GEOMETRY_FIELDS, geometry)))
+                    aabb = rotated_aabb(candidate)
+                    if element["id"] == cover_element_id:
+                        target_width = to_fraction(target["width"])
+                        target_height = to_fraction(target["height"])
+                        valid = (
+                            aabb[0] <= 0
+                            and aabb[1] <= 0
+                            and aabb[2] >= target_width
+                            and aabb[3] >= target_height
+                        )
+                    else:
+                        valid = _safe_geometry(element, x, y, width, height, target, None)
+                    if not valid:
+                        break
+                    result[element["id"]] = geometry
+                if valid:
+                    candidate_elements = []
+                    for element in elements:
+                        candidate = dict(element)
+                        candidate.update(
+                            dict(zip(_GEOMETRY_FIELDS, result[element["id"]]))
+                        )
+                        candidate_elements.append(candidate)
+                    source_for_check = list(elements)
+                    response_for_check = candidate_elements
+                    if occupied:
+                        source_for_check.extend(source for source, _ in occupied)
+                        response_for_check.extend(response for _, response in occupied)
+                    if _preserves_source_separation(
+                        source_for_check, response_for_check
+                    ):
+                        return result, group_scale
+    return None
 
 
 def _text_fits(element: Mapping[str, Any], font_size: int, font_manager, target: Mapping[str, Any]) -> bool:
+    _, convert_chameleon_to_crello, _, TextLayoutError = _renderer_components()
     candidate = dict(element)
     candidate["font_size"] = font_size
     try:
@@ -363,27 +514,41 @@ def _text_fits(element: Mapping[str, Any], font_size: int, font_manager, target:
     return True
 
 
-def _floor_fraction(value: Fraction) -> int:
-    return value.numerator // value.denominator
+def _render_candidate(
+    response: Mapping[str, Any],
+    assets_dir: str | None,
+    fonts_dir: str | None,
+    font_manager,
+) -> bytes:
+    _, _, render_candidate_to_png, _ = _renderer_components()
+    resolved_assets_dir = assets_dir or str(Path(__file__).resolve().parents[2] / "brand_kit" / "assets")
+    resolved_fonts_dir = fonts_dir or str(Path(__file__).resolve().parents[2] / "brand_kit" / "fonts")
+    with TemporaryDirectory(prefix=".chameleon-layout-") as directory:
+        png_path = Path(directory) / "candidate.png"
+        warnings = render_candidate_to_png(
+            dict(response),
+            resolved_assets_dir,
+            png_path,
+            fonts_dir=resolved_fonts_dir,
+            font_manager=font_manager,
+        )
+        for warning in warnings or []:
+            logger.warning("renderer warning: %r", warning)
+        return png_path.read_bytes()
 
 
 def _preferred_font_size(source_size: Fraction, scale: Fraction) -> int:
-    """Choose a search ceiling without enlarging text below the readable floor."""
+    """Choose a serialized search ceiling without enlarging small source text."""
 
-    readable_floor = min(source_size, Fraction(10))
-    preferred = min(source_size, max(readable_floor, source_size * scale))
-    return max(1, _floor_fraction(preferred))
-
-
-def _validate_candidate(
-    source: Mapping[str, Any],
-    response: Mapping[str, Any],
-) -> bool:
-    try:
-        validate_response(source, response["canvas"], response)
-    except InfeasibleLayoutError:
-        return False
-    return True
+    source_limit = (
+        _floor_fraction(source_size)
+        if source_size < Fraction(10)
+        else quantize_to_int(source_size)
+    )
+    readable_floor = min(source_limit, 10)
+    scaled_size = quantize_to_int(source_size * scale)
+    preferred = min(source_limit, max(readable_floor, scaled_size))
+    return max(1, preferred)
 
 
 def solve_near_isomorphic(
@@ -392,6 +557,7 @@ def solve_near_isomorphic(
     *,
     font_manager=None,
     fonts_dir: str | None = None,
+    assets_dir: str | None = None,
 ) -> dict[str, Any]:
     """Return one hard-safe, centered near-isomorphic candidate.
 
@@ -413,54 +579,21 @@ def solve_near_isomorphic(
             group_indices.setdefault(element["group_id"], []).append(index)
 
     transformed: dict[int, tuple[int, int, int, int]] = {}
-    handled_groups: set[Any] = set()
-    for group_id, indices in group_indices.items():
-        cover_element_id = (
-            source_elements[background_index]["id"]
-            if background_index in indices
-            else None
-        )
-        group = _group_candidate(
-            [source_elements[index] for index in indices],
-            scale,
-            target_canvas,
-            cover_element_id=cover_element_id,
-        )
-        if group is None:
-            _fail("explicit group cannot be represented by one positive integer transform", group_id=group_id)
-        geometries, _group_scale = group
-        for index in indices:
-            transformed[index] = geometries[source_elements[index]["id"]]
-        handled_groups.add(group_id)
-
     target_width = to_fraction(target_canvas["width"])
     target_height = to_fraction(target_canvas["height"])
+
+    # Place ungrouped records first. Group placement can then choose among
+    # several legal translations without creating a new collision with the
+    # already transformed source topology.
     for index, element in enumerate(source_elements):
-        if index == background_index:
-            if element.get("group_id") is None:
-                transformed[index] = (0, 0, int(target_width), int(target_height))
-                continue
-            if index not in transformed:
-                _fail("grouped background has no rigid candidate", element_id=element["id"])
-            grouped_background = dict(element)
-            grouped_background.update(dict(zip(_GEOMETRY_FIELDS, transformed[index])))
-            background_aabb = rotated_aabb(grouped_background)
-            if not (
-                background_aabb[0] <= 0
-                and background_aabb[1] <= 0
-                and background_aabb[2] >= target_width
-                and background_aabb[3] >= target_height
-            ):
-                _fail(
-                    "rigid grouped background does not cover the target canvas",
-                    element_id=element["id"],
-                )
+        if element.get("group_id") is not None:
             continue
-        if element.get("group_id") in handled_groups:
+        if index == background_index:
+            transformed[index] = (0, 0, int(target_width), int(target_height))
             continue
         raw_x, raw_y, raw_width, raw_height = _transformed_box(element, scale, tx, ty)
         expected_bleed = source_bleed_sides(element, source_aabbs[index], source["canvas"])
-        bleed_positions = (
+        raw_positions = (
             _bleed_position_candidates(
                 element,
                 scale,
@@ -481,18 +614,49 @@ def solve_near_isomorphic(
             raw_y,
             target_canvas,
             expected_bleed,
-            bleed_positions,
+            raw_positions=raw_positions,
         )
         if geometry is None:
-            _fail("foreground geometry cannot be represented as safe integer bounds", element_id=element["id"])
+            _fail(
+                "foreground geometry cannot be represented as safe integer bounds",
+                element_id=element["id"],
+            )
         transformed[index] = geometry
 
+    for group_id, indices in group_indices.items():
+        cover_element_id = (
+            source_elements[background_index]["id"]
+            if background_index in indices
+            else None
+        )
+        occupied = []
+        for occupied_index, geometry in transformed.items():
+            occupied_element = dict(source_elements[occupied_index])
+            occupied_element.update(dict(zip(_GEOMETRY_FIELDS, geometry)))
+            occupied.append((source_elements[occupied_index], occupied_element))
+        group = _group_candidate(
+            [source_elements[index] for index in indices],
+            scale,
+            target_canvas,
+            cover_element_id=cover_element_id,
+            preferred_translation=(tx, ty) if cover_element_id is None else None,
+            occupied=occupied,
+        )
+        if group is None:
+            _fail(
+                "explicit group cannot be represented by one positive integer transform",
+                group_id=group_id,
+            )
+        geometries, _group_scale = group
+        for index in indices:
+            transformed[index] = geometries[source_elements[index]["id"]]
     for index, geometry in transformed.items():
         response_elements[index].update(dict(zip(_GEOMETRY_FIELDS, geometry)))
 
     text_indices = [index for index, element in enumerate(source_elements) if element["type"] == "text"]
     if text_indices:
         if font_manager is None:
+            load_brand_font_manager = _renderer_components()[0]
             resolved_fonts_dir = fonts_dir or str(Path(__file__).resolve().parents[2] / "brand_kit" / "fonts")
             font_manager = load_brand_font_manager(resolved_fonts_dir)
         for index in text_indices:
@@ -511,8 +675,16 @@ def solve_near_isomorphic(
         "canvas": {"width": int(target_width), "height": int(target_height)},
         "elements": response_elements,
     }
-    if not _validate_candidate(source, response):
-        _fail("candidate failed serialized hard validation")
+    try:
+        validate_response(source, target_canvas, response)
+    except InfeasibleLayoutError as error:
+        _fail(
+            "candidate failed serialized hard validation",
+            reason_code=error.reason_code.value,
+            reason=error.message,
+            details=error.details,
+        )
+    _render_candidate(response, assets_dir, fonts_dir, font_manager)
     return response
 
 

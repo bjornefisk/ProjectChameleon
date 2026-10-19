@@ -610,6 +610,46 @@ def resolve_runner_python(configured: Path | None) -> Path | None:
     return None
 
 
+def docker_cli_plugin_directories() -> tuple[Path, ...]:
+    candidates: list[Path] = []
+    configured_root = os.environ.get("DOCKER_CONFIG")
+    if configured_root:
+        candidates.append(Path(configured_root).expanduser() / "cli-plugins")
+    candidates.append(Path.home() / ".docker" / "cli-plugins")
+    candidates.extend(
+        Path(path)
+        for path in (
+            "/usr/local/lib/docker/cli-plugins",
+            "/usr/local/libexec/docker/cli-plugins",
+            "/opt/homebrew/lib/docker/cli-plugins",
+            "/opt/homebrew/libexec/docker/cli-plugins",
+            "/usr/lib/docker/cli-plugins",
+            "/usr/libexec/docker/cli-plugins",
+            "/Applications/Docker.app/Contents/Resources/cli-plugins",
+        )
+    )
+    return tuple(dict.fromkeys(candidates))
+
+
+def expose_docker_cli_plugins(sandbox_config: Path) -> None:
+    exposed = sandbox_config / "cli-plugins"
+    exposed.mkdir(parents=True, exist_ok=True)
+    for source in docker_cli_plugin_directories():
+        if not source.is_dir():
+            continue
+        try:
+            plugins = tuple(source.iterdir())
+        except OSError:
+            continue
+        for plugin in plugins:
+            if not plugin.name.startswith("docker-") or not plugin.is_file():
+                continue
+            target = exposed / plugin.name
+            if target.exists() or target.is_symlink():
+                continue
+            target.symlink_to(plugin)
+
+
 def isolated_environment(report_dir: Path) -> dict[str, str]:
     sandbox_home = report_dir / "sandbox-home"
     sandbox_tmp = report_dir / "sandbox-tmp"
@@ -617,6 +657,7 @@ def isolated_environment(report_dir: Path) -> dict[str, str]:
     sandbox_home.mkdir(parents=True, exist_ok=True)
     sandbox_tmp.mkdir(parents=True, exist_ok=True)
     sandbox_config.mkdir(parents=True, exist_ok=True)
+    expose_docker_cli_plugins(sandbox_config)
     path_parts = {"/usr/bin", "/bin", "/usr/sbin", "/sbin"}
     for command in ("git", "make", "docker"):
         resolved = shutil.which(command)

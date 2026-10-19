@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import json
 import sys
 import tempfile
@@ -71,8 +72,15 @@ class Level1IntegrationTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory:
             png_path = Path(directory) / "level1.png"
+            repeat_path = Path(directory) / "level1-repeat.png"
             warnings = render_design_to_png(response, ASSETS, png_path)
+            repeat_warnings = render_design_to_png(response, ASSETS, repeat_path)
             self.assertEqual(warnings, [])
+            self.assertEqual(repeat_warnings, [])
+            self.assertEqual(
+                hashlib.sha256(png_path.read_bytes()).digest(),
+                hashlib.sha256(repeat_path.read_bytes()).digest(),
+            )
             with Image.open(png_path) as image:
                 self.assertEqual(image.format, "PNG")
                 self.assertEqual(image.size, (1080, 1350))

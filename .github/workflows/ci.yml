@@ -38,3 +38,50 @@ jobs:
 
       - name: Run tests
         run: make test
+      - name: Record native renderer qualification
+        run: |
+          uname -a
+          .venv/bin/python -m pip freeze
+          .venv/bin/python -m unittest discover \
+            -s chameleon/tests/renderer -t . -p 'test_renderer_golden.py' -v
+
+      - name: Verify Docker Buildx
+        run: docker buildx version
+
+      - name: Build linux/amd64 Docker image
+        run: make docker-build
+
+      - name: Verify Docker image architecture
+        run: test "$(docker image inspect chameleon-stage1 --format '{{.Os}}/{{.Architecture}}')" = "linux/amd64"
+      - name: Run native amd64 offline smoke
+        shell: bash
+        run: |
+          set -o pipefail
+          test "$(uname -m)" = "x86_64"
+          make clean
+          set +e
+          make docker-test 2>&1 | tee "$RUNNER_TEMP/docker-test.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          test "$status" -ne 0
+          grep -F "[chameleon_sample_level1_warmup.json] status=SUCCESS" "$RUNNER_TEMP/docker-test.log"
+          grep -F "[chameleon_sample_level2_core.json] status=SUCCESS" "$RUNNER_TEMP/docker-test.log"
+          grep -F "[chameleon_sample_level3_advanced.json] status=INCOMPLETE_SEARCH" "$RUNNER_TEMP/docker-test.log"
+          test -f chameleon/output/chameleon_sample_level1_warmup_output.json
+          test -f chameleon/output/chameleon_sample_level1_warmup_output.png
+          test -f chameleon/output/chameleon_sample_level2_core_output.json
+          test -f chameleon/output/chameleon_sample_level2_core_output.png
+          test ! -e chameleon/output/chameleon_sample_level3_advanced_output.json
+          test ! -e chameleon/output/chameleon_sample_level3_advanced_output.png
+      - name: Record native sample artifact hashes
+        run: |
+          sha256sum \
+            chameleon/output/chameleon_sample_level1_warmup_output.json \
+            chameleon/output/chameleon_sample_level1_warmup_output.png \
+            chameleon/output/chameleon_sample_level2_core_output.json \
+            chameleon/output/chameleon_sample_level2_core_output.png
+          cat chameleon/output/.chameleon_sample_level1_warmup_output.commit
+          cat chameleon/output/.chameleon_sample_level2_core_output.commit
+
+      - name: Verify offline native renderer imports
+        run: docker run --rm --network none --entrypoint python chameleon-stage1 -c "import cr_renderer; import skia"
