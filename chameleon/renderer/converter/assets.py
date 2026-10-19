@@ -1,7 +1,8 @@
 from pathlib import Path
 from typing import Optional
-
 from PIL import Image, ImageDraw
+
+from .resources import validate_image_dimensions
 
 
 def asset_path(assets_dir: Optional[str], asset_id: Optional[str]) -> Optional[Path]:
@@ -40,10 +41,13 @@ def load_asset_image(
     into the element's box - it has no notion of aspect-preserving fit.
     """
     path = asset_path(assets_dir, asset_id)
+    width_px, height_px = validate_image_dimensions(width, height)
     if path is None:
-        return _placeholder(asset_id, width, height)
-    image = Image.open(path).convert("RGBA")
-    return _fit_image(image, width, height, fit)
+        return _placeholder(asset_id, width_px, height_px)
+    with Image.open(path) as opened:
+        validate_image_dimensions(opened.width, opened.height, resource="asset_source")
+        image = opened.convert("RGBA")
+    return _fit_image(image, width_px, height_px, fit)
 
 
 def _placeholder(asset_id: Optional[str], width: float, height: float) -> Image.Image:
@@ -62,10 +66,11 @@ def _placeholder(asset_id: Optional[str], width: float, height: float) -> Image.
 
 
 def _fit_image(image: Image.Image, width: float, height: float, fit: str) -> Image.Image:
-    w, h = max(1, round(width)), max(1, round(height))
+    w, h = validate_image_dimensions(width, height)
     if fit == "contain":
         scale = min(w / image.width, h / image.height)
         nw, nh = max(1, round(image.width * scale)), max(1, round(image.height * scale))
+        validate_image_dimensions(nw, nh, resource="fit_intermediate")
         resized = image.resize((nw, nh), Image.LANCZOS)
         canvas = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         canvas.paste(resized, ((w - nw) // 2, (h - nh) // 2), resized)
@@ -73,6 +78,7 @@ def _fit_image(image: Image.Image, width: float, height: float, fit: str) -> Ima
     if fit == "cover":
         scale = max(w / image.width, h / image.height)
         nw, nh = max(1, round(image.width * scale)), max(1, round(image.height * scale))
+        validate_image_dimensions(nw, nh, resource="fit_intermediate")
         resized = image.resize((nw, nh), Image.LANCZOS)
         left, top = (nw - w) // 2, (nh - h) // 2
         return resized.crop((left, top, left + w, top + h))

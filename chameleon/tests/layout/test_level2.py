@@ -2,6 +2,7 @@ import copy
 import hashlib
 import json
 import sys
+from unittest.mock import patch
 import tempfile
 import unittest
 from decimal import Decimal
@@ -23,8 +24,8 @@ try:
     )
     from engine.geometry.groups import has_common_transform
     from engine.geometry.ratios import preserves_source_ratio
-    from engine.layout.column_pivot import is_column_pivot_suitable
-    from engine.layout.near_isomorphic import solve_near_isomorphic
+    from engine.layout.column_pivot import _build_column_candidate, is_column_pivot_suitable
+    from engine.layout.near_isomorphic import _largest_fitting_font_size, solve_near_isomorphic
     from engine.layout.roles import RoleKind, infer_roles
     from engine.resize import resize
 except ModuleNotFoundError:
@@ -37,8 +38,8 @@ except ModuleNotFoundError:
     )
     from chameleon.engine.geometry.groups import has_common_transform
     from chameleon.engine.geometry.ratios import preserves_source_ratio
-    from chameleon.engine.layout.column_pivot import is_column_pivot_suitable
-    from chameleon.engine.layout.near_isomorphic import solve_near_isomorphic
+    from chameleon.engine.layout.column_pivot import _build_column_candidate, is_column_pivot_suitable
+    from chameleon.engine.layout.near_isomorphic import _largest_fitting_font_size, solve_near_isomorphic
     from chameleon.engine.layout.roles import RoleKind, infer_roles
     from chameleon.engine.resize import resize
 
@@ -71,6 +72,78 @@ class Level2IntegrationTests(unittest.TestCase):
         self.assertIn("source_bleed_sides", model.assignment_for("deco_circle_1").signals)
         self.assertTrue(any(relationship.source_overlap for relationship in model.relationships))
         self.assertTrue(is_column_pivot_suitable(source, task["target_canvas"], model))
+
+    def test_hero_selection_excludes_translucent_watermark_overlay(self):
+        source = {
+            "canvas": {"width": 1000, "height": 1000},
+            "elements": [
+                {
+                    "id": "watermark",
+                    "type": "image",
+                    "x": 0,
+                    "y": 0,
+                    "width": 900,
+                    "height": 900,
+                    "asset_id": "watermark.png",
+                    "opacity": Decimal("0.2"),
+                    "z_index": -10,
+                    "fit": "contain",
+                },
+                {
+                    "id": "product",
+                    "type": "image",
+                    "x": 300,
+                    "y": 300,
+                    "width": 200,
+                    "height": 200,
+                    "asset_id": "product.png",
+                    "opacity": 1,
+                    "z_index": 1,
+                    "fit": "contain",
+                },
+            ],
+        }
+        roles = infer_roles(source)
+        self.assertEqual(roles.assignment_for("product").role, RoleKind.HERO_MEDIA)
+        self.assertNotEqual(roles.assignment_for("watermark").role, RoleKind.HERO_MEDIA)
+
+    def test_column_text_box_ignores_mutable_source_font_size(self):
+        task = self._load_task()
+        source = copy.deepcopy(task["source"])
+        headline = next(element for element in source["elements"] if element["id"] == "headline")
+        headline["font_size"] = 10**100
+        roles = infer_roles(source)
+        with patch("engine.layout.column_pivot._largest_fitting_font_size", return_value=10):
+            response = _build_column_candidate(
+                source,
+                task["target_canvas"],
+                roles,
+                font_manager=object(),
+            )
+        expected_height = max(
+            1,
+            round(
+                task["target_canvas"]["height"]
+                * source["elements"][source["elements"].index(headline)]["height"]
+                / source["canvas"]["height"]
+            ),
+        )
+        output_headline = next(element for element in response["elements"] if element["id"] == "headline")
+        self.assertEqual(output_headline["height"], expected_height)
+
+    def test_grouped_cover_background_falls_back_without_losing_coverage(self):
+        task = self._load_task()
+        source = copy.deepcopy(task["source"])
+        background = next(element for element in source["elements"] if element["id"] == "bg")
+        background["group_id"] = "cover-group"
+        response = resize(source, task["target_canvas"])
+        validate_response(source, task["target_canvas"], response)
+        output_background = next(element for element in response["elements"] if element["id"] == "bg")
+        output_aabb = rotated_aabb(output_background)
+        self.assertLessEqual(output_aabb[0], 0)
+        self.assertLessEqual(output_aabb[1], 0)
+        self.assertGreaterEqual(output_aabb[2], task["target_canvas"]["width"])
+        self.assertGreaterEqual(output_aabb[3], task["target_canvas"]["height"])
     def test_logo_only_media_signal_routes_supported_column_builder(self):
         task = self._load_task()
         source = copy.deepcopy(task["source"])
@@ -192,6 +265,39 @@ class Level2IntegrationTests(unittest.TestCase):
         self.assertFalse(font_search["exhausted_size_one"])
         self.assertTrue(font_search["hit_cutoff"])
         self.assertEqual(font_search["status_reason"], "preferred_size_bit_limit_exceeded")
+
+    def test_huge_preferred_font_size_does_not_probe_renderer(self):
+        element = {
+            "id": "headline",
+            "type": "text",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "content": "A",
+            "font_family": "Solstice Sans",
+            "font_size": 10,
+            "color": "rgba(0,0,0,1)",
+        }
+        calls = []
+
+        def renderer_probe(*args):
+            calls.append(args)
+            raise AssertionError("renderer must not probe oversized font")
+
+        details = {}
+        result = _largest_fitting_font_size(
+            element,
+            1 << 62,
+            object(),
+            {"width": 100, "height": 100},
+            fit=renderer_probe,
+            search_details=details,
+        )
+        self.assertIsNone(result)
+        self.assertEqual(calls, [])
+        self.assertFalse(details["attempted"])
+        self.assertEqual(details["status_reason"], "preferred_size_resource_limit_exceeded")
 
 
 

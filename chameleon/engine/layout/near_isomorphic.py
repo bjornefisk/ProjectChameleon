@@ -517,7 +517,7 @@ def _text_fits(element: Mapping[str, Any], font_size: int, font_manager, target:
 
 _MAX_FONT_SEARCH_STEPS = 64
 _MAX_FONT_SEARCH_BITS = 63
-
+_MAX_RENDERER_FONT_SIZE = 1 << 20
 
 def _largest_fitting_font_size(
     element: Mapping[str, Any],
@@ -536,13 +536,14 @@ def _largest_fitting_font_size(
     """
 
     preferred = max(1, int(preferred))
-    if preferred.bit_length() > _MAX_FONT_SEARCH_BITS:
+    if preferred > _MAX_RENDERER_FONT_SIZE or preferred.bit_length() > _MAX_FONT_SEARCH_BITS:
         if search_details is not None:
             search_details.update(
                 {
                     "preferred_size": preferred,
                     "max_steps": _MAX_FONT_SEARCH_STEPS,
                     "max_bits": _MAX_FONT_SEARCH_BITS,
+                    "max_renderer_size": _MAX_RENDERER_FONT_SIZE,
                     "candidate_order": "descending",
                     "work_unit": "font_size_candidate",
                     "attempted": False,
@@ -552,7 +553,11 @@ def _largest_fitting_font_size(
                     "search_exhausted": False,
                     "exhausted_size_one": False,
                     "hit_cutoff": True,
-                    "status_reason": "preferred_size_bit_limit_exceeded",
+                    "status_reason": (
+                        "preferred_size_resource_limit_exceeded"
+                        if preferred.bit_length() <= _MAX_FONT_SEARCH_BITS
+                        else "preferred_size_bit_limit_exceeded"
+                    ),
                 }
             )
         return None

@@ -12,6 +12,25 @@ from .layout.near_isomorphic import solve_near_isomorphic
 from .layout.roles import infer_roles
 
 
+
+def _coerce_layout_error(error: Exception) -> InfeasibleLayoutError | None:
+    if isinstance(error, InfeasibleLayoutError):
+        return error
+    reason_code = getattr(error, "reason_code", None)
+    if reason_code is None:
+        return None
+    try:
+        normalized = InfeasibleReasonCode(reason_code)
+    except ValueError:
+        return None
+    return InfeasibleLayoutError(
+        normalized,
+        getattr(error, "message", str(error)),
+        getattr(error, "details", {}),
+    )
+
+
+
 def resize(
     source: Mapping[str, Any], target_canvas: Mapping[str, Any]
 ) -> dict[str, Any]:
@@ -26,12 +45,14 @@ def resize(
     validate_source(source)
     validate_target_canvas(target_canvas)
     roles = infer_roles(source)
-
     response: dict[str, Any]
     if is_column_pivot_suitable(source, target_canvas, roles):
         try:
             response = solve_column_pivot(source, target_canvas, roles=roles)
-        except InfeasibleLayoutError as column_error:
+        except Exception as raw_column_error:
+            column_error = _coerce_layout_error(raw_column_error)
+            if column_error is None:
+                raise
             if column_error.reason_code not in {
                 InfeasibleReasonCode.INCOMPLETE_SEARCH,
                 InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE,

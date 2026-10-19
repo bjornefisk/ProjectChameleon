@@ -108,6 +108,19 @@ def _ratio(element: Mapping[str, Any]) -> Fraction | None:
     return width / height
 
 
+def _is_decorative_media(element: Mapping[str, Any]) -> bool:
+    """Exclude translucent image overlays from hero emphasis."""
+    return to_fraction(element.get("opacity", 1)) < 1
+
+
+def _rotated_area(aabb: Any) -> Fraction:
+    return max(Fraction(0), aabb[2] - aabb[0]) * max(Fraction(0), aabb[3] - aabb[1])
+
+
+def _fit_priority(element: Mapping[str, Any]) -> int:
+    return {"contain": 2, "fill": 1, "cover": 0}.get(element.get("fit", "contain"), 0)
+
+
 def _content_signal(element: Mapping[str, Any]) -> dict[str, Any]:
     content = str(element.get("content", ""))
     words = tuple(word.casefold() for word in content.replace("-", " ").split())
@@ -172,14 +185,37 @@ def infer_roles(source: Mapping[str, Any]) -> RoleModel:
         for index, element in enumerate(elements)
         if element.get("type") == "image" and index != background_index
     ]
-    image_ratios = [ratio for index in image_indices if (ratio := _ratio(elements[index])) is not None]
+    image_ratios = [
+        ratio
+        for index in image_indices
+        if (ratio := _ratio(elements[index])) is not None
+    ]
     ratio_median = median(image_ratios) if image_ratios else None
     image_areas = {index: _area(elements[index]) for index in image_indices}
-    hero_index = max(image_indices, key=lambda index: (image_areas[index], -index), default=None)
+    decorative_media = {
+        index for index in image_indices if _is_decorative_media(elements[index])
+    }
+    hero_candidates = [
+        index for index in image_indices if index not in decorative_media
+    ] or image_indices
+    hero_index = max(
+        hero_candidates,
+        key=lambda index: (
+            _rotated_area(aabbs[index]),
+            image_areas[index],
+            to_fraction(elements[index].get("opacity", 1)),
+            _effective_z(elements[index]),
+            _fit_priority(elements[index]),
+            -index,
+        ),
+        default=None,
+    )
     logo_candidates = [
         index
         for index in image_indices
-        if ratio_median is not None and _ratio(elements[index]) is not None and _ratio(elements[index]) > ratio_median
+        if ratio_median is not None
+        and _ratio(elements[index]) is not None
+        and _ratio(elements[index]) > ratio_median
     ]
     logo_index = min(
         logo_candidates,

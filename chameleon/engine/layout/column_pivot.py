@@ -197,6 +197,12 @@ def _build_column_candidate(
 
     if model.background_index is not None:
         index = model.background_index
+        if source_elements[index].get("group_id") is not None:
+            _fail(
+                "column pivot does not support grouped cover background",
+                element_id=source_elements[index]["id"],
+                group_id=source_elements[index]["group_id"],
+            )
         _set_box(response_elements, index, (0, 0, int(target_width), int(target_height)))
         transformed.add(index)
 
@@ -281,12 +287,10 @@ def _build_column_candidate(
     text_indices = roles.get(RoleKind.HEADLINE, []) + roles.get(RoleKind.SUPPORTING_TEXT, [])
     for index in text_indices:
         element = source_elements[index]
-        # Text boxes use source proportions for height, with a renderer-safe
-        # minimum based on the source font size and line-height.
+        # Derive box height from source geometry only; font_size is mutable.
         width = max(1, quantize_to_int(right_width))
         source_height_fraction = to_fraction(element["height"]) / source_height
-        font_floor_height = to_fraction(element.get("font_size", 1)) * to_fraction(element.get("line_height", Fraction(6, 5)))
-        height = max(quantize_to_int(target_height * source_height_fraction), _ceil_fraction(font_floor_height))
+        height = max(1, quantize_to_int(target_height * source_height_fraction))
         if index in transformed:
             continue
         if model.assignments[index].role == RoleKind.HEADLINE:

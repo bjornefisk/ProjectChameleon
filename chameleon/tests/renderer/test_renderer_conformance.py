@@ -7,6 +7,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from chameleon.renderer.converter.brand_fonts import MissingFontError, load_brand_font_manager
 from chameleon.renderer.converter.convert import convert_chameleon_to_crello
+from chameleon.engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
 from chameleon.renderer.converter.shapes import render_shape
 from chameleon.renderer.converter.wrap import (
     MalformedTextError,
@@ -45,6 +46,19 @@ class RendererConformanceTests(unittest.TestCase):
         element.update(overrides)
         document = {"canvas": {"width": 400, "height": 100}, "elements": [element]}
         return convert_chameleon_to_crello(document, self.font_manager)[0]
+
+    def test_oversized_canvas_is_rejected_before_renderer_allocations(self):
+        document = {
+            "canvas": {"width": 100_000, "height": 100_000},
+            "elements": [],
+        }
+        with self.assertRaises(InfeasibleLayoutError) as raised:
+            convert_chameleon_to_crello(document, self.font_manager)
+        self.assertEqual(
+            raised.exception.reason_code,
+            InfeasibleReasonCode.INCOMPLETE_SEARCH,
+        )
+        self.assertEqual(raised.exception.details["resource"], "canvas_width")
 
     def test_style_runs_are_end_exclusive_and_later_properties_win(self):
         red = "rgba(255,0,0,1)"

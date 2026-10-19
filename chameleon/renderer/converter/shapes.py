@@ -1,6 +1,7 @@
 from PIL import Image, ImageDraw
-
 from .colorutil import parse_rgba
+
+from .resources import validate_image_dimensions
 
 
 def _rgba_pixel(value: str, default: tuple[int, int, int, float]) -> tuple[int, int, int, int]:
@@ -9,9 +10,11 @@ def _rgba_pixel(value: str, default: tuple[int, int, int, float]) -> tuple[int, 
 
 
 def render_shape(element: dict) -> Image.Image:
-    """Rasterize a shape without drawing any pixel outside its box."""
-    width = max(1, round(float(element.get("width", 1))))
-    height = max(1, round(float(element.get("height", 1))))
+    width, height = validate_image_dimensions(
+        element.get("width", 1),
+        element.get("height", 1),
+        resource="shape",
+    )
     image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
 
