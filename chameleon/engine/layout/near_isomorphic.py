@@ -17,6 +17,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, NoReturn
 
+from PIL import Image
+
 from ..contract import validate_response, validate_source, validate_target_canvas
 from ..errors import InfeasibleLayoutError, InfeasibleReasonCode
 from ..geometry.bounds import (
@@ -513,6 +515,86 @@ def _text_fits(element: Mapping[str, Any], font_size: int, font_manager, target:
         return False
     return True
 
+_MAX_FONT_SEARCH_STEPS = 64
+_FONT_SEARCH_FLOOR = 10
+_MAX_FONT_SEARCH_BITS = 63
+_MAX_RENDERER_FONT_SIZE = 1 << 20
+
+
+def _largest_fitting_font_size(
+    element: Mapping[str, Any],
+    preferred: int,
+    font_manager,
+    target: Mapping[str, Any],
+    *,
+    fit=None,
+    search_details: dict[str, Any] | None = None,
+) -> int | None:
+    """Find a fitting integer with a deterministic bounded search.
+
+    Very large source font sizes are clamped only as a renderer probe ceiling;
+    the search still tests the readable floor so a valid smaller candidate is
+    not rejected solely because the source value is large.
+    """
+
+    preferred = max(1, int(preferred))
+    search_start = preferred
+    preferred_clamped = False
+    if preferred > _MAX_RENDERER_FONT_SIZE or preferred.bit_length() > _MAX_FONT_SEARCH_BITS:
+        search_start = _MAX_RENDERER_FONT_SIZE
+        preferred_clamped = True
+
+    fits = fit or _text_fits
+    tested_sizes: list[int] = []
+
+    def try_size(size: int) -> bool:
+        if size in tested_sizes:
+            return False
+        tested_sizes.append(size)
+        return bool(fits(element, size, font_manager, target))
+
+    main_budget = _MAX_FONT_SEARCH_STEPS
+    for offset in range(min(search_start, main_budget)):
+        size = search_start - offset
+        if try_size(size):
+            return size
+
+    for size in range(min(search_start, _FONT_SEARCH_FLOOR), 0, -1):
+        if try_size(size):
+            return size
+
+    if search_details is not None:
+        exhausted_size_one = 1 in tested_sizes
+        search_exhausted = len(tested_sizes) == search_start
+        search_details.update(
+            {
+                "preferred_size": preferred,
+                "search_start": search_start,
+                "preferred_clamped": preferred_clamped,
+                "max_steps": _MAX_FONT_SEARCH_STEPS,
+                "floor_probe_limit": _FONT_SEARCH_FLOOR,
+                "max_bits": _MAX_FONT_SEARCH_BITS,
+                "max_renderer_size": _MAX_RENDERER_FONT_SIZE,
+                "candidate_order": "descending_with_readable_floor",
+                "work_unit": "font_size_candidate",
+                "attempted": bool(tested_sizes),
+                "no_attempt": not tested_sizes,
+                "tested_size_range": (
+                    [max(tested_sizes), min(tested_sizes)] if tested_sizes else None
+                ),
+                "tested_size_count": len(tested_sizes),
+                "search_exhausted": search_exhausted,
+                "exhausted_size_one": exhausted_size_one,
+                "hit_cutoff": not search_exhausted,
+                "status_reason": (
+                    "font_search_exhausted_at_size_one"
+                    if search_exhausted
+                    else "font_search_step_limit_reached"
+                ),
+            }
+        )
+    return None
+
 
 def _render_candidate(
     response: Mapping[str, Any],
@@ -534,6 +616,8 @@ def _render_candidate(
         )
         for warning in warnings or []:
             logger.warning("renderer warning: %r", warning)
+        with Image.open(png_path) as image:
+            image.verify()
         return png_path.read_bytes()
 
 
@@ -662,13 +746,20 @@ def solve_near_isomorphic(
         for index in text_indices:
             element = source_elements[index]
             preferred = _preferred_font_size(to_fraction(element["font_size"]), scale)
-            selected = None
-            for size in range(preferred, 0, -1):
-                if _text_fits(response_elements[index], size, font_manager, target_canvas):
-                    selected = size
-                    break
+            font_search: dict[str, Any] = {}
+            selected = _largest_fitting_font_size(
+                response_elements[index],
+                preferred,
+                font_manager,
+                target_canvas,
+                search_details=font_search,
+            )
             if selected is None:
-                _fail("no integer text size fits the renderer bounds", element_id=element["id"])
+                _fail(
+                    "no integer text size fits the renderer bounds",
+                    element_id=element["id"],
+                    font_search=font_search,
+                )
             response_elements[index]["font_size"] = selected
 
     response = {

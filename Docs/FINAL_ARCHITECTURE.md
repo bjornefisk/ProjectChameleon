@@ -1,6 +1,6 @@
 # Project Chameleon final architecture
 
-**Status:** Final consolidated architecture summary; implementation and qualification remain pending.
+**Status:** Gate 1 qualification is cleared. PR #14's bounded Ticket 06 source-aware routing and column-pivot implementation is under integration review after refreshed-PR corrections; focused/full/runtime local evidence passes and partner review is pending. Tickets 07-08, full candidate ranking, and held-out evaluation remain later work.
 
 **Scope:** Stage 1 retargeting engine and the separate finale integration boundary.
 
@@ -23,7 +23,7 @@ The architecture must:
 - produce deterministic results in an offline `linux/amd64` container; and
 - keep the autonomous Stage 1 engine separate from the interactive finale.
 
-The current phase is **Gate 1: renderer and validator qualification before the solver**. The existing resize implementation is an intentionally nonconforming baseline, not an architectural authority.
+The current phase is **Ticket 06 integration review after Gate 1 qualification**. The bounded source-aware role inference and column-pivot slice is implemented; refreshed-PR corrections remove arbitrary relationship/resource ceilings and reconcile evidence claims. The existing near-isomorphic path remains a bounded candidate family, and Tickets 07-08, full ranking, and held-out evaluation remain outside this phase.
 
 ### Terminology
 

@@ -6,8 +6,10 @@ A horizontal ribbon layout generator and spatial compression engine for Level 3 
 **Blocked by:**  
 `06: Multi-Signal Role Inference and Level 2 Column Pivot Solver`
 
-**Status:**  
-ready-for-agent
+**Status:**
+blocked-pending-pr-14-partner-review-and-merge
+
+**Dispatch gate:** Do not create or modify Ticket 07 product files until PR #14 is merged and `Docs/STATUS.md` records Ticket 06 as complete. This brief is a handoff contract only; no Ticket 07 implementation has started.
 
 - [ ] Create `chameleon/engine/layout/horizontal_ribbon.py` implementing horizontal ribbon layouts for extreme wide-and-short formats: allocate horizontal slots along the width while fitting within tight vertical height constraints.
 - [ ] Create `chameleon/engine/layout/vertical_restack.py` implementing vertical re-stacking for extreme tall-and-narrow formats.

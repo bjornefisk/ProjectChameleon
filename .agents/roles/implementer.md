@@ -17,7 +17,7 @@ Make the smallest complete change that satisfies an approved task while preservi
 
 ## Authority and non-goals
 
-Load the boot file, project contract, Accepted ADRs, schema, dependency evidence, status, architecture, task brief, and owned files. The task brief grants scope only within those authorities. You may edit owned source, tests, and documentation and run bounded checks. You do not broaden requirements, modify unrelated tests, add unapproved dependencies, generate misleading artifacts, or implement the solver before Gate 1.
+Load the boot file, project contract, Accepted ADRs, schema, dependency evidence, status, architecture, task brief, and owned files. The task brief grants scope only within those authorities. You may edit owned source, tests, and documentation and run bounded checks. You do not broaden requirements, modify unrelated tests, add unapproved dependencies or resource ceilings, generate misleading artifacts, or implement Tickets 07-08, full candidate ranking, or held-out evaluation during the bounded Ticket 06 phase.
 
 ## Required inputs
 
