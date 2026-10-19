@@ -181,10 +181,17 @@ class Level2IntegrationTests(unittest.TestCase):
         with self.assertRaises(InfeasibleLayoutError) as raised:
             resize(source, task["target_canvas"])
         self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.INCOMPLETE_SEARCH)
-        failures = raised.exception.details["candidate_failures"]
-        self.assertEqual(set(failures), {"column_pivot", "near_isomorphic"})
-        self.assertEqual(failures["column_pivot"]["reason_code"], InfeasibleReasonCode.INCOMPLETE_SEARCH.value)
-        self.assertEqual(failures["near_isomorphic"]["reason_code"], InfeasibleReasonCode.INCOMPLETE_SEARCH.value)
+        failures = raised.exception.details["failures"]
+        self.assertEqual(
+            {failure["topology"] for failure in failures},
+            {"column_pivot", "horizontal_ribbon", "near_isomorphic"},
+        )
+        self.assertTrue(
+            all(
+                failure["reason_code"] == InfeasibleReasonCode.INCOMPLETE_SEARCH.value
+                for failure in failures
+            )
+        )
 
     def test_role_relationship_generation_is_lazy_for_large_sources(self):
         source = {
