@@ -8,8 +8,10 @@ from typing import Any
 from .contract import validate_response, validate_source, validate_target_canvas
 from .errors import InfeasibleLayoutError, InfeasibleReasonCode
 from .layout.column_pivot import is_column_pivot_suitable, solve_column_pivot
+from .layout.horizontal_ribbon import is_horizontal_ribbon_suitable, solve_horizontal_ribbon
 from .layout.near_isomorphic import solve_near_isomorphic
 from .layout.roles import infer_roles
+from .layout.vertical_restack import is_vertical_restack_suitable, solve_vertical_restack
 
 
 
@@ -36,71 +38,73 @@ def resize(
 ) -> dict[str, Any]:
     """Return the first serialized, hard-validated bounded candidate.
 
-    A source/target-aware column pivot is attempted when role and proportion
-    evidence supports it.  Near-isomorphic remains available as the bounded
-    fallback family; no fixed aspect-ratio delta is exposed as the routing
-    contract.
+    Topology suitability is source- and target-aware.  Every supported family
+    remains available until its candidate is serialized and hard validated;
+    no fixed aspect-ratio delta is used as the routing contract.
     """
 
     validate_source(source)
     validate_target_canvas(target_canvas)
     roles = infer_roles(source)
-    response: dict[str, Any]
+    candidates: list[tuple[str, Any]] = []
+    if is_horizontal_ribbon_suitable(source, target_canvas):
+        candidates.append(("horizontal_ribbon", solve_horizontal_ribbon))
+    if is_vertical_restack_suitable(source, target_canvas):
+        candidates.append(("vertical_restack", solve_vertical_restack))
     if is_column_pivot_suitable(source, target_canvas, roles):
+        candidates.append(("column_pivot", solve_column_pivot))
+    candidates.append(("near_isomorphic", solve_near_isomorphic))
+
+    failures: dict[str, dict[str, Any]] = {}
+    for name, solver in candidates:
         try:
-            response = solve_column_pivot(source, target_canvas, roles=roles)
-        except Exception as raw_column_error:
-            column_error = _coerce_layout_error(raw_column_error)
-            if column_error is None:
+            if name == "column_pivot":
+                response = solver(source, target_canvas, roles=roles)
+            else:
+                response = solver(source, target_canvas)
+        except Exception as raw_error:
+            error = _coerce_layout_error(raw_error)
+            if error is None:
                 raise
-            if column_error.reason_code not in {
+            if error.reason_code not in {
                 InfeasibleReasonCode.INCOMPLETE_SEARCH,
                 InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE,
             }:
                 raise
-            try:
-                response = solve_near_isomorphic(source, target_canvas)
-            except Exception as raw_near_error:
-                near_error = _coerce_layout_error(raw_near_error)
-                if near_error is None:
-                    raise
-                raise InfeasibleLayoutError(
-                    near_error.reason_code,
-                    "bounded candidate families failed",
-                    {
-                        "candidate_failures": {
-                            "column_pivot": {
-                                "reason_code": column_error.reason_code.value,
-                                "message": column_error.message,
-                                "details": column_error.details,
-                            },
-                            "near_isomorphic": {
-                                "reason_code": near_error.reason_code.value,
-                                "message": near_error.message,
-                                "details": near_error.details,
-                            },
-                        }
-                    },
-                ) from near_error
-    else:
-        try:
-            response = solve_near_isomorphic(source, target_canvas)
-        except Exception as raw_near_error:
-            near_error = _coerce_layout_error(raw_near_error)
-            if near_error is None:
-                raise
-            raise near_error from raw_near_error
-
-    try:
-        validate_response(source, target_canvas, response)
-    except InfeasibleLayoutError as error:
-        raise InfeasibleLayoutError(
-            InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE,
-            "layout candidate failed serialized hard validation",
-            {
+            failures[name] = {
                 "reason_code": error.reason_code.value,
-                "reason": error.message,
+                "message": error.message,
                 "details": error.details,
-            },
-        ) from error
-    return response
+            }
+            continue
+        try:
+            validate_response(source, target_canvas, response)
+        except InfeasibleLayoutError as error:
+            failures[name] = {
+                "reason_code": InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE.value,
+                "message": "layout candidate failed serialized hard validation",
+                "details": {
+                    "reason_code": error.reason_code.value,
+                    "reason": error.message,
+                    "details": error.details,
+                },
+            }
+            continue
+        return response
+
+    if failures:
+        first = next(iter(failures.values()))
+        try:
+            reason_code = InfeasibleReasonCode(first["reason_code"])
+        except ValueError:
+            reason_code = InfeasibleReasonCode.INCOMPLETE_SEARCH
+        raise InfeasibleLayoutError(
+            reason_code,
+            "bounded candidate families failed",
+            {"candidate_failures": failures},
+        )
+    raise InfeasibleLayoutError(
+        InfeasibleReasonCode.INCOMPLETE_SEARCH,
+        "no bounded candidate family was suitable",
+        {"candidate_failures": {}},
+    )

@@ -1,10 +1,10 @@
 # Implementation roadmap and review report
 
-**Status:** Execution plan after contract and decision ratification. This file is non-normative; `PROJECT_CONTRACT.md` and Accepted ADRs are the authority. Gate 1 is cleared; PR #14's Ticket 06 implementation, focused/full tests, and sample evidence are under integration review after refreshed-PR corrections, with local correction and smoke evidence passing and partner review pending.
+**Status:** Execution plan after contract and decision ratification. This file is non-normative; `PROJECT_CONTRACT.md` and Accepted ADRs are the authority. Gate 1 is cleared and PR #14's Ticket 06 implementation is merged. Ticket 07 is the active bounded topology slice; feasible synthetic candidates and the full local suite pass, while the adversarial Level 3 sample remains a typed fail-closed result under review.
 
 ## Ratified delivery plan
 
-Decision ratification is complete and documentation-only. Implementation of Tickets 01-05 is complete. Gate 1 is cleared per `STATUS.md`. Ticket 06 (Issue #13; owner @bjornefisk; partner reviewer @gabegaines24) has implementation evidence on `feat/ticket-06-column-pivot-level2`, based on transition revision `77b3368`; refreshed-PR corrections for contract-valid large sources, readable-floor font search, and accurate evidence are verified locally. Do not claim held-out evaluation, full four-topology ranking, merge/release, or native-amd64 qualification from the local arm64-host Docker run until those later gates have evidence.
+Decision ratification is complete and documentation-only. Implementation of Tickets 01-05 is complete, Ticket 06 is merged, and Ticket 07 is active review. Do not claim held-out evaluation, full four-topology ranking, sample-pass completion, merge/release, or native-amd64 qualification from the local arm64-host Docker run until those later gates have evidence.
 
 ### Gate 0 — Contract and evidence (complete; documentation only)
 
@@ -32,13 +32,11 @@ Decision ratification is complete and documentation-only. Implementation of Tick
 - Apply one round-half-even serialization step and validate serialized integers, reduced image-ratio lattice, rotated AABB containment, positive-area overlap, deterministic background tie-break, and same-side source bleed.
 - Acceptance: Level 1 plus geometry fixtures pass structural validation. The baseline must never hide or drop an element. **Gate 2 acceptance achieved** - Ticket 05 Level 1 solver complete with 20 layout tests passing.
 
-### Gate 3 — Source-aware routing (Ticket 06 review — partner review pending)
+### Gate 3 — Source-aware routing (Ticket 06 complete; Ticket 07 active review)
 
 - Infer roles from multiple signals without fixed z-index/coverage thresholds.
-- Generate four topology candidates: near-isomorphic, column pivot, horizontal ribbon, and vertical re-stack.
-- For each family, generate at most three source-derived slot/emphasis variants; omit unsupported variants rather than inventing roles.
 - Derive slots from target proportions, source group extents, measured text, and image ratios. Never reserve fixed logo/hero/CTA pixels.
-- Acceptance: Ticket 06 implementation, focused/full tests, and Level 2 sample evidence are recorded; relationship/resource-cap corrections and evidence reconciliation pass local verification, and partner review remains pending. The later horizontal-ribbon, vertical-restack, full-ranking, and held-out-evaluation acceptance remains unverified.
+- Acceptance: Ticket 06 implementation, focused/full tests, and Level 2 sample evidence are recorded and merged. Ticket 07 horizontal-ribbon and vertical-restack candidates are implemented and pass feasible synthetic contract tests, but the public Level 3 sample-pass criterion remains unresolved; do not relax hard constraints to close it.
 
 ### Gate 4 — Typography and candidate generation
 

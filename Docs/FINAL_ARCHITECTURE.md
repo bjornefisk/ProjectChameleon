@@ -1,6 +1,6 @@
 # Project Chameleon final architecture
 
-**Status:** Gate 1 qualification is cleared. PR #14's bounded Ticket 06 source-aware routing and column-pivot implementation is under integration review after refreshed-PR corrections; focused/full/runtime local evidence passes and partner review is pending. Tickets 07-08, full candidate ranking, and held-out evaluation remain later work.
+**Status:** Gate 1 qualification is cleared and PR #14's bounded Ticket 06 source-aware routing and column-pivot implementation is merged. Ticket 07 horizontal-ribbon and vertical-restack implementation is active review; feasible synthetic candidates and the full local suite pass, while the adversarial Level 3 sample remains a typed fail-closed result. Ticket 08, full candidate ranking, and held-out evaluation remain later work.
 
 **Scope:** Stage 1 retargeting engine and the separate finale integration boundary.
 
@@ -23,7 +23,7 @@ The architecture must:
 - produce deterministic results in an offline `linux/amd64` container; and
 - keep the autonomous Stage 1 engine separate from the interactive finale.
 
-The current phase is **Ticket 06 integration review after Gate 1 qualification**. The bounded source-aware role inference and column-pivot slice is implemented; refreshed-PR corrections remove arbitrary relationship/resource ceilings and reconcile evidence claims. The existing near-isomorphic path remains a bounded candidate family, and Tickets 07-08, full ranking, and held-out evaluation remain outside this phase.
+The current phase is **Ticket 07 active review after Gate 1 qualification**. The bounded source-aware role inference and column-pivot slice is merged; Ticket 07 adds bounded horizontal-ribbon and vertical-restack candidate families without changing the public schema or hard contract. The public Level 3 sample-pass criterion remains unresolved and must not be addressed by shedding records, changing copy/font attributes, substituting fonts, or relaxing hard validation. Ticket 08, full ranking, and held-out evaluation remain outside this phase.
 
 ### Terminology
 
