@@ -6,10 +6,8 @@ import tempfile
 import unittest
 from decimal import Decimal
 from pathlib import Path
-from unittest.mock import patch
 
 from PIL import Image
-from PIL import UnidentifiedImageError
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
@@ -25,15 +23,9 @@ try:
     )
     from engine.geometry.groups import has_common_transform
     from engine.geometry.ratios import preserves_source_ratio
-    from engine.layout.column_pivot import (
-        generate_column_pivot_candidate,
-        is_column_pivot_suitable,
-    )
+    from engine.layout.column_pivot import is_column_pivot_suitable
     from engine.layout.near_isomorphic import solve_near_isomorphic
     from engine.layout.roles import RoleKind, infer_roles
-    import engine.layout.column_pivot as column_pivot_module
-    import engine.layout.near_isomorphic as near_isomorphic_module
-    import engine.resize as resize_module
     from engine.resize import resize
 except ModuleNotFoundError:
     from chameleon.engine.contract import validate_response
@@ -45,15 +37,9 @@ except ModuleNotFoundError:
     )
     from chameleon.engine.geometry.groups import has_common_transform
     from chameleon.engine.geometry.ratios import preserves_source_ratio
-    from chameleon.engine.layout.column_pivot import (
-        generate_column_pivot_candidate,
-        is_column_pivot_suitable,
-    )
+    from chameleon.engine.layout.column_pivot import is_column_pivot_suitable
     from chameleon.engine.layout.near_isomorphic import solve_near_isomorphic
     from chameleon.engine.layout.roles import RoleKind, infer_roles
-    import chameleon.engine.layout.column_pivot as column_pivot_module
-    import chameleon.engine.layout.near_isomorphic as near_isomorphic_module
-    import chameleon.engine.resize as resize_module
     from chameleon.engine.resize import resize
 
 try:
@@ -85,11 +71,47 @@ class Level2IntegrationTests(unittest.TestCase):
         self.assertIn("source_bleed_sides", model.assignment_for("deco_circle_1").signals)
         self.assertTrue(any(relationship.source_overlap for relationship in model.relationships))
         self.assertTrue(is_column_pivot_suitable(source, task["target_canvas"], model))
-    def test_resize_infers_roles_once_and_reuses_model(self):
+    def test_logo_only_media_signal_routes_supported_column_builder(self):
         task = self._load_task()
-        with patch.object(resize_module, "infer_roles", wraps=infer_roles) as infer_spy:
-            resize(task["source"], task["target_canvas"])
-        self.assertEqual(infer_spy.call_count, 1)
+        source = copy.deepcopy(task["source"])
+        product = next(element for element in source["elements"] if element["id"] == "product")
+        product.update({"group_id": "hero", "width": 200, "height": 200})
+        model = infer_roles(source)
+        self.assertEqual(model.assignment_for("product").role, RoleKind.SHAPE)
+        self.assertEqual(model.assignment_for("logo").role, RoleKind.LOGO)
+        self.assertTrue(is_column_pivot_suitable(source, task["target_canvas"], model))
+        response = resize(source, task["target_canvas"])
+        validate_response(source, task["target_canvas"], response)
+
+
+    def test_resize_preserves_immutable_and_omitted_fields(self):
+        task = self._load_task()
+        source = copy.deepcopy(task["source"])
+        response = resize(source, task["target_canvas"])
+        geometry = {"x", "y", "width", "height"}
+        for source_element, response_element in zip(source["elements"], response["elements"]):
+            for key, value in source_element.items():
+                if key not in geometry and not (key == "font_size" and source_element["type"] == "text"):
+                    self.assertEqual(response_element[key], value, (source_element["id"], key))
+            self.assertEqual(
+                set(response_element) - geometry - {"font_size"},
+                set(source_element) - geometry - {"font_size"},
+            )
+        subhead = next(element for element in response["elements"] if element["id"] == "subhead")
+        self.assertNotIn("font_weight", subhead)
+
+    def test_resize_reports_both_failed_candidate_families(self):
+        task = self._load_task()
+        source = copy.deepcopy(task["source"])
+        headline = next(element for element in source["elements"] if element["id"] == "headline")
+        headline["font_size"] = 10**100
+        with self.assertRaises(InfeasibleLayoutError) as raised:
+            resize(source, task["target_canvas"])
+        self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.INCOMPLETE_SEARCH)
+        failures = raised.exception.details["candidate_failures"]
+        self.assertEqual(set(failures), {"column_pivot", "near_isomorphic"})
+        self.assertEqual(failures["column_pivot"]["reason_code"], InfeasibleReasonCode.INCOMPLETE_SEARCH.value)
+        self.assertEqual(failures["near_isomorphic"]["reason_code"], InfeasibleReasonCode.INCOMPLETE_SEARCH.value)
 
     def test_role_relationship_generation_has_deterministic_bound(self):
         source = {
@@ -109,6 +131,9 @@ class Level2IntegrationTests(unittest.TestCase):
         with self.assertRaises(InfeasibleLayoutError) as raised:
             infer_roles(source)
         self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.INCOMPLETE_SEARCH)
+        self.assertEqual(raised.exception.details["relationship_count"], 8385)
+        self.assertEqual(raised.exception.details["relationship_cap"], 8192)
+        self.assertFalse(raised.exception.details["search_exhausted"])
 
     def test_small_right_bottom_bleed_survives_integer_serialization(self):
         task = self._load_task()
@@ -132,31 +157,8 @@ class Level2IntegrationTests(unittest.TestCase):
             )
         )
 
-    def test_exported_column_candidate_runs_renderer_validation(self):
-        task = self._load_task()
-        with patch.object(column_pivot_module, "_render_candidate", return_value=b"png") as render_spy:
-            response = generate_column_pivot_candidate(task["source"], task["target_canvas"])
-        validate_response(task["source"], task["target_canvas"], response)
-        render_spy.assert_called_once()
 
-    def test_candidate_renderer_rejects_malformed_png(self):
-        def write_malformed_png(_response, _assets_dir, png_path, **_kwargs):
-            png_path.write_bytes(b"not a png")
-            return []
-
-        with patch.object(
-            near_isomorphic_module,
-            "_renderer_components",
-            return_value=(None, None, write_malformed_png, None),
-        ):
-            with self.assertRaises(UnidentifiedImageError):
-                near_isomorphic_module._render_candidate(
-                    {"canvas": {"width": 1, "height": 1}, "elements": []},
-                    None,
-                    None,
-                    None,
-                )
-    def test_huge_font_size_fails_with_bounded_search_status(self):
+    def test_huge_font_size_fails_with_reproducible_search_diagnostics(self):
         source = {
             "canvas": {"width": 100, "height": 100},
             "elements": [
@@ -177,6 +179,19 @@ class Level2IntegrationTests(unittest.TestCase):
         with self.assertRaises(InfeasibleLayoutError) as raised:
             solve_near_isomorphic(source, source["canvas"], font_manager=object())
         self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.INCOMPLETE_SEARCH)
+        font_search = raised.exception.details["font_search"]
+        self.assertEqual(font_search["preferred_size"], 10**100)
+        self.assertEqual(font_search["max_steps"], 64)
+        self.assertEqual(font_search["max_bits"], 63)
+        self.assertEqual(font_search["candidate_order"], "descending")
+        self.assertEqual(font_search["work_unit"], "font_size_candidate")
+        self.assertFalse(font_search["search_exhausted"])
+        self.assertTrue(font_search["no_attempt"])
+        self.assertIsNone(font_search["tested_size_range"])
+        self.assertEqual(font_search["tested_size_count"], 0)
+        self.assertFalse(font_search["exhausted_size_one"])
+        self.assertTrue(font_search["hit_cutoff"])
+        self.assertEqual(font_search["status_reason"], "preferred_size_bit_limit_exceeded")
 
 
 

@@ -202,6 +202,10 @@ def _build_column_candidate(
 
     hero_index = roles.get(RoleKind.HERO_MEDIA, [None])[0]
     if hero_index is None:
+        # A logo is a supported media anchor when role inference has no
+        # distinct hero (for example, a grouped hero image).
+        hero_index = roles.get(RoleKind.LOGO, [None])[0]
+    if hero_index is None:
         _fail("column pivot requires a source media role")
     hero = source_elements[hero_index]
     media_fraction = min(Fraction(1), max(Fraction(1, 4), to_fraction(hero["width"]) / source_width))
@@ -349,15 +353,21 @@ def _build_column_candidate(
         for index in text_all:
             element = source_elements[index]
             preferred = _preferred_font_size(to_fraction(element.get("font_size", 1)), Fraction(1))
+            font_search: dict[str, Any] = {}
             selected = _largest_fitting_font_size(
                 response_elements[index],
                 preferred,
                 manager,
                 target_canvas,
                 fit=_text_fits,
+                search_details=font_search,
             )
             if selected is None:
-                _fail("no integer text size fits renderer bounds", element_id=element["id"])
+                _fail(
+                    "no integer text size fits the renderer bounds",
+                    element_id=element["id"],
+                    font_search=font_search,
+                )
             response_elements[index]["font_size"] = selected
 
     response = {

@@ -526,17 +526,69 @@ def _largest_fitting_font_size(
     target: Mapping[str, Any],
     *,
     fit=None,
+    search_details: dict[str, Any] | None = None,
 ) -> int | None:
-    """Find largest fitting integer with deterministic descending budget."""
+    """Find largest fitting integer with deterministic descending budget.
+
+    ``search_details`` is populated only with deterministic work information
+    when no size fits.  Keeping diagnostics out of the return value preserves
+    the helper's existing successful result for both topology callers.
+    """
 
     preferred = max(1, int(preferred))
     if preferred.bit_length() > _MAX_FONT_SEARCH_BITS:
+        if search_details is not None:
+            search_details.update(
+                {
+                    "preferred_size": preferred,
+                    "max_steps": _MAX_FONT_SEARCH_STEPS,
+                    "max_bits": _MAX_FONT_SEARCH_BITS,
+                    "candidate_order": "descending",
+                    "work_unit": "font_size_candidate",
+                    "attempted": False,
+                    "no_attempt": True,
+                    "tested_size_range": None,
+                    "tested_size_count": 0,
+                    "search_exhausted": False,
+                    "exhausted_size_one": False,
+                    "hit_cutoff": True,
+                    "status_reason": "preferred_size_bit_limit_exceeded",
+                }
+            )
         return None
     fits = fit or _text_fits
+    tested_count = 0
+    tested_max = preferred
+    tested_min = preferred
     for offset in range(min(preferred, _MAX_FONT_SEARCH_STEPS)):
         size = preferred - offset
+        tested_count += 1
+        tested_min = size
         if fits(element, size, font_manager, target):
             return size
+    if search_details is not None:
+        exhausted_size_one = tested_min == 1
+        search_details.update(
+            {
+                "preferred_size": preferred,
+                "max_steps": _MAX_FONT_SEARCH_STEPS,
+                "max_bits": _MAX_FONT_SEARCH_BITS,
+                "candidate_order": "descending",
+                "work_unit": "font_size_candidate",
+                "attempted": True,
+                "no_attempt": False,
+                "tested_size_range": [tested_max, tested_min],
+                "tested_size_count": tested_count,
+                "search_exhausted": exhausted_size_one,
+                "exhausted_size_one": exhausted_size_one,
+                "hit_cutoff": not exhausted_size_one,
+                "status_reason": (
+                    "font_search_exhausted_at_size_one"
+                    if exhausted_size_one
+                    else "font_search_step_limit_reached"
+                ),
+            }
+        )
     return None
 
 
@@ -690,14 +742,20 @@ def solve_near_isomorphic(
         for index in text_indices:
             element = source_elements[index]
             preferred = _preferred_font_size(to_fraction(element["font_size"]), scale)
+            font_search: dict[str, Any] = {}
             selected = _largest_fitting_font_size(
                 response_elements[index],
                 preferred,
                 font_manager,
                 target_canvas,
+                search_details=font_search,
             )
             if selected is None:
-                _fail("no integer text size fits the renderer bounds", element_id=element["id"])
+                _fail(
+                    "no integer text size fits the renderer bounds",
+                    element_id=element["id"],
+                    font_search=font_search,
+                )
             response_elements[index]["font_size"] = selected
 
     response = {

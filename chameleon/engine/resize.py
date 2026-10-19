@@ -37,7 +37,27 @@ def resize(
                 InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE,
             }:
                 raise
-            response = solve_near_isomorphic(source, target_canvas)
+            try:
+                response = solve_near_isomorphic(source, target_canvas)
+            except InfeasibleLayoutError as near_error:
+                raise InfeasibleLayoutError(
+                    near_error.reason_code,
+                    "bounded candidate families failed",
+                    {
+                        "candidate_failures": {
+                            "column_pivot": {
+                                "reason_code": column_error.reason_code.value,
+                                "message": column_error.message,
+                                "details": column_error.details,
+                            },
+                            "near_isomorphic": {
+                                "reason_code": near_error.reason_code.value,
+                                "message": near_error.message,
+                                "details": near_error.details,
+                            },
+                        }
+                    },
+                ) from near_error
     else:
         response = solve_near_isomorphic(source, target_canvas)
 
