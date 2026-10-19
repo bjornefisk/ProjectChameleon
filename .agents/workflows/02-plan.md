@@ -24,7 +24,7 @@ Choose the smallest complete design that satisfies the request and is testable a
 
 ## Exit gate
 
-The implementer has a bounded task packet, explicit capability set, first action, acceptance mapping, and verification command. No plan may add solver/runtime/dependency scope against the current phase.
+The implementer has a bounded task packet, explicit capability set, first action, acceptance mapping, and verification command. No plan may add models, model weights/runtime, CP-SAT, OR-Tools, unapproved dependencies/APIs, or runtime network access; bounded Ticket 06 role inference and column-pivot topology are permitted, while Tickets 07-08, full ranking, and held-out evaluation remain later work.
 
 ## Stop conditions
 

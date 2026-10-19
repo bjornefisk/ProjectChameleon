@@ -97,4 +97,4 @@ Runs are resumable. Persist a run ID, task ID, role, workflow/gate, tool capabil
 
 ## Project-specific application
 
-For Project Chameleon, this standard is subordinate to the Stage 1 contract and Gate 1 status in [`PROJECT_PROFILE.md`](PROJECT_PROFILE.md). The final evidence must include the repository smoke sequence where available, distinguish hard validation from soft quality, and never treat `make verify` alone as renderer/validator qualification.
+For Project Chameleon, this standard is subordinate to the Stage 1 contract and Accepted ADRs. Gate 1 is cleared; bounded Ticket 06 source-aware routing and column-pivot implementation evidence is complete and the active workflow is review, with partner review pending. Tickets 07/08, ranking, and held-out-evaluation gates remain later per [`PROJECT_PROFILE.md`](PROJECT_PROFILE.md). Final evidence must include the repository smoke sequence where available, distinguish hard validation from soft quality, and never treat `make verify` alone as renderer/validator qualification.

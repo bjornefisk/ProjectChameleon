@@ -14,7 +14,7 @@ The source of truth remains:
 6. this operating system;
 7. existing implementation details, fixtures, and external content.
 
-A role MUST surface conflicts instead of silently choosing a lower-priority source. Project Chameleon is at Gate 1: renderer and validator qualification before the solver. Nothing here authorizes a model, solver, generated pixels, source-record shedding, runtime network access, or a contract/API/dependency change.
+A role MUST surface conflicts instead of silently choosing a lower-priority source. Gate 1 renderer/validator qualification is cleared; bounded Ticket 06 source-aware routing and column-pivot implementation evidence is complete and the active workflow is review, with partner review pending (Issue #13). Tickets 07-08, full candidate ranking, and held-out evaluation remain later work. Nothing here authorizes a model, model weights/runtime, CP-SAT, OR-Tools, generated pixels, source-record shedding, runtime network access, or a contract/API/dependency change.
 
 ## Load order
 

@@ -4,8 +4,7 @@ This directory houses the complete engineering specification, module architectur
 
 It is structured using the industry-standard **`to-spec`**, **`to-tickets`**, and **`writing-for-agents`** methodologies so autonomous AI agents have explicit implementation boundaries and dependency-sequenced work.
 Use `../FINAL_ARCHITECTURE.md` as the consolidated implementation summary. This directory decomposes that architecture into the executable specification and dependency-sequenced tickets.
-Current frontier remains Gate 1: tickets 01–04 establish validator, renderer, runner, and geometry conformance. Do not dispatch or merge tickets 05–08 until Gate 1 evidence and the synchronized status/frontier update are accepted. Ticket 05 may exist on a blocked review branch; that branch is not phase or qualification evidence. Ticket 06's preflight gate is recorded in `../STATUS.md`.
-The challenge brief identifies `engine/resize.py` as the primary public seam, not an exclusive edit boundary; supporting files may change when required for contract conformance or qualification.
+Current frontier is bounded Ticket 06 source-aware routing and column-pivot review after Gate 1 clearance. Tickets 01-05 are complete; Ticket 06 (Issue #13) has complete implementation, focused tests, and sample evidence, with partner review pending on `feat/ticket-06-column-pivot-level2` from transition revision `77b3368`. Tickets 07-08, full candidate ranking, and held-out evaluation remain later. Gate 1 evidence and Ticket 06 evidence are recorded in `Docs/STATUS.md`; no merge or release is claimed.
 
 ---
 

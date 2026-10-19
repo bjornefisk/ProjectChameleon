@@ -19,7 +19,7 @@ The contract plus Accepted ADRs win conflicts. Starter comments, warning-only ch
 
 ## Current phase
 
-Project status is **Gate 1: renderer and validator qualification, before the solver**. The solver has not started.
+Gate 1 renderer/validator qualification is cleared. Bounded Ticket 06 source-aware routing and column-pivot implementation evidence is complete and the active workflow is review, with partner review pending (Issue #13). Tickets 07-08, full candidate ranking, and held-out evaluation remain later work.
 
 Stage 1 MUST preserve source identity, IDs, counts, order, types, immutable fields, content, assets, and source relationships. Only target canvas dimensions, element geometry, and text `font_size` may change; serialized mutable values must be finite integers. Hard validation is authoritative for rotated bounds, exact foreground-image ratios, groups and source-separated overlap, text/render bounds, and missing assets. Invalid candidates fail closed without misleading output files.
 
