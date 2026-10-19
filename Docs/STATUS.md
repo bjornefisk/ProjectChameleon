@@ -133,7 +133,7 @@ These are intentionally visible; none is silently promoted to contract behavior:
 
 1. Ticket 05 implements only the deterministic near-isomorphic Level 1 candidate; column-pivot, horizontal-ribbon, vertical-re-stack, multi-candidate ranking, cutoff/exhaustion, and held-out evaluation paths remain unimplemented.
 2. `engine/main.py` has a warning-only self-check that checks unrotated rectangles and ID sets; it is not the contract validator.
-3. The adapter-to-pinned-renderer golden seam now covers a representative text/shape path; broader renderer goldens, cross-runtime/native-library parity, and native-amd64 qualification remain unverified.
+3. The adapter-to-pinned-renderer golden seam covers a representative text/shape path and the native amd64 bounded sample is qualified; broader renderer goldens and cross-runtime/native-library parity remain unverified.
 4. The runner's typed-status, private staging, marker-gated pair publication, stale-path quarantine, aggregate exit, exact target validation, exact numeric ingress, and half-even serialization paths are implemented and focused-tested; the inspector now rejects symlinked inspection roots, while full deterministic cutoff/exhaustion producer semantics remain absent from the observed solver path.
 5. The deterministic role-inference and four-topology candidate search, renderer-in-loop ranking, cutoff/exhaustion distinction, and held-out evaluation path have not been implemented beyond the bounded Level 1 near-isomorphic candidate.
 6. The Docker build has no project-owned hash-locked wheelhouse or apt-version lock; the direct compatibility pins are an initial baseline.
@@ -210,10 +210,9 @@ The hidden `.<stem>_output.commit` marker is the pair manifest and commit author
 ## Ticket 05 boundary and verification record
 
 Ticket 05 is implemented within its bounded Level 1 near-isomorphic scope through `chameleon/engine/layout/near_isomorphic.py`, `engine/resize.py`, and `tests/layout`. It does not claim the ADR-009 four-topology search, candidate ranking, or exhausted-search infeasibility.
-- `make test` — 154 project tests and 47 review tests passed.
+- `make test` — 155 project tests and 47 review tests passed in the current native qualification run.
 - `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 20 focused tests passed, including grouped cover feasibility, source-bleed edge relocation, font-size preference, bounded-search status, renderer-gate, and repeated render-hash checks.
 - `./.venv/bin/python -m unittest discover -s chameleon/tests/renderer -t . -p 'test_renderer_golden.py' -v` — 1 adapter-to-pinned-renderer golden test passed locally; the test also asserts the installed renderer commit.
-- GitHub Actions run [39183646457](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39183646457) — refreshed native `x86_64` CI passed the golden seam, bounded runtime, and offline import checks.
 - GitHub Actions run [39184874691](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39184874691) — native `x86_64` runner recorded the pinned renderer/font provenance, representative golden hash, sample JSON/PNG hashes, and commit manifests; see the evidence table above.
 - `python3 scripts/verify_repository.py`, changed-file `py_compile`, and `git diff --check` — passed.
 - `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1 as expected for the mixed sample batch; Levels 1 and 2 returned `SUCCESS` and committed valid JSON/PNG pairs, while Level 3 returned `INCOMPLETE_SEARCH` and published no failed-task artifacts.
