@@ -37,7 +37,7 @@ The sibling code slice must preserve the existing public resize/serialization an
 
 Integration checks:
 - `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` | 25 tests passed | Main-observed focused evidence
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` | 159 tests passed | Main-observed full evidence
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` | 160 tests passed after rebasing onto merged `main` | Main-observed full evidence
 - `python3 scripts/verify_repository.py` | passed | Main-observed repository check
 - `make verify` | passed | Main-observed repository check
 - `git diff --check` | passed | Main-observed whitespace check
