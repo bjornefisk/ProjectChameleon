@@ -81,3 +81,7 @@ Observed on this arm64 workstation under Docker amd64 emulation:
 - Docker reported the expected `linux/amd64` versus host `linux/arm64/v8` emulation warning, plus a fontconfig warning from the base image.
 
 The emulated container runtimes exceed the `<2.0s` target. Native-amd64 runtime and peak-memory qualification remain **unverified** on this arm64 host; these measurements must not be promoted to native-amd64 evidence. The local host RSS measurements above remain below the 500 MiB target, but they are not a substitute for container memory measurement.
+
+## Integration residual
+
+The existing topology solver APIs render their source-proportional response internally for text/layout validation and discard those PNG bytes. Ticket 08 renders each admitted response again at the centralized search gate so derived variants are gated and the actual PNG is available for scoring. Removing that duplicate base render requires changing the shared topology solver return contract, including the parallel Ticket 07-owned solvers; this PR leaves that ownership boundary intact. The duplicated base render is a documented performance risk, not a bypassed hard-validation step.
