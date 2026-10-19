@@ -17,6 +17,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, NoReturn
 
+from PIL import Image
+
 from ..contract import validate_response, validate_source, validate_target_canvas
 from ..errors import InfeasibleLayoutError, InfeasibleReasonCode
 from ..geometry.bounds import (
@@ -513,6 +515,30 @@ def _text_fits(element: Mapping[str, Any], font_size: int, font_manager, target:
         return False
     return True
 
+_MAX_FONT_SEARCH_STEPS = 64
+_MAX_FONT_SEARCH_BITS = 63
+
+
+def _largest_fitting_font_size(
+    element: Mapping[str, Any],
+    preferred: int,
+    font_manager,
+    target: Mapping[str, Any],
+    *,
+    fit=None,
+) -> int | None:
+    """Find largest fitting integer with deterministic descending budget."""
+
+    preferred = max(1, int(preferred))
+    if preferred.bit_length() > _MAX_FONT_SEARCH_BITS:
+        return None
+    fits = fit or _text_fits
+    for offset in range(min(preferred, _MAX_FONT_SEARCH_STEPS)):
+        size = preferred - offset
+        if fits(element, size, font_manager, target):
+            return size
+    return None
+
 
 def _render_candidate(
     response: Mapping[str, Any],
@@ -534,6 +560,8 @@ def _render_candidate(
         )
         for warning in warnings or []:
             logger.warning("renderer warning: %r", warning)
+        with Image.open(png_path) as image:
+            image.verify()
         return png_path.read_bytes()
 
 
@@ -662,11 +690,12 @@ def solve_near_isomorphic(
         for index in text_indices:
             element = source_elements[index]
             preferred = _preferred_font_size(to_fraction(element["font_size"]), scale)
-            selected = None
-            for size in range(preferred, 0, -1):
-                if _text_fits(response_elements[index], size, font_manager, target_canvas):
-                    selected = size
-                    break
+            selected = _largest_fitting_font_size(
+                response_elements[index],
+                preferred,
+                font_manager,
+                target_canvas,
+            )
             if selected is None:
                 _fail("no integer text size fits the renderer bounds", element_id=element["id"])
             response_elements[index]["font_size"] = selected

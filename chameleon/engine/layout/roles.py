@@ -14,8 +14,13 @@ from fractions import Fraction
 from statistics import median
 from typing import Any, Mapping
 
+from ..errors import InfeasibleLayoutError, InfeasibleReasonCode
 from ..geometry.bounds import positive_aabb_intersection, rotated_aabb, source_bleed_sides
 from ..geometry.math_util import to_fraction
+
+# Relationship materialization is deliberately capped to keep inference
+# fail-closed instead of retaining an unbounded quadratic tuple.
+_MAX_RELATIONSHIPS = 8192
 
 
 class RoleKind(str, Enum):
@@ -148,6 +153,18 @@ def infer_roles(source: Mapping[str, Any]) -> RoleModel:
     """
 
     elements = list(source["elements"])
+    relationship_count = len(elements) * (len(elements) - 1) // 2
+    if relationship_count > _MAX_RELATIONSHIPS:
+        raise InfeasibleLayoutError(
+            InfeasibleReasonCode.INCOMPLETE_SEARCH,
+            "role relationship search exceeds deterministic bounded capacity",
+            {
+                "search_kind": "role_relationships",
+                "search_exhausted": False,
+                "relationship_count": relationship_count,
+                "relationship_cap": _MAX_RELATIONSHIPS,
+            },
+        )
     aabbs = [rotated_aabb(element) for element in elements]
     background_index = _background_index(source, aabbs)
     image_indices = [

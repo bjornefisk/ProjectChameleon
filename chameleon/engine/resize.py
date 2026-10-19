@@ -9,6 +9,7 @@ from .contract import validate_response, validate_source, validate_target_canvas
 from .errors import InfeasibleLayoutError, InfeasibleReasonCode
 from .layout.column_pivot import is_column_pivot_suitable, solve_column_pivot
 from .layout.near_isomorphic import solve_near_isomorphic
+from .layout.roles import infer_roles
 
 
 def resize(
@@ -24,11 +25,12 @@ def resize(
 
     validate_source(source)
     validate_target_canvas(target_canvas)
+    roles = infer_roles(source)
 
     response: dict[str, Any]
-    if is_column_pivot_suitable(source, target_canvas):
+    if is_column_pivot_suitable(source, target_canvas, roles):
         try:
-            response = solve_column_pivot(source, target_canvas)
+            response = solve_column_pivot(source, target_canvas, roles=roles)
         except InfeasibleLayoutError as column_error:
             if column_error.reason_code not in {
                 InfeasibleReasonCode.INCOMPLETE_SEARCH,

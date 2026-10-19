@@ -15,7 +15,13 @@ from ..errors import InfeasibleLayoutError, InfeasibleReasonCode
 from ..geometry.bounds import intersects_canvas, is_contained_in_canvas, rotated_aabb, source_bleed_sides
 from ..geometry.math_util import quantize_to_int, to_fraction
 from ..geometry.ratios import reduced_ratio
-from .near_isomorphic import _render_candidate, _text_fits, _preferred_font_size, _smallest_integral_scale
+from .near_isomorphic import (
+    _largest_fitting_font_size,
+    _render_candidate,
+    _text_fits,
+    _preferred_font_size,
+    _smallest_integral_scale,
+)
 from .roles import RoleKind, RoleModel, infer_roles
 
 _GEOMETRY_FIELDS = ("x", "y", "width", "height")
@@ -158,6 +164,19 @@ def _role_indices(model: RoleModel) -> dict[RoleKind, list[int]]:
         result.setdefault(assignment.role, []).append(assignment.index)
     return result
 
+def _bleed_position(size: int, canvas_size: int, sides: frozenset[str], low: str, high: str) -> int:
+    """Return integer placement that crosses one side and keeps overlap positive."""
+
+    if low in sides and high in sides:
+        return -1 if size > canvas_size + 1 else canvas_size - size + 1
+    overshoot = min(max(1, size // 5), size - 1)
+    if low in sides:
+        return -overshoot
+    if high in sides:
+        return canvas_size - size + overshoot
+    return max(0, canvas_size - size)
+
+
 
 def _build_column_candidate(
     source: Mapping[str, Any],
@@ -296,8 +315,12 @@ def _build_column_candidate(
         width = max(1, quantize_to_int(target_height * to_fraction(element["width"]) / source_width))
         height = max(1, quantize_to_int(target_height * to_fraction(element["height"]) / source_height))
         if bleed is not None:
-            x = -max(1, width // 5) if "left" in bleed else int(target_width) - width + (width // 5 if "right" in bleed else 0)
-            y = -max(1, height // 5) if "top" in bleed else int(target_height) - height + (height // 5 if "bottom" in bleed else 0)
+            if "left" in bleed or "right" in bleed:
+                width = max(2, width)
+            if "top" in bleed or "bottom" in bleed:
+                height = max(2, height)
+            x = _bleed_position(width, int(target_width), bleed, "left", "right")
+            y = _bleed_position(height, int(target_height), bleed, "top", "bottom")
         else:
             x = max(0, int(target_width) - width - quantize_to_int(gutter))
             y = max(0, int(target_height) - height - quantize_to_int(gutter))
@@ -326,11 +349,13 @@ def _build_column_candidate(
         for index in text_all:
             element = source_elements[index]
             preferred = _preferred_font_size(to_fraction(element.get("font_size", 1)), Fraction(1))
-            selected = None
-            for size in range(preferred, 0, -1):
-                if _text_fits(response_elements[index], size, manager, target_canvas):
-                    selected = size
-                    break
+            selected = _largest_fitting_font_size(
+                response_elements[index],
+                preferred,
+                manager,
+                target_canvas,
+                fit=_text_fits,
+            )
             if selected is None:
                 _fail("no integer text size fits renderer bounds", element_id=element["id"])
             response_elements[index]["font_size"] = selected
@@ -367,13 +392,16 @@ def generate_column_pivot_candidate(
     model = roles or infer_roles(source)
     if not is_column_pivot_suitable(source, target_canvas, model):
         _fail("source and target proportions do not support a column pivot")
-    return _build_column_candidate(
+    response = _build_column_candidate(
         source,
         target_canvas,
         model,
         font_manager=font_manager,
         fonts_dir=fonts_dir,
     )
+    _render_candidate(response, assets_dir, fonts_dir, font_manager)
+    validate_response(source, target_canvas, response)
+    return response
 
 
 def solve_column_pivot(
