@@ -1,6 +1,6 @@
 # Project Chameleon status
 
-**Date:** 2026-10-16
+**Date:** 2026-10-18
 
 **Phase:** Tickets 01, 02, 03, 04, and 05 implementation complete within bounded scopes; full Gate 1 qualification and later solver gates remain pending.
 **Decision status:** Tickets 01–05 have local implementation evidence. Ticket 05 covers only the deterministic Level 1 near-isomorphic path; deterministic cutoff/full-search semantics, later topology families, ranking, and full runtime qualification remain pending.
@@ -11,7 +11,7 @@ The bounded Ticket 05 implementation is present on this branch for review. It do
 
 PR12 MUST remain unmerged until the repository records:
 
-- renderer goldens, repeated render hashes, and native-library parity;
+- renderer goldens, recorded repeated render hashes, and native-library parity;
 - a clean native `linux/amd64` build and `--network none` run;
 - synchronized status and implementation-frontier documentation;
 - accepted phase ownership through the repository change-control process, if the project advances before all planned gates close.
@@ -45,6 +45,20 @@ Local tests and arm64-host Docker emulation are supplemental evidence. They are 
 - Verify every successful sample produces a committed JSON/PNG pair and every failed sample publishes neither artifact.
 - Confirm renderer golden/native-parity evidence and preserve the successful native-amd64 CI run before clearing the PR12 merge gate.
 - Keep arm64-host Buildx output labeled supplemental evidence.
+
+## Ticket 06 preflight gate
+
+Ticket 06 is not dispatchable yet. It is blocked by the Gate 1 phase gate in addition to its Ticket 05 dependency. The current Level 2 pair is bounded Ticket 05 near-isomorphic output, not column-pivot evidence.
+
+Before dispatch, the project must record:
+
+- **Gate 1 renderer/validator qualification:** serialized hard-validation and renderer-edge evidence, including deterministic renderer goldens and native-library parity.
+- **Native/offline runtime:** a clean `linux/amd64` build and `--network none` run with packaged fonts/assets, renderer imports, pair publication, and failed-task cleanup. Arm64-host emulation remains supplemental.
+- **Ticket 05 acceptance:** owner/reviewer acceptance of the bounded Level 1 path and its fail-closed Level 3 behavior; the Ticket 05 PR and phase state must be updated accordingly.
+- **Frontier/change control:** synchronized status, implementation-frontier, and ticket state, plus approved phase ownership before solver work is dispatched.
+- **Cutoff semantics disposition:** explicitly record whether producer-level cutoff/exhaustion behavior is a Gate 1 exit criterion or a later search-ticket dependency; neither interpretation may be silently assumed.
+
+Ticket 06 does not require Ticket 07 or Ticket 08 to be implemented first. Level 3 may remain `INCOMPLETE_SEARCH`; full macro-search/ranking belongs to Ticket 08. Ticket 06 must preserve those future seams and must not add a fixed aspect-ratio routing contract.
 
 
 
@@ -179,7 +193,8 @@ Ticket 05 is implemented within its bounded Level 1 near-isomorphic scope throug
 - `make test` — 154 project tests and 47 review tests passed.
 - `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 20 focused tests passed, including grouped cover feasibility, source-bleed edge relocation, font-size preference, bounded-search status, renderer-gate, and repeated render-hash checks.
 - `python3 scripts/verify_repository.py`, changed-file `py_compile`, and `git diff --check` — passed.
-- `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1 as expected for the mixed sample batch; Level 1 returned `SUCCESS`, while bounded Level 2/3 failures returned `INCOMPLETE_SEARCH` and published no failed-task artifacts.
+- `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1 as expected for the mixed sample batch; Levels 1 and 2 returned `SUCCESS` and committed valid JSON/PNG pairs, while Level 3 returned `INCOMPLETE_SEARCH` and published no failed-task artifacts.
+- The Level 2 success is still produced by Ticket 05's near-isomorphic candidate; it is not column-pivot or role-inference evidence.
 - The committed Level 1 PNG is `1080 × 1350` RGBA; its serialized JSON passes `validate_response()`.
 
 
@@ -197,4 +212,4 @@ docker run --rm --network none \
   chameleon-stage1
 ```
 
-The warning-only self-check remains non-authoritative; Ticket 05 has only local Level 1 evidence and does not complete Gate 1. Bounded `INCOMPLETE_SEARCH` reporting is implemented, while full accepted cutoff/exhaustion semantics, renderer goldens/native-library parity, clean native amd64 run, and the full ADR-009 solver remain pending.
+The warning-only self-check remains non-authoritative. Ticket 05 has local bounded evidence but does not complete Gate 1. Bounded `INCOMPLETE_SEARCH` reporting is implemented; full accepted cutoff/exhaustion semantics, renderer goldens/native-library parity, and clean native amd64 qualification remain pending. The full ADR-009 search is later solver work, not a prerequisite to begin Ticket 06 after the gate is formally cleared.

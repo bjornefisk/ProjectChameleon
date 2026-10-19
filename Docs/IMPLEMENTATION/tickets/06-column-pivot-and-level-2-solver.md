@@ -3,11 +3,15 @@
 **What to build:**  
 A multi-signal role inference engine and column-pivot archetype generator that automatically solves Level 2 ($1080 \times 1080 \to 1600 \times 400$). The solver pivots vertical element stacks into side-by-side columns (e.g. hero image on one side, headline/copy/CTA on the other), locks grouped button and badge units together via uniform group transforms, respects intentional translucent corner bleed, and avoids collisions between source-separated elements.
 
-**Blocked by:**  
-`05: Safe Geometry Baseline and Level 1 Near-Isomorphic Solver`
+**Blocked by:**
+- `05: Safe Geometry Baseline and Level 1 Near-Isomorphic Solver`
+- Gate 1 renderer/validator qualification and the approved phase-frontier transition recorded in [`Docs/STATUS.md`](../../STATUS.md).
 
-**Status:**  
-ready-for-agent
+**Status:**
+blocked — Gate 1 exit evidence and Ticket 05 acceptance are pending
+
+**Dispatch gate:**
+Do not dispatch this ticket until the Gate 1 and Ticket 05 preflight checklist in [`Docs/STATUS.md`](../../STATUS.md) is accepted. The former `ready-for-agent` label does not override the current project phase.
 
 - [ ] Create `chameleon/engine/layout/roles.py` implementing deterministic multi-signal role inference: classify background, logo, hero product art, primary headline, supporting text, button/badge assemblies, and decorative shapes using geometric coverage, layer indices, opacity, and type properties.
 - [ ] Create `chameleon/engine/layout/column_pivot.py` implementing column-pivot layouts for wide targets: divide horizontal space into proportional column slots (e.g. left media slot, right copy/action slot) based on source group extents.
