@@ -80,8 +80,8 @@ jobs:
             chameleon/output/chameleon_sample_level1_warmup_output.png \
             chameleon/output/chameleon_sample_level2_core_output.json \
             chameleon/output/chameleon_sample_level2_core_output.png
-          cat chameleon/output/chameleon_sample_level1_warmup_output.commit
-          cat chameleon/output/chameleon_sample_level2_core_output.commit
+          cat chameleon/output/.chameleon_sample_level1_warmup_output.commit
+          cat chameleon/output/.chameleon_sample_level2_core_output.commit
 
       - name: Verify offline native renderer imports
         run: docker run --rm --network none --entrypoint python chameleon-stage1 -c "import cr_renderer; import skia"
