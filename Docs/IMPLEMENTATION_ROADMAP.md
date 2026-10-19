@@ -1,10 +1,10 @@
 # Implementation roadmap and review report
 
-**Status:** Execution plan after contract and decision ratification. This file is non-normative; `PROJECT_CONTRACT.md` and Accepted ADRs are the authority. Gate 1 is cleared; Ticket 06 implementation, focused tests, and sample evidence are complete and the slice is in review with partner review pending.
+**Status:** Execution plan after contract and decision ratification. This file is non-normative; `PROJECT_CONTRACT.md` and Accepted ADRs are the authority. Gate 1 is cleared; PR #14's Ticket 06 implementation, focused/full tests, and sample evidence are under integration review after refreshed-PR corrections, with local correction and smoke evidence passing and partner review pending.
 
 ## Ratified delivery plan
 
-Decision ratification is complete and documentation-only. Implementation of Tickets 01-05 is complete. Gate 1 is cleared per `STATUS.md`. Ticket 06 (Issue #13; owner @bjornefisk; partner reviewer @gabegaines24) has complete implementation evidence on `feat/ticket-06-column-pivot-level2`, based on transition revision `77b3368`; partner review is pending. Do not claim held-out evaluation, full four-topology ranking, merge/release, or native-amd64 qualification from the local arm64-host Docker run until those later gates have evidence.
+Decision ratification is complete and documentation-only. Implementation of Tickets 01-05 is complete. Gate 1 is cleared per `STATUS.md`. Ticket 06 (Issue #13; owner @bjornefisk; partner reviewer @gabegaines24) has implementation evidence on `feat/ticket-06-column-pivot-level2`, based on transition revision `77b3368`; refreshed-PR corrections for contract-valid large sources, readable-floor font search, and accurate evidence are verified locally. Do not claim held-out evaluation, full four-topology ranking, merge/release, or native-amd64 qualification from the local arm64-host Docker run until those later gates have evidence.
 
 ### Gate 0 — Contract and evidence (complete; documentation only)
 
@@ -38,7 +38,7 @@ Decision ratification is complete and documentation-only. Implementation of Tick
 - Generate four topology candidates: near-isomorphic, column pivot, horizontal ribbon, and vertical re-stack.
 - For each family, generate at most three source-derived slot/emphasis variants; omit unsupported variants rather than inventing roles.
 - Derive slots from target proportions, source group extents, measured text, and image ratios. Never reserve fixed logo/hero/CTA pixels.
-- Acceptance: Ticket 06 implementation, focused tests, and Level 2 sample evidence are complete; partner review remains pending. The later horizontal-ribbon, vertical-restack, full-ranking, and held-out-evaluation acceptance remains unverified.
+- Acceptance: Ticket 06 implementation, focused/full tests, and Level 2 sample evidence are recorded; relationship/resource-cap corrections and evidence reconciliation pass local verification, and partner review remains pending. The later horizontal-ribbon, vertical-restack, full-ranking, and held-out-evaluation acceptance remains unverified.
 
 ### Gate 4 — Typography and candidate generation
 

@@ -25,7 +25,7 @@ try:
     from engine.geometry.groups import has_common_transform
     from engine.geometry.ratios import preserves_source_ratio
     from engine.layout.column_pivot import _build_column_candidate, is_column_pivot_suitable
-    from engine.layout.near_isomorphic import _largest_fitting_font_size, solve_near_isomorphic
+    from engine.layout.near_isomorphic import _largest_fitting_font_size
     from engine.layout.roles import RoleKind, infer_roles
     from engine.resize import resize
 except ModuleNotFoundError:
@@ -39,7 +39,7 @@ except ModuleNotFoundError:
     from chameleon.engine.geometry.groups import has_common_transform
     from chameleon.engine.geometry.ratios import preserves_source_ratio
     from chameleon.engine.layout.column_pivot import _build_column_candidate, is_column_pivot_suitable
-    from chameleon.engine.layout.near_isomorphic import _largest_fitting_font_size, solve_near_isomorphic
+    from chameleon.engine.layout.near_isomorphic import _largest_fitting_font_size
     from chameleon.engine.layout.roles import RoleKind, infer_roles
     from chameleon.engine.resize import resize
 
@@ -177,7 +177,7 @@ class Level2IntegrationTests(unittest.TestCase):
         task = self._load_task()
         source = copy.deepcopy(task["source"])
         headline = next(element for element in source["elements"] if element["id"] == "headline")
-        headline["font_size"] = 10**100
+        headline["content"] = "X" * 10_000
         with self.assertRaises(InfeasibleLayoutError) as raised:
             resize(source, task["target_canvas"])
         self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.INCOMPLETE_SEARCH)
@@ -186,7 +186,7 @@ class Level2IntegrationTests(unittest.TestCase):
         self.assertEqual(failures["column_pivot"]["reason_code"], InfeasibleReasonCode.INCOMPLETE_SEARCH.value)
         self.assertEqual(failures["near_isomorphic"]["reason_code"], InfeasibleReasonCode.INCOMPLETE_SEARCH.value)
 
-    def test_role_relationship_generation_has_deterministic_bound(self):
+    def test_role_relationship_generation_is_lazy_for_large_sources(self):
         source = {
             "canvas": {"width": 100, "height": 100},
             "elements": [
@@ -201,12 +201,11 @@ class Level2IntegrationTests(unittest.TestCase):
                 for index in range(130)
             ],
         }
-        with self.assertRaises(InfeasibleLayoutError) as raised:
-            infer_roles(source)
-        self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.INCOMPLETE_SEARCH)
-        self.assertEqual(raised.exception.details["relationship_count"], 8385)
-        self.assertEqual(raised.exception.details["relationship_cap"], 8192)
-        self.assertFalse(raised.exception.details["search_exhausted"])
+        model = infer_roles(source)
+        self.assertEqual(len(model.relationships), 8385)
+        self.assertTrue(model.relationships[0].source_overlap)
+        self.assertEqual((model.relationships[-1].left_index, model.relationships[-1].right_index), (128, 129))
+        self.assertTrue(model.overlaps(0, 129))
 
     def test_small_right_bottom_bleed_survives_integer_serialization(self):
         task = self._load_task()
@@ -231,42 +230,37 @@ class Level2IntegrationTests(unittest.TestCase):
         )
 
 
-    def test_huge_font_size_fails_with_reproducible_search_diagnostics(self):
-        source = {
-            "canvas": {"width": 100, "height": 100},
-            "elements": [
-                {
-                    "id": "headline",
-                    "type": "text",
-                    "x": 0,
-                    "y": 0,
-                    "width": 100,
-                    "height": 100,
-                    "content": "A",
-                    "font_family": "Solstice Sans",
-                    "font_size": 10**100,
-                    "color": "rgba(0,0,0,1)",
-                }
-            ],
+    def test_huge_font_size_reduces_to_readable_floor(self):
+        element = {
+            "id": "headline",
+            "type": "text",
+            "x": 0,
+            "y": 0,
+            "width": 100,
+            "height": 100,
+            "content": "A",
+            "font_family": "Solstice Sans",
+            "font_size": 10**100,
+            "color": "rgba(0,0,0,1)",
         }
-        with self.assertRaises(InfeasibleLayoutError) as raised:
-            solve_near_isomorphic(source, source["canvas"], font_manager=object())
-        self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.INCOMPLETE_SEARCH)
-        font_search = raised.exception.details["font_search"]
-        self.assertEqual(font_search["preferred_size"], 10**100)
-        self.assertEqual(font_search["max_steps"], 64)
-        self.assertEqual(font_search["max_bits"], 63)
-        self.assertEqual(font_search["candidate_order"], "descending")
-        self.assertEqual(font_search["work_unit"], "font_size_candidate")
-        self.assertFalse(font_search["search_exhausted"])
-        self.assertTrue(font_search["no_attempt"])
-        self.assertIsNone(font_search["tested_size_range"])
-        self.assertEqual(font_search["tested_size_count"], 0)
-        self.assertFalse(font_search["exhausted_size_one"])
-        self.assertTrue(font_search["hit_cutoff"])
-        self.assertEqual(font_search["status_reason"], "preferred_size_bit_limit_exceeded")
+        calls = []
 
-    def test_huge_preferred_font_size_does_not_probe_renderer(self):
+        def fits(_element, size, _font_manager, _target):
+            calls.append(size)
+            return size <= 10
+
+        result = _largest_fitting_font_size(
+            element,
+            10**100,
+            object(),
+            {"width": 100, "height": 100},
+            fit=fits,
+        )
+        self.assertEqual(result, 10)
+        self.assertTrue(calls)
+        self.assertLessEqual(max(calls), 1 << 20)
+
+    def test_huge_preferred_font_size_reports_cutoff_after_floor_probe(self):
         element = {
             "id": "headline",
             "type": "text",
@@ -281,9 +275,9 @@ class Level2IntegrationTests(unittest.TestCase):
         }
         calls = []
 
-        def renderer_probe(*args):
-            calls.append(args)
-            raise AssertionError("renderer must not probe oversized font")
+        def fits(_element, size, _font_manager, _target):
+            calls.append(size)
+            return False
 
         details = {}
         result = _largest_fitting_font_size(
@@ -291,13 +285,20 @@ class Level2IntegrationTests(unittest.TestCase):
             1 << 62,
             object(),
             {"width": 100, "height": 100},
-            fit=renderer_probe,
+            fit=fits,
             search_details=details,
         )
         self.assertIsNone(result)
-        self.assertEqual(calls, [])
-        self.assertFalse(details["attempted"])
-        self.assertEqual(details["status_reason"], "preferred_size_resource_limit_exceeded")
+        self.assertEqual(len(calls), 74)
+        self.assertLessEqual(max(calls), 1 << 20)
+        self.assertEqual(min(calls), 1)
+        self.assertTrue(details["preferred_clamped"])
+        self.assertTrue(details["attempted"])
+        self.assertFalse(details["no_attempt"])
+        self.assertEqual(details["candidate_order"], "descending_with_readable_floor")
+        self.assertTrue(details["hit_cutoff"])
+        self.assertEqual(details["status_reason"], "font_search_step_limit_reached")
+        self.assertFalse(details["search_exhausted"])
 
 
 

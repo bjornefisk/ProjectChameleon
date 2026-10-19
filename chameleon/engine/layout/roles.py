@@ -12,15 +12,11 @@ from dataclasses import dataclass
 from enum import Enum
 from fractions import Fraction
 from statistics import median
-from typing import Any, Mapping
+from typing import Any, Iterator, Mapping
 
-from ..errors import InfeasibleLayoutError, InfeasibleReasonCode
 from ..geometry.bounds import positive_aabb_intersection, rotated_aabb, source_bleed_sides
 from ..geometry.math_util import to_fraction
 
-# Relationship materialization is deliberately capped to keep inference
-# fail-closed instead of retaining an unbounded quadratic tuple.
-_MAX_RELATIONSHIPS = 8192
 
 
 class RoleKind(str, Enum):
@@ -60,12 +56,84 @@ class Relationship:
     same_group: bool
 
 
+class RelationshipView:
+    """Lazy deterministic source-relationship sequence.
+
+    Relationship pairs are derived on demand so role inference does not reject
+    contract-valid designs or allocate a quadratic tuple for sparse sources.
+    """
+
+    __slots__ = ("_aabbs", "_group_ids", "_ids")
+
+    def __init__(
+        self,
+        ids: tuple[str, ...],
+        group_ids: tuple[Any, ...],
+        aabbs: tuple[Any, ...],
+    ) -> None:
+        self._ids = ids
+        self._group_ids = group_ids
+        self._aabbs = aabbs
+
+    def __len__(self) -> int:
+        count = len(self._ids)
+        return count * (count - 1) // 2
+
+    def _row_start(self, left: int) -> int:
+        count = len(self._ids)
+        return left * (2 * count - left - 1) // 2
+
+    def _pair_for_offset(self, offset: int) -> tuple[int, int]:
+        if offset < 0 or offset >= len(self):
+            raise IndexError(offset)
+        low, high = 0, len(self._ids) - 2
+        while low <= high:
+            middle = (low + high) // 2
+            if self._row_start(middle) <= offset:
+                low = middle + 1
+            else:
+                high = middle - 1
+        left = high
+        right = left + 1 + offset - self._row_start(left)
+        return left, right
+
+    def _relationship(self, left: int, right: int) -> "Relationship":
+        return Relationship(
+            left,
+            right,
+            self._ids[left],
+            self._ids[right],
+            positive_aabb_intersection(self._aabbs[left], self._aabbs[right]),
+            self._group_ids[left] is not None
+            and self._group_ids[left] == self._group_ids[right],
+        )
+
+    def for_pair(self, left: int, right: int) -> "Relationship":
+        if left == right or min(left, right) < 0 or max(left, right) >= len(self._ids):
+            raise IndexError((left, right))
+        if left > right:
+            left, right = right, left
+        return self._relationship(left, right)
+
+    def __iter__(self) -> Iterator["Relationship"]:
+        for left in range(len(self._ids)):
+            for right in range(left + 1, len(self._ids)):
+                yield self._relationship(left, right)
+
+    def __getitem__(self, index: int | slice) -> "Relationship" | tuple["Relationship", ...]:
+        if isinstance(index, slice):
+            return tuple(self[item] for item in range(*index.indices(len(self))))
+        if index < 0:
+            index += len(self)
+        return self._relationship(*self._pair_for_offset(index))
+
+
 @dataclass(frozen=True, slots=True)
 class RoleModel:
     """Stable role assignments plus source relationships."""
 
     assignments: tuple[RoleAssignment, ...]
-    relationships: tuple[Relationship, ...]
+    relationships: RelationshipView
     background_index: int | None
 
     @property
@@ -84,12 +152,7 @@ class RoleModel:
 
     def overlaps(self, left_index: int, right_index: int) -> bool:
         low, high = sorted((left_index, right_index))
-        return any(
-            relationship.left_index == low
-            and relationship.right_index == high
-            and relationship.source_overlap
-            for relationship in self.relationships
-        )
+        return self.relationships.for_pair(low, high).source_overlap
 
 
 def _effective_z(element: Mapping[str, Any]) -> int:
@@ -166,18 +229,6 @@ def infer_roles(source: Mapping[str, Any]) -> RoleModel:
     """
 
     elements = list(source["elements"])
-    relationship_count = len(elements) * (len(elements) - 1) // 2
-    if relationship_count > _MAX_RELATIONSHIPS:
-        raise InfeasibleLayoutError(
-            InfeasibleReasonCode.INCOMPLETE_SEARCH,
-            "role relationship search exceeds deterministic bounded capacity",
-            {
-                "search_kind": "role_relationships",
-                "search_exhausted": False,
-                "relationship_count": relationship_count,
-                "relationship_cap": _MAX_RELATIONSHIPS,
-            },
-        )
     aabbs = [rotated_aabb(element) for element in elements]
     background_index = _background_index(source, aabbs)
     image_indices = [
@@ -306,21 +357,12 @@ def infer_roles(source: Mapping[str, Any]) -> RoleModel:
         }
         assignments.append(RoleAssignment(index, str(element["id"]), role, signals))
 
-    relationships: list[Relationship] = []
-    for left in range(len(elements)):
-        for right in range(left + 1, len(elements)):
-            relationships.append(
-                Relationship(
-                    left,
-                    right,
-                    str(elements[left]["id"]),
-                    str(elements[right]["id"]),
-                    positive_aabb_intersection(aabbs[left], aabbs[right]),
-                    elements[left].get("group_id") is not None
-                    and elements[left].get("group_id") == elements[right].get("group_id"),
-                )
-            )
-    return RoleModel(tuple(assignments), tuple(relationships), background_index)
+    relationships = RelationshipView(
+        tuple(str(element["id"]) for element in elements),
+        tuple(element.get("group_id") for element in elements),
+        tuple(aabbs),
+    )
+    return RoleModel(tuple(assignments), relationships, background_index)
 
 
 # Explicit aliases make the intended seam discoverable to callers while keeping

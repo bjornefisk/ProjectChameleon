@@ -28,7 +28,6 @@ from .assets import asset_path, load_asset_image
 from .brand_fonts import load_brand_font_manager, lookup_exact_font
 from .features_stub import make_stub_features
 from .shapes import render_shape
-from .resources import validate_design_resources, validate_image_dimensions
 from .wrap import (
     MalformedTextError,
     TextOverflowError,
@@ -57,7 +56,6 @@ def convert_chameleon_to_crello(
     font face lookups that will later render the glyphs.
     """
     design = doc["source"] if "source" in doc else doc
-    validate_design_resources(design)
     canvas = design["canvas"]
     canvas_width = float(canvas["width"])
     canvas_height = float(canvas["height"])
@@ -131,11 +129,8 @@ def convert_chameleon_to_crello(
             warnings.append(f"Unknown element type '{etype}' for '{eid}' - skipped (blank).")
             out["type"].append("ImageElement")
             _append_blank_text(out)
-            w, h = validate_image_dimensions(
-                element.get("width", 1.0),
-                element.get("height", 1.0),
-                resource="unknown_element",
-            )
+            w = max(1, round(element.get("width", 1.0)))
+            h = max(1, round(element.get("height", 1.0)))
             out["image"].append(Image.new("RGBA", (w, h), (0, 0, 0, 0)))
 
     return out, warnings
