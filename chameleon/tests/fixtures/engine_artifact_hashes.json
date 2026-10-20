@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "purpose": "Persisted engine-level artifact evidence for issue #23 / F-07: SHA-256 of the committed JSON/PNG pair that `python -m engine.main` publishes for the shipped Level 1 and Level 2 sample tasks. Hashes are regression pins bound to the inputs below; they are not a Stage 1 wire field, a ranking input, or an organizer qualification result.",
+  "bound_inputs": {
+    "renderer_commit": "a17e1fb9a732959dd6c21ae168d5ee09d74bd64f",
+    "dependencies": {
+      "Pillow": "11.1.0",
+      "skia-python": "132.0b11"
+    },
+    "schema_sha256": "d084eb524b7b0e683c9a31a63706ea4101ee0e3cd4a9a3b8218a59975fa55e41",
+    "asset_tree_sha256": "50ede90b7cde483506d75a578f11d67acd61a5c0b11da7fb74f75b1de37a4e30",
+    "font_tree_sha256": "c9b22d1fe1dcccea9035bd23fd5fb0ac3aec1cd3ad1b3b6e68eb06d76e8dc0fa",
+    "task_sha256": {
+      "chameleon_sample_level1_warmup": "79f889a1b0ec616b3f75de7b0d7fe4b92dcfb027e99b512a019a7aa941000ea6",
+      "chameleon_sample_level2_core": "5c45b48d6df313b3bd9a716af413e23193cbb273b0d23f9011d5aaca1d002a93"
+    }
+  },
+  "platforms": {
+    "linux-x86_64": {
+      "observed_on": "Native amd64 GitHub Actions container run 39461763417 (main@8097c09, step 'Record native sample artifact hashes') and a local linux/amd64 Docker run emulated on Apple Silicon; the two sources are byte-identical.",
+      "artifacts": {
+        "chameleon_sample_level1_warmup": {
+          "json_sha256": "237a8a9eeeeae02ab954bf820fc0294b2501890097c390b3bb6c0c148d2744ba",
+          "png_sha256": "71e0be9ea2ae55ab860100fed77ce870e1f531da8f74df05adb67414cf27cea0"
+        },
+        "chameleon_sample_level2_core": {
+          "json_sha256": "3e26ef9e95df3f9b9f3fc9fa8149382962081531936e5f01480f5161e3b5f8f6",
+          "png_sha256": "bf24e67125529d96b65df1f049d3f4b11cd0fcc9e05a2c7a765a60c3e5952f99"
+        }
+      }
+    },
+    "linux-aarch64": {
+      "observed_on": "Local native linux/arm64 Docker container built from the pinned Dockerfile with only the platform flag changed; two runs byte-identical. Layout JSON equals linux-x86_64; PNG bytes differ (architecture-dependent raster output).",
+      "artifacts": {
+        "chameleon_sample_level1_warmup": {
+          "json_sha256": "237a8a9eeeeae02ab954bf820fc0294b2501890097c390b3bb6c0c148d2744ba",
+          "png_sha256": "58d49a6e5191c3367a721a5afcd3e048ac2b72c04c7f8fe65d6bf307ca796ffe"
+        },
+        "chameleon_sample_level2_core": {
+          "json_sha256": "3e26ef9e95df3f9b9f3fc9fa8149382962081531936e5f01480f5161e3b5f8f6",
+          "png_sha256": "ef0d29f6bdb33ff28634006487a3f75876e1ffa16b1565aadb8da5674a668e43"
+        }
+      }
+    },
+    "darwin-arm64": {
+      "observed_on": "Local macOS arm64 run with the repository .venv (pinned dependency versions); repeated runs and different PYTHONHASHSEED values were byte-identical. Level 2 JSON differs from Linux because Skia glyph advances are fractional on macOS and hinted integers on Linux, which changes the largest fitting text font size.",
+      "artifacts": {
+        "chameleon_sample_level1_warmup": {
+          "json_sha256": "237a8a9eeeeae02ab954bf820fc0294b2501890097c390b3bb6c0c148d2744ba",
+          "png_sha256": "e04df5d20fb99784765fe3dc5d67268b73c34e7ac7a8c631b4907117f3ff4b9e"
+        },
+        "chameleon_sample_level2_core": {
+          "json_sha256": "9618cc72bfde603d505fbfcff646f797b219cb2644484b93d815a8bd1ef8c2e4",
+          "png_sha256": "bc5af21d9c57b5ea508b617028a666aee0e12bb03b8b067d23ae12e7b2f2f449"
+        }
+      }
+    }
+  }
+}
