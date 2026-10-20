@@ -92,14 +92,13 @@ Ticket 07 product work is implemented on `feat/ticket-07-horizontal-ribbon-level
 
 ## Issue #19 / F-03 exhaustion-aware status evidence — complete
 
-The resize failure seam now preserves a strict boolean `search_exhausted` value for every attempted topology family, aggregates all family outcomes, and emits `NO_HARD_VALID_CANDIDATE` only when every attempted family proves finite search exhaustion. Missing, non-boolean, false, cutoff, and outer serialized-validation metadata remain `INCOMPLETE_SEARCH`. Failed tasks remain fail-closed and publish no JSON/PNG pair.
+The resize failure seam aggregates all attempted family outcomes and emits `NO_HARD_VALID_CANDIDATE` only when every attempted family has top-level `details["search_exhausted"] is True`. Missing, non-boolean, false, cutoff, and outer serialized-validation metadata cannot establish exhaustion and remain `INCOMPLETE_SEARCH`. Failed tasks remain fail-closed and publish no JSON/PNG pair.
 
-- **Focused evidence:** `cd chameleon && ../.venv/bin/python -m unittest tests.layout.test_search_status tests.layout.test_level3 tests.runner.test_main tests.runner.test_runner -v` — 67 passed.
-- **Repository/full evidence:** `python3 scripts/verify_repository.py`, `make verify`, and `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — 179 passed.
+- **Focused evidence:** `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 43 passed; `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 72 passed.
+- **Repository/full evidence:** `python3 scripts/verify_repository.py`, `make verify`, and `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 178 passed; changed-file `py_compile` and whitespace checks passed.
 - **Engine smoke:** the documented `cd chameleon && python -m engine.main` command is unavailable in the system interpreter because `jsonschema` is not installed. The project environment `../.venv/bin/python -m engine.main` ran Levels 1–2 as `SUCCESS` with committed pairs and Level 3 as typed `INCOMPLETE_SEARCH` with no pair.
 - **Docker supplemental smoke:** `docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` passed with the existing `FromPlatformFlagConstDisallowed` warning. The offline `docker run --rm --network none ... chameleon-stage1` run exited nonzero as expected under arm64-host amd64 emulation: Levels 1–2 committed pairs and Level 3 reported `INCOMPLETE_SEARCH` without a pair. This is supplemental, not native-amd64 qualification.
-- **Review:** independent correctness review approved after strict-boolean normalization; security review found no blocking issue. Ticket 07's public Level 3 sample-pass gap and Ticket 08 search/ranking work remain open.
-
+- **Review:** independent contract-focused correctness review found no issues. No security-sensitive paths changed; no separate security review was required for this status-only change. Ticket 07's public Level 3 sample-pass gap and Ticket 08 search/ranking work remain open.
 
 ## Ground truth now recorded
 
