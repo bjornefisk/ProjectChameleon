@@ -41,6 +41,7 @@ The following evidence was produced on the current integration tree, not copied 
 - `cd chameleon && ../.venv/bin/python -m engine.main` — exit **1 expected**; Level 1 and Level 2 published valid pairs, Level 3 returned typed `INCOMPLETE_SEARCH` with no pair. Generated smoke artifacts were cleaned afterward.
 - `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — **passed** with Docker's constant-platform warning.
 - `cd chameleon && docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — exit **1 expected** under the arm64 host's amd64 emulation; Level 1 and Level 2 published valid pairs, Level 3 returned typed `INCOMPLETE_SEARCH`, and generated smoke artifacts were cleaned. This is not native-amd64 qualification.
+- Pinned `chameleon-main-edge-v2` `linux/amd64` source-mounted suite — **254 tests passed**. Arm64-host emulation remains supplemental.
 
 The earlier sections below preserve historical ticket and transition records. Their counts, branch names, and environment results are not current Issue #16 verification evidence.
 
