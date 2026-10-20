@@ -15,6 +15,9 @@ from tempfile import TemporaryDirectory
 from types import MappingProxyType
 from typing import Any, Callable, Mapping
 
+from PIL import Image
+
+from ..artifact import validate_artifact
 from ..contract import validate_response, validate_source, validate_target_canvas
 from ..errors import InfeasibleLayoutError, InfeasibleReasonCode, TaskStatus
 from ..geometry.bounds import rotated_aabb, source_bleed_sides
@@ -312,14 +315,25 @@ def _render_candidate(
         resolved_fonts = str(fonts_dir or default_fonts)
         with TemporaryDirectory(prefix=".chameleon-search-") as directory:
             png_path = Path(directory) / "candidate.png"
-            warnings = render_design_to_png(
+            raw_warnings = render_design_to_png(
                 deepcopy(dict(response)),
                 resolved_assets,
                 png_path,
                 resolved_fonts,
                 font_manager=font_manager,
-            )
-            return png_path.read_bytes(), tuple(str(warning) for warning in warnings)
+            ) or []
+            warnings = tuple(str(warning) for warning in raw_warnings)
+            with Image.open(png_path) as image:
+                image.load()
+                validate_artifact(
+                    response,
+                    image,
+                    assets_dir=resolved_assets,
+                    fonts_dir=resolved_fonts,
+                    font_manager=font_manager,
+                    warnings=warnings,
+                )
+            return png_path.read_bytes(), warnings
     except _renderer_classes() as error:
         raise error
 

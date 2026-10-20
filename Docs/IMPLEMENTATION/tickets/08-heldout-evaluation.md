@@ -56,11 +56,11 @@ Observed on the local Darwin arm64 workstation:
   had a serialized validation error. The missing-asset case emitted the
   authorized deterministic placeholder warning twice, while preserving the
   source asset reference.
-- Per-case runtime ranged from 236.9 ms to 1045.2 ms across the two repeats.
-  Process maximum RSS ranged from about 224 MiB to 278 MiB on this host; this
+- Per-case runtime ranged from 236.1 ms to 1125.6 ms across the two repeats.
+  Process maximum RSS ranged from about 225 MiB to 277 MiB on this host; this
   is not container or native-amd64 qualification.
 - Report SHA-256:
-  `7727f6245eb050f74d9cedfd3bf376fed93936f59804e3ab3070a445b48f8976`
+  `4c5f6fa8cb549365307760c2e0e40cae44017349fdbb147c859e29ed1609cfc7`
 
 No result is inferred from fixture construction or from soft quality scores.
 
