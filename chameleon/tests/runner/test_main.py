@@ -10,7 +10,6 @@ from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
 
-from PIL import Image
 
 PROJECT_ROOT = Path(__file__).parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -46,7 +45,13 @@ class RunnerPublicationTests(unittest.TestCase):
 
     @staticmethod
     def _write_png(path):
-        Image.new("RGBA", (1, 1), (0, 0, 0, 0)).save(path, format="PNG")
+        json_path = Path(path).with_name(
+            Path(path).name.replace(".png.tmp", ".json.tmp")
+        )
+        design = json.loads(json_path.read_text(encoding="utf-8"))
+        from renderer.converter.convert import render_design_to_png
+
+        return render_design_to_png(design, main.ASSETS_DIR, path)
 
     @staticmethod
     def _classify(error, phase):
@@ -190,34 +195,31 @@ class RunnerPublicationTests(unittest.TestCase):
 
     def test_half_even_serialization_applies_to_text_font_size(self):
         source = {
-            "canvas": {"width": 20, "height": 20},
+            "canvas": {"width": 100, "height": 20},
             "elements": [
                 {
                     "id": "label",
                     "type": "text",
-                    "x": 0,
+                    "x": 2,
                     "y": 0,
-                    "width": 20,
+                    "width": 96,
                     "height": 20,
                     "content": "Label",
                     "font_family": "Solstice Sans",
                     "font_size": 10,
                     "color": "rgba(0,0,0,1)",
+                    "text_align": "center",
                 }
             ],
         }
-        target = {"width": 20, "height": 20}
+        target = {"width": 100, "height": 20}
         response = {
             "canvas": dict(target),
             "elements": [{**source["elements"][0], "font_size": Decimal("10.5")}],
         }
         with tempfile.TemporaryDirectory() as directory:
             output_dir = Path(directory)
-            with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
-                main,
-                "render_to_png",
-                side_effect=lambda _design, _assets, path: self._write_png(path),
-            ):
+            with patch.object(main, "OUTPUT_DIR", output_dir):
                 self._publish_pair(source, target, response, "text")
 
             published = json.loads(
@@ -661,9 +663,10 @@ class RunnerPublicationTests(unittest.TestCase):
             with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
                 main,
                 "render_to_png",
-                side_effect=lambda _design, _assets, path: Path(path).write_bytes(
-                    b"not-a-png"
-                ),
+                side_effect=lambda _design, _assets, path: (
+                    Path(path).write_bytes(b"not-a-png"),
+                    None,
+                )[1],
             ):
                 with self.assertRaises(OSError):
                     self._publish_pair(source, target, output, "task")

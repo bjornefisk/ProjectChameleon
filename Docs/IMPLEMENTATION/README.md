@@ -4,7 +4,7 @@ This directory houses the complete engineering specification, module architectur
 
 It is structured using the industry-standard **`to-spec`**, **`to-tickets`**, and **`writing-for-agents`** methodologies so autonomous AI agents have explicit implementation boundaries and dependency-sequenced work.
 Use `../FINAL_ARCHITECTURE.md` as the consolidated implementation summary. This directory decomposes that architecture into the executable specification and dependency-sequenced tickets.
-Current frontier is PR #14 integration review for bounded Ticket 06 source-aware routing and column-pivot work after Gate 1 clearance. Tickets 01-05 are complete; Ticket 06 implementation, focused/full tests, and sample evidence are recorded, and refreshed-PR corrections for contract-valid large sources, readable-floor font search, and accurate path/status evidence are verified locally. Partner review remains pending on `feat/ticket-06-column-pivot-level2`; Tickets 07-08, full candidate ranking, and held-out evaluation remain later. No merge or release is claimed.
+Current frontier is bounded Ticket 08 search/ranking integration after Ticket 07 topology implementation. The engine considers all four topology families, admits only renderer-gated hard-valid candidates, ranks fixed-point quality deterministically, and has local held-out-style evidence. The adversarial Level 3 sample remains a typed fail-closed result; native-amd64, broad organizer-held-out, and release qualification remain unverified. No official merge or release claim is made by this blueprint.
 
 ---
 
@@ -51,14 +51,14 @@ Agents work the **frontier**: any ticket whose blockers are 100% complete.
            [07: Level 3 Solver]
                      │ (blocks)
                      ▼
-           [08: Macro Search & Docker]
+           [08: Bounded Search & Ranking]
 ```
 
 ---
 
 ## Execution summary by ticket
 
-| Ticket | What it delivers | Blocked by |
+| Ticket | What it delivers | Dependency/status |
 |---|---|---|
 | **01** | `engine/errors.py` & `engine/contract.py` semantic validator oracle | None (can start immediately) |
 | **02** | `wrap.py`, `convert.py`, `shapes.py` Unicode & style-run fixes | None (can start immediately) |
@@ -67,7 +67,7 @@ Agents work the **frontier**: any ticket whose blockers are 100% complete.
 | **05** | `resize.py` isotropic scaling & near-isomorphic solver (passes Level 1) | **02, 03, 04** |
 | **06** | `roles.py` & `column_pivot.py` multi-signal inference (passes Level 2) | **05** |
 | **07** | `horizontal_ribbon.py` & spatial compression engine (passes Level 3) | **06** |
-| **08** | Complete 12-candidate search, fixed-point ranking & Docker qualification | **07** |
+| **08** | Bounded four-family search, fixed-point ranking, local artifact/held-out evidence, and offline Docker qualification plan | **07** for topology interfaces; bounded integration is present, official/native qualification remains pending |
 
 ---
 
