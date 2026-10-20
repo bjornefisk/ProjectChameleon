@@ -1,0 +1,63 @@
+{
+  "asset_sha256": "a9bea75d9592cee51bd1ee56e043662091326c612fc8c208eee3872c216aa053",
+  "cases": {
+    "contain": {
+      "document_sha256": "4d046543e55f75df4246a5efe9cb7e6389718d4c7b2d1bfecb770df6a9ee2b30",
+      "png_sha256": "b2171fe5a043af683a53f83285dbf84acdce4d769a536a35dcd6039363d5df35",
+      "size": [
+        32,
+        16
+      ],
+      "warnings": []
+    },
+    "cover": {
+      "document_sha256": "e308a9f037d2fd1906d79ecd3d6bf7b3304627e5e544602ed03240efd0c61891",
+      "png_sha256": "f2a2aa150398d02598e95ed63e406f79b85f443708d03f1daa0253186fd11e44",
+      "size": [
+        32,
+        16
+      ],
+      "warnings": []
+    },
+    "fill": {
+      "document_sha256": "b93785b0982b677cb028d97f609dae1aa5e1b67d1de051e1b6affac46354af7e",
+      "png_sha256": "9545fe5e74f92239b3f5d809ccb541c5a7897c24fac8453349ef802ac7d736d8",
+      "size": [
+        32,
+        16
+      ],
+      "warnings": []
+    },
+    "missing_asset": {
+      "document_sha256": "ef8af445fbee655947ca241822f1fc8c8ec0ddd81995279a3c21e21a487e8aaa",
+      "png_sha256": "45de45cfda84f9240795dc503b05f3e9cff6a3934b62f2b0ce9c8a841a6a1b15",
+      "size": [
+        40,
+        30
+      ],
+      "warnings": [
+        "Missing asset 'missing-provenance.png' for element 'missing' - rendered a placeholder."
+      ]
+    },
+    "right_negative_spacing": {
+      "document_sha256": "a001ce49cfff25dd4e72591424af7b003144188931af7cfc93696d1c2a4fc9a9",
+      "png_sha256": "5a058be8d999a72a2bb9e34af980623687ede662f4c3378a15c92d6cab9855c9",
+      "size": [
+        160,
+        50
+      ],
+      "warnings": []
+    },
+    "rotation": {
+      "document_sha256": "aadefe4075603320d952aba428fca4058cbdbf5ae7ef8c4f95b2cd2b4c32504a",
+      "png_sha256": "4b30fcae6d9949555692d86f6084e506ff8b48e41ef18152a1a75e887a43267e",
+      "size": [
+        40,
+        40
+      ],
+      "warnings": []
+    }
+  },
+  "font_tree_sha256": "c9b22d1fe1dcccea9035bd23fd5fb0ac3aec1cd3ad1b3b6e68eb06d76e8dc0fa",
+  "renderer_commit": "a17e1fb9a732959dd6c21ae168d5ee09d74bd64f"
+}
