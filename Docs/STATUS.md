@@ -90,6 +90,17 @@ Ticket 07 product work is implemented on `feat/ticket-07-horizontal-ribbon-level
 - **Known review risk:** the ticket requires a valid $728 x 90$ sample output, but the current hard-valid search has not produced one. Do not mark Ticket 07 complete, claim sample-pass evidence, or promote this arm64-host work to native-amd64 qualification until the gap is resolved or superseded by an accepted contract decision.
 - **Next review question:** independently enumerate the legal integer group/image lattices and renderer-valid text boxes for the fixture before changing hard constraints. A solver change MUST remain bounded and MUST NOT shed records, rewrite copy/font attributes, substitute fonts, or relax overlap/containment rules.
 
+## Issue #19 / F-03 exhaustion-aware status evidence — complete
+
+The resize failure seam now preserves a strict boolean `search_exhausted` value for every attempted topology family, aggregates all family outcomes, and emits `NO_HARD_VALID_CANDIDATE` only when every attempted family proves finite search exhaustion. Missing, non-boolean, false, cutoff, and outer serialized-validation metadata remain `INCOMPLETE_SEARCH`. Failed tasks remain fail-closed and publish no JSON/PNG pair.
+
+- **Focused evidence:** `cd chameleon && ../.venv/bin/python -m unittest tests.layout.test_search_status tests.layout.test_level3 tests.runner.test_main tests.runner.test_runner -v` — 67 passed.
+- **Repository/full evidence:** `python3 scripts/verify_repository.py`, `make verify`, and `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — 179 passed.
+- **Engine smoke:** the documented `cd chameleon && python -m engine.main` command is unavailable in the system interpreter because `jsonschema` is not installed. The project environment `../.venv/bin/python -m engine.main` ran Levels 1–2 as `SUCCESS` with committed pairs and Level 3 as typed `INCOMPLETE_SEARCH` with no pair.
+- **Docker supplemental smoke:** `docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` passed with the existing `FromPlatformFlagConstDisallowed` warning. The offline `docker run --rm --network none ... chameleon-stage1` run exited nonzero as expected under arm64-host amd64 emulation: Levels 1–2 committed pairs and Level 3 reported `INCOMPLETE_SEARCH` without a pair. This is supplemental, not native-amd64 qualification.
+- **Review:** independent correctness review approved after strict-boolean normalization; security review found no blocking issue. Ticket 07's public Level 3 sample-pass gap and Ticket 08 search/ranking work remain open.
+
+
 ## Ground truth now recorded
 
 - `Docs/PROJECT_CONTRACT.md` is the Stage 1 behavioral authority.
