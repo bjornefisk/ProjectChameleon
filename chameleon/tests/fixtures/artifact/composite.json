@@ -1,0 +1,11 @@
+{
+  "canvas": {"width": 400, "height": 300},
+  "elements": [
+    {"id": "backdrop", "type": "image", "x": 0, "y": 0, "width": 400, "height": 300, "z_index": 0, "asset_id": "solstice_bg_gradient.png", "fit": "cover"},
+    {"id": "panel", "type": "shape", "x": 20, "y": 20, "width": 180, "height": 110, "z_index": 1, "shape_type": "rectangle", "fill_color": "rgba(20,60,120,1)", "stroke_color": "rgba(255,255,255,1)", "stroke_width": 3, "corner_radius": 12},
+    {"id": "bottle", "type": "image", "x": 240, "y": 30, "width": 120, "height": 200, "z_index": 2, "asset_id": "solstice_bottle.png", "fit": "contain"},
+    {"id": "dot", "type": "shape", "x": 30, "y": 200, "width": 60, "height": 60, "z_index": 2, "shape_type": "ellipse", "fill_color": "rgba(255,120,0,1)"},
+    {"id": "veil", "type": "shape", "x": 200, "y": 150, "width": 150, "height": 100, "z_index": 3, "shape_type": "rectangle", "fill_color": "rgba(255,255,255,1)", "opacity": 0.35},
+    {"id": "label", "type": "text", "x": 36, "y": 50, "width": 150, "height": 40, "z_index": 4, "content": "Solstice", "font_family": "Solstice Sans", "font_size": 24, "color": "rgba(255,255,255,1)"}
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "canvas": {"width": 200, "height": 120},
+  "elements": [
+    {"id": "hero", "type": "image", "x": 10, "y": 10, "width": 100, "height": 100, "z_index": 0, "asset_id": "absent_hero.png", "fit": "contain"},
+    {"id": "chip", "type": "shape", "x": 130, "y": 20, "width": 50, "height": 30, "z_index": 1, "shape_type": "rectangle", "fill_color": "rgba(200,30,30,1)"}
+  ]
+}

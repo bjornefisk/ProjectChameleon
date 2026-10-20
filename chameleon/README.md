@@ -85,6 +85,14 @@ placeholder. If the renderer import fails, that task reports
 `RUNTIME_IO_FAILURE` and publishes no JSON/PNG pair. Install the pinned
 dependencies from `requirements.txt` before running the engine.
 
+Before either a solver candidate is accepted or a task pair is published, the
+engine runs `engine.artifact.validate_artifact()` on the decoded PNG and the
+serialized design. It verifies renderer-sized dimensions, an opaque canvas,
+rendered bounds, pinned-renderer pixels, source-pixel provenance for exact
+draws, and the deterministic missing-asset warning. A readable but
+semantically wrong PNG is rejected and no JSON/PNG pair is committed. Contrast
+and readability remain separate soft-quality concerns.
+
 ## Docker (how you'll actually be run)
 
 ```bash
