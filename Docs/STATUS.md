@@ -28,14 +28,16 @@ The public Level 3 fixture remains intentionally typed `INCOMPLETE_SEARCH` with 
 
 The following evidence was produced on the current integration tree, not copied from the historical records below:
 
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — **209 tests passed**.
-- Focused suites: artifact **10**, renderer **30**, layout **56**, and runner **72** tests passed.
-- `../.venv/bin/python ../scripts/evaluate_heldout_search.py --repeats 2` — five local authored cases, 12 candidates per case, hard-valid rate **0.45**, repeated PNG/search signatures stable, all four topology families present in the work set. This is not organizer-held-out or native-amd64 qualification.
-- `python3 scripts/verify_repository.py`, `make verify`, changed-file `py_compile`, and `git diff --check` — passed.
-- `cd chameleon && python -m engine.main` — not runnable because the system interpreter lacks `jsonschema`.
-- `cd chameleon && ../.venv/bin/python -m engine.main` — exit **1 expected**; Level 1 and Level 2 published valid pairs, Level 3 returned typed `INCOMPLETE_SEARCH` with no pair. The generated smoke artifacts were cleaned afterward.
-- `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — blocked before build because the local Docker daemon was unavailable; no local Docker run was performed.
-- GitHub Actions run `39462292155` — **passed** unit tests, repository verification, native renderer qualification, Buildx/image architecture checks, native amd64 offline smoke, artifact hashes, and offline renderer imports. This is CI evidence, not organizer-controlled final qualification.
+- `docker run --rm --network none -v "$PWD/..:/workspace" -w /workspace/chameleon --env PYTHONPATH=/workspace:/workspace/chameleon --entrypoint python chameleon-main-edge-v2 -m unittest discover -s tests -t . -p 'test_*.py' -v` — **214 tests passed** under the pinned amd64 container.
+- Focused additions: layout **5** new regressions covering zero-span groups, singleton-group transforms, bleed intersections, source order, and BADGE variants.
+- `./.venv/bin/python scripts/evaluate_heldout_search.py --repeats 2` — five local authored cases, 12 candidates per case, hard-valid rate **0.45**, repeated PNG/search signatures stable, all four topology families present in the work set. This is not organizer-held-out or native-amd64 qualification.
+- `python3 scripts/verify_repository.py`, `make verify`, `python3 -m compileall -q chameleon`, and `git diff --check` — passed.
+- `python -m engine.main` — not runnable because system `python` is unavailable.
+- `cd chameleon && ../.venv/bin/python -m engine.main` — exit **1 expected**; Level 1 and Level 2 published valid pairs, Level 3 returned typed `INCOMPLETE_SEARCH` with no pair. Generated smoke artifacts were cleaned.
+- `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-main-edge-v2 .` — passed with `FromPlatformFlagConstDisallowed`; the image manifest was `sha256:128c0cee121b258077560456c3d07f4d87b619077a7a7c67c2bfea7d4380bfa8`.
+- `cd chameleon && docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-main-edge-v2` — exit **1 expected** under arm64-host amd64 emulation; Level 1/2 published valid pairs, Level 3 returned typed `INCOMPLETE_SEARCH`, and artifacts were cleaned.
+- `./.venv/bin/python -m unittest scripts.test_review_pr -v` — **47 tests passed**.
+- Native amd64 qualification, clean-cache parity, and organizer-controlled held-out/resource claims remain unverified.
 
 The earlier sections below preserve historical ticket and transition records. Their counts, branch names, and environment results are not current Issue #16 verification evidence.
 
