@@ -21,6 +21,7 @@ from PIL import Image
 
 from ..contract import validate_response, validate_source, validate_target_canvas
 from ..errors import InfeasibleLayoutError, InfeasibleReasonCode
+from ..artifact import validate_artifact
 from ..geometry.bounds import (
     clipped_sides,
     intersects_canvas,
@@ -618,6 +619,16 @@ def _render_candidate(
             logger.warning("renderer warning: %r", warning)
         with Image.open(png_path) as image:
             image.verify()
+        with Image.open(png_path) as image:
+            image.load()
+            validate_artifact(
+                response,
+                image,
+                assets_dir=resolved_assets_dir,
+                fonts_dir=resolved_fonts_dir,
+                font_manager=font_manager,
+                warnings=warnings or (),
+            )
         return png_path.read_bytes()
 
 

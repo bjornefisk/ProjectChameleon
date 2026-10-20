@@ -23,10 +23,22 @@ from chameleon.renderer.converter.wrap import TextOverflowError
 
 
 def _test_renderer(design, assets_dir, png_path):
+    if design.get("elements") and all(
+        element.get("type") == "shape" for element in design["elements"]
+    ):
+        from chameleon.renderer.converter.convert import render_design_to_png
+
+        root = PROJECT_ROOT / "chameleon" / "brand_kit"
+        render_design_to_png(
+            design,
+            root / "assets",
+            png_path,
+            fonts_dir=root / "fonts",
+        )
+        return
     Image.new(
         "RGB", (design["canvas"]["width"], design["canvas"]["height"]), "white"
     ).save(png_path, format="PNG")
-
 
 class RunnerIntegrationTests(unittest.TestCase):
     def setUp(self):

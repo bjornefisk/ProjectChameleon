@@ -6,6 +6,20 @@
 **Decision status:** Gate 1 renderer/validator qualification and native runtime remain recorded on the transition branch. Ticket 06 focused/full implementation/sample evidence and correction verification are recorded. Tickets 07-08, full candidate ranking, and held-out evaluation remain later work.
 **Ticket 06 authority:** User-requested GitHub issue #13; owner @bjornefisk; partner reviewer @gabegaines24. Implementation branch `feat/ticket-06-column-pivot-level2`, refreshed PR #14 source revision `2166392` reviewed locally, based on transition revision `77b3368` (`origin/work/pr-12-ready`).
 
+## Issue #21 artifact-conformance implementation (local, not merged)
+
+Issue #21 adds hard semantic PNG validation at both trust boundaries. `engine.artifact.validate_artifact()` checks the pinned `max_size=2048` dimensions, fully opaque canvas, exact missing-asset warnings, adapter-derived paint bounds, one-to-one opaque raster replay, and full pixel equality with a second pinned-adapter render for non-exact layers. The gate returns `RUNTIME_IO_FAILURE`; staging cleans the private pair before publication. Contrast remains outside hard validity.
+
+- **Changed production paths:** `chameleon/engine/artifact.py` (new), `engine/staging.py`, `engine/layout/near_isomorphic.py`, `renderer/converter/assets.py`, and `renderer/converter/convert.py`.
+- **Changed evidence paths:** artifact fixtures/tests under `chameleon/tests/fixtures/artifact/` and `chameleon/tests/artifact/`; conformant renderer doubles in `tests/runner`; `PROJECT_CONTRACT.md` traceability, `FINAL_ARCHITECTURE.md`, and `chameleon/README.md`.
+- **Focused artifact evidence:** `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/artifact -t . -p 'test_*.py' -v` — 34 passed.
+- **Related focused evidence:** renderer 24 passed; layout 35 passed; runner 72 passed.
+- **Full local evidence:** `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — 204 passed.
+- **Repository evidence:** `python3 scripts/verify_repository.py`, `make verify`, changed-file `py_compile`, and `git diff --check` passed.
+- **Engine smoke:** `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1 expected; Level 1 and Level 2 committed valid pairs, Level 3 returned `INCOMPLETE_SEARCH` with no pair. Generated smoke artifacts were removed afterward.
+- **Docker evidence:** `docker buildx build --platform linux/amd64 --load ...` was not run to completion because the local Docker daemon was unavailable. Native-amd64 qualification remains unverified.
+- **Independent review:** contract review accepted the seam wiring; its zero-area concern was checked against the pinned renderer (zero-area draws are no-ops) and covered by a regression. Security review identified arbitrary non-exact edge-ink acceptance, fixed by requiring the pinned renderer's reference pixels, and separately noted the pre-existing unbounded image/resource risk. Resource policy changes remain outside this ticket and require contract/ADR authority.
+
 ## PR12 merge gate — CLEARED
 
 The bounded Ticket 05 implementation completes Gate 1 within its accepted scope. Gate 1 now cleared as follows:

@@ -202,6 +202,18 @@ The adapter owns task-schema conversion, local font loading, image fit preproces
 
 Missing assets retain their original element records and `asset_id`. A deterministic diagnostic placeholder may be rendered for inspection, but it is never written into the design response or treated as a replacement asset.
 
+### PNG artifact conformance
+
+The renderer output is a hard-validity input, not merely a readable preview. The candidate and publication seams both validate the serialized design and decoded PNG before acceptance:
+
+- output dimensions mirror the pinned renderer's `max_size=2048` scaling and the canvas must be fully opaque;
+- missing image assets retain their source records and require the adapter's deterministic warning;
+- opaque, integral, unrotated, one-to-one image and shape layers are replayed from the adapter's source raster;
+- rendered non-exact layers are constrained to their adapter-derived paint regions and compared with a second render from the pinned adapter, so text, rotation, blending, resampling, and antialias edges cannot be replaced by arbitrary pixels;
+- failures use `RUNTIME_IO_FAILURE`, publish no pair, and never repair or mutate the decoded image.
+
+Contrast and readability remain soft ranking concerns. PNG container metadata is covered by staging readability checks, not semantic pixel validation.
+
 ## 7. Deterministic search architecture
 
 The initial solver is a bounded structured search, not a model or CP-SAT system.

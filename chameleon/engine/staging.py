@@ -24,6 +24,7 @@ from PIL import Image
 
 from .contract import validate_response
 from .geometry.math_util import quantize_to_int
+from .artifact import validate_artifact
 
 
 _OUTPUT_FILE_RE = re.compile(
@@ -426,8 +427,14 @@ def _publish_response_json(response: Mapping[str, Any], path: Path) -> Mapping[s
     return _read_serialized_design(path)
 
 
-def validate_png(path: Path) -> None:
-    """Ensure a staged file is a readable, non-empty PNG image."""
+def validate_png(
+    path: Path,
+    *,
+    design: Mapping[str, Any] | None = None,
+    assets_dir: Path | None = None,
+    warnings: list[str] | None = None,
+) -> None:
+    """Ensure a staged PNG is readable and, when supplied, semantically valid."""
 
     with _open_regular_file(path) as stream:
         if os.fstat(stream.fileno()).st_size == 0:
@@ -439,6 +446,13 @@ def validate_png(path: Path) -> None:
     with _open_regular_file(path) as stream:
         with Image.open(stream) as image:
             image.load()
+            if design is not None:
+                validate_artifact(
+                    design,
+                    image,
+                    assets_dir=assets_dir,
+                    warnings=warnings or (),
+                )
 
 
 def _validate_output_directory(output_dir: Path) -> None:
@@ -485,8 +499,13 @@ def publish_task(
     try:
         serialized = _publish_response_json(response, paths.json_tmp)
         validate_response(source, target_canvas, serialized)
-        render_to_png(serialized, assets_dir, paths.png_tmp)
-        validate_png(paths.png_tmp)
+        render_warnings = render_to_png(serialized, assets_dir, paths.png_tmp) or []
+        validate_png(
+            paths.png_tmp,
+            design=serialized,
+            assets_dir=assets_dir,
+            warnings=render_warnings,
+        )
         _write_commit_marker(paths)
 
         # POSIX cannot rename two root files as one operation. The marker is
