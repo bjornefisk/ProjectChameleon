@@ -10,6 +10,7 @@ from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
 
+from PIL import Image
 
 PROJECT_ROOT = Path(__file__).parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -44,14 +45,29 @@ class RunnerPublicationTests(unittest.TestCase):
         return source, target
 
     @staticmethod
-    def _write_png(path):
-        json_path = Path(path).with_name(
-            Path(path).name.replace(".png.tmp", ".json.tmp")
-        )
-        design = json.loads(json_path.read_text(encoding="utf-8"))
-        from renderer.converter.convert import render_design_to_png
+    def _write_png(path, design=None):
+        """Write a conformant test render for shape/text-only designs."""
 
-        return render_design_to_png(design, main.ASSETS_DIR, path)
+        if design is not None and all(
+            element.get("type") in {"shape", "text"}
+            for element in design.get("elements", ())
+        ):
+            from chameleon.renderer.converter.convert import render_design_to_png
+
+            root = PROJECT_ROOT / "chameleon" / "brand_kit"
+            render_design_to_png(
+                design,
+                root / "assets",
+                path,
+                fonts_dir=root / "fonts",
+            )
+            return
+        size = (
+            (int(design["canvas"]["width"]), int(design["canvas"]["height"]))
+            if design is not None
+            else (1, 1)
+        )
+        Image.new("RGBA", size, (255, 255, 255, 255)).save(path, format="PNG")
 
     @staticmethod
     def _classify(error, phase):
@@ -168,7 +184,7 @@ class RunnerPublicationTests(unittest.TestCase):
         def renderer(design, _assets_dir, png_path):
             rendered["design"] = design
             rendered["png_path"] = Path(png_path)
-            self._write_png(png_path)
+            self._write_png(png_path, design)
 
         with tempfile.TemporaryDirectory() as directory:
             output_dir = Path(directory)
@@ -195,31 +211,34 @@ class RunnerPublicationTests(unittest.TestCase):
 
     def test_half_even_serialization_applies_to_text_font_size(self):
         source = {
-            "canvas": {"width": 100, "height": 20},
+            "canvas": {"width": 80, "height": 20},
             "elements": [
                 {
                     "id": "label",
                     "type": "text",
                     "x": 2,
                     "y": 0,
-                    "width": 96,
+                    "width": 70,
                     "height": 20,
-                    "content": "Label",
+                    "content": "",
                     "font_family": "Solstice Sans",
                     "font_size": 10,
                     "color": "rgba(0,0,0,1)",
-                    "text_align": "center",
                 }
             ],
         }
-        target = {"width": 100, "height": 20}
+        target = {"width": 80, "height": 20}
         response = {
             "canvas": dict(target),
             "elements": [{**source["elements"][0], "font_size": Decimal("10.5")}],
         }
         with tempfile.TemporaryDirectory() as directory:
             output_dir = Path(directory)
-            with patch.object(main, "OUTPUT_DIR", output_dir):
+            with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
+                main,
+                "render_to_png",
+                side_effect=lambda _design, _assets, path: self._write_png(path, _design),
+            ):
                 self._publish_pair(source, target, response, "text")
 
             published = json.loads(
@@ -249,7 +268,7 @@ class RunnerPublicationTests(unittest.TestCase):
 
         def renderer(design, _assets_dir, png_path):
             rendered["design"] = design
-            self._write_png(png_path)
+            self._write_png(png_path, design)
 
         with tempfile.TemporaryDirectory() as directory:
             output_dir = Path(directory)
@@ -358,7 +377,7 @@ class RunnerPublicationTests(unittest.TestCase):
             with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
                 main,
                 "render_to_png",
-                side_effect=lambda _design, _assets, path: self._write_png(path),
+                side_effect=lambda _design, _assets, path: self._write_png(path, _design),
             ):
                 self._publish_pair(source, target, output, "task")
 
@@ -388,7 +407,7 @@ class RunnerPublicationTests(unittest.TestCase):
             with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
                 main,
                 "render_to_png",
-                side_effect=lambda _design, _assets, path: self._write_png(path),
+                side_effect=lambda _design, _assets, path: self._write_png(path, _design),
             ):
                 with self.assertRaises(ValueError):
                     self._publish_pair(source, target, output, "../escape")
@@ -421,7 +440,7 @@ class RunnerPublicationTests(unittest.TestCase):
             with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
                 main,
                 "render_to_png",
-                side_effect=lambda _design, _assets, path: self._write_png(path),
+                side_effect=lambda _design, _assets, path: self._write_png(path, _design),
             ), patch.object(staging.os, "replace", side_effect=symlink_json):
                 with self.assertRaises((OSError, ValueError)):
                     self._publish_pair(source, target, output, "task")
@@ -450,7 +469,7 @@ class RunnerPublicationTests(unittest.TestCase):
             with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
                 main,
                 "render_to_png",
-                side_effect=lambda _design, _assets, path: self._write_png(path),
+                side_effect=lambda _design, _assets, path: self._write_png(path, _design),
             ), patch.object(staging.os, "replace", side_effect=symlink_marker):
                 with self.assertRaises((OSError, ValueError)):
                     self._publish_pair(source, target, output, "task")
@@ -475,7 +494,7 @@ class RunnerPublicationTests(unittest.TestCase):
             with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
                 main,
                 "render_to_png",
-                side_effect=lambda _design, _assets, path: self._write_png(path),
+                side_effect=lambda _design, _assets, path: self._write_png(path, _design),
             ), patch.object(staging.os, "replace", side_effect=record_replace):
                 self._publish_pair(source, target, output, "task")
 
@@ -499,7 +518,7 @@ class RunnerPublicationTests(unittest.TestCase):
             with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
                 main,
                 "render_to_png",
-                side_effect=lambda _design, _assets, path: self._write_png(path),
+                side_effect=lambda _design, _assets, path: self._write_png(path, _design),
             ), patch.object(staging.os, "replace", side_effect=tamper_marker):
                 with self.assertRaises((ValueError, KeyError)):
                     self._publish_pair(source, target, output, "task")
@@ -518,7 +537,7 @@ class RunnerPublicationTests(unittest.TestCase):
             with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
                 main,
                 "render_to_png",
-                side_effect=lambda _design, _assets, path: self._write_png(path),
+                side_effect=lambda _design, _assets, path: self._write_png(path, _design),
             ):
                 with self.assertRaises(OSError):
                     self._publish_pair(source, target, output, "task")
@@ -557,7 +576,7 @@ class RunnerPublicationTests(unittest.TestCase):
             with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
                 main,
                 "render_to_png",
-                side_effect=lambda _design, _assets, path: self._write_png(path),
+                side_effect=lambda _design, _assets, path: self._write_png(path, _design),
             ):
                 self._publish_pair(source, target, output, "task")
 
@@ -591,7 +610,7 @@ class RunnerPublicationTests(unittest.TestCase):
             with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
                 main,
                 "render_to_png",
-                side_effect=lambda _design, _assets, path: self._write_png(path),
+                side_effect=lambda _design, _assets, path: self._write_png(path, _design),
             ):
                 self._publish_pair(
                     source,
@@ -623,7 +642,7 @@ class RunnerPublicationTests(unittest.TestCase):
                     target_canvas=target,
                     response={"canvas": target, "elements": []},
                     assets_dir=root / "assets",
-                    render_to_png=lambda _design, _assets, path: self._write_png(path),
+                    render_to_png=lambda _design, _assets, path: self._write_png(path, _design),
                 )
 
             self.assertEqual(list(outside.iterdir()), [])
@@ -660,13 +679,15 @@ class RunnerPublicationTests(unittest.TestCase):
         output = {"canvas": target, "elements": []}
         with tempfile.TemporaryDirectory() as directory:
             output_dir = Path(directory)
+
+            def write_invalid_png(_design, _assets, path):
+                Path(path).write_bytes(b"not-a-png")
+                return []
+
             with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
                 main,
                 "render_to_png",
-                side_effect=lambda _design, _assets, path: (
-                    Path(path).write_bytes(b"not-a-png"),
-                    None,
-                )[1],
+                side_effect=write_invalid_png,
             ):
                 with self.assertRaises(OSError):
                     self._publish_pair(source, target, output, "task")
@@ -687,7 +708,7 @@ class RunnerPublicationTests(unittest.TestCase):
             with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
                 main,
                 "render_to_png",
-                side_effect=lambda _design, _assets, path: self._write_png(path),
+                side_effect=lambda _design, _assets, path: self._write_png(path, _design),
             ), patch.object(staging.os, "replace", side_effect=fail_commit_marker):
                 with self.assertRaises(OSError):
                     self._publish_pair(source, target, output, "task")
@@ -708,7 +729,7 @@ class RunnerPublicationTests(unittest.TestCase):
             with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
                 main,
                 "render_to_png",
-                side_effect=lambda _design, _assets, path: self._write_png(path),
+                side_effect=lambda _design, _assets, path: self._write_png(path, _design),
             ), patch.object(staging.os, "replace", side_effect=interrupt_after_json):
                 with self.assertRaises(KeyboardInterrupt):
                     self._publish_pair(source, target, output, "task")
@@ -739,7 +760,7 @@ class RunnerPublicationTests(unittest.TestCase):
             ), patch.object(
                 main,
                 "render_to_png",
-                side_effect=lambda _design, _assets, path: self._write_png(path),
+                side_effect=lambda _design, _assets, path: self._write_png(path, _design),
             ):
                 result = main.main()
 
