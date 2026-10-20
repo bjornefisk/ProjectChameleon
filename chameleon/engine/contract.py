@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import math
+from functools import lru_cache
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from fractions import Fraction
@@ -89,13 +90,18 @@ def validate_response(
     source: Mapping[str, Any],
     target_canvas: Mapping[str, Any],
     response: Mapping[str, Any],
+    *,
+    font_manager=None,
+    fonts_dir: str | None = None,
 ) -> None:
     """Validate a serialized candidate against ``source`` and ``target_canvas``.
 
     All mutable geometry is checked from the response's serialized integer
     values.  The source is validated first, then the response is checked in a
     deterministic order so callers receive one stable reason code for the
-    first hard failure.
+    first hard failure.  Optional renderer arguments inject the already-loaded
+    local font manager used by generation and preserve the default packaged
+    font path for standalone validation.
     """
 
     validate_source(source)
@@ -290,7 +296,12 @@ def validate_response(
     _validate_source_separation(
         source_elements, response_elements, source_aabbs, response_aabbs
     )
-    _validate_text_overflow(response_elements)
+    _validate_text_overflow(
+        response_elements,
+        response["canvas"],
+        font_manager=font_manager,
+        fonts_dir=fonts_dir,
+    )
 
 
 def _schema_view(value: Any) -> Any:
@@ -557,7 +568,13 @@ def _validate_source_separation(
             )
 
 
-def _validate_text_overflow(response_elements: Sequence[Mapping[str, Any]]) -> None:
+def _validate_text_overflow(
+    response_elements: Sequence[Mapping[str, Any]],
+    canvas: Mapping[str, Any],
+    *,
+    font_manager=None,
+    fonts_dir: str | None = None,
+) -> None:
     for index, element in enumerate(response_elements):
         if element["type"] != "text":
             continue
@@ -591,6 +608,86 @@ def _validate_text_overflow(response_elements: Sequence[Mapping[str, Any]]) -> N
                     "height": element["height"],
                 },
             )
+
+    _validate_renderer_text(
+        response_elements,
+        canvas,
+        font_manager=font_manager,
+        fonts_dir=fonts_dir,
+    )
+
+
+@lru_cache(maxsize=4)
+def _contract_font_manager(fonts_dir: str):
+    try:
+        from renderer.converter.brand_fonts import load_brand_font_manager
+    except ModuleNotFoundError:
+        from chameleon.renderer.converter.brand_fonts import load_brand_font_manager
+
+    return load_brand_font_manager(fonts_dir)
+
+
+def _validate_renderer_text(
+    response_elements: Sequence[Mapping[str, Any]],
+    canvas: Mapping[str, Any],
+    *,
+    font_manager=None,
+    fonts_dir: str | None = None,
+) -> None:
+    """Run renderer text preflight as an independent hard-validation seam."""
+
+    text_elements = [
+        (index, element)
+        for index, element in enumerate(response_elements)
+        if element["type"] == "text"
+    ]
+    if not text_elements:
+        return
+
+    index, element = text_elements[0]
+    try:
+        try:
+            from renderer.converter.brand_fonts import MissingFontError
+            from renderer.converter.convert import convert_chameleon_to_crello
+            from renderer.converter.wrap import MalformedTextError, TextLayoutError
+        except ModuleNotFoundError:
+            from chameleon.renderer.converter.brand_fonts import MissingFontError
+            from chameleon.renderer.converter.convert import convert_chameleon_to_crello
+            from chameleon.renderer.converter.wrap import MalformedTextError, TextLayoutError
+
+        resolved_font_manager = font_manager
+        if resolved_font_manager is None:
+            resolved_fonts_dir = fonts_dir or str(Path(__file__).resolve().parents[1] / "brand_kit" / "fonts")
+            resolved_font_manager = _contract_font_manager(resolved_fonts_dir)
+        for index, element in text_elements:
+            convert_chameleon_to_crello(
+                {"canvas": dict(canvas), "elements": [dict(element)]},
+                resolved_font_manager,
+            )
+    except MalformedTextError as error:
+        _fail(
+            InfeasibleReasonCode.MALFORMED_INPUT,
+            "renderer rejected serialized text metadata",
+            {"index": index, "id": element["id"], "error": str(error)},
+        )
+    except TextLayoutError as error:
+        _fail(
+            InfeasibleReasonCode.TEXT_OVERFLOW,
+            "renderer rejected serialized text layout",
+            {"index": index, "id": element["id"], "error": str(error)},
+        )
+    except MissingFontError as error:
+        _fail(
+            InfeasibleReasonCode.RUNTIME_IO_FAILURE,
+            "renderer could not load a required local font face",
+            {"index": index, "id": element["id"], "error": str(error)},
+        )
+    except (ImportError, OSError, OverflowError, RuntimeError) as error:
+        _fail(
+            InfeasibleReasonCode.RUNTIME_IO_FAILURE,
+            "renderer text preflight failed",
+            {"error": str(error)},
+        )
 
 
 def _background_index(source: Mapping[str, Any], source_aabbs: Sequence[AABB]) -> int | None:

@@ -190,23 +190,24 @@ class RunnerPublicationTests(unittest.TestCase):
 
     def test_half_even_serialization_applies_to_text_font_size(self):
         source = {
-            "canvas": {"width": 20, "height": 20},
+            "canvas": {"width": 100, "height": 100},
             "elements": [
                 {
                     "id": "label",
                     "type": "text",
                     "x": 0,
                     "y": 0,
-                    "width": 20,
-                    "height": 20,
+                    "width": 100,
+                    "height": 100,
                     "content": "Label",
                     "font_family": "Solstice Sans",
                     "font_size": 10,
                     "color": "rgba(0,0,0,1)",
+                    "text_align": "center",
                 }
             ],
         }
-        target = {"width": 20, "height": 20}
+        target = {"width": 100, "height": 100}
         response = {
             "canvas": dict(target),
             "elements": [{**source["elements"][0], "font_size": Decimal("10.5")}],

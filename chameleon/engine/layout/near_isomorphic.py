@@ -767,8 +767,16 @@ def solve_near_isomorphic(
         "elements": response_elements,
     }
     try:
-        validate_response(source, target_canvas, response)
+        validate_response(
+            source,
+            target_canvas,
+            response,
+            font_manager=font_manager,
+            fonts_dir=fonts_dir,
+        )
     except InfeasibleLayoutError as error:
+        if error.reason_code is InfeasibleReasonCode.RUNTIME_IO_FAILURE:
+            raise
         _fail(
             "candidate failed serialized hard validation",
             reason_code=error.reason_code.value,

@@ -4,9 +4,9 @@
     {
       "id": "styled",
       "type": "text",
-      "x": 10,
+      "x": 0,
       "y": 10,
-      "width": 300,
+      "width": 320,
       "height": 50,
       "z_index": 0,
       "content": "Chase the Light",
@@ -14,7 +14,8 @@
       "font_size": 24,
       "font_weight": "bold",
       "color": "rgba(255,255,255,1)",
-      "style_runs": [{"start": 6, "end": 15, "color": "rgba(240,178,66,1)"}]
+      "style_runs": [{"start": 6, "end": 15, "color": "rgba(240,178,66,1)"}],
+      "text_align": "center"
     }
   ]
 }
