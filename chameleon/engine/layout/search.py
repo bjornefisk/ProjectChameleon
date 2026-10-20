@@ -495,12 +495,14 @@ def _invoke_solver(
     target_canvas: Mapping[str, Any],
     roles: RoleModel,
     *,
+    variant: str,
     font_manager: Any,
     fonts_dir: str | Path | None,
     assets_dir: str | Path | None,
 ) -> Mapping[str, Any]:
     solver = _TOPOLOGY_SOLVERS[spec.topology_order]
     kwargs: dict[str, Any] = {
+        "variant": variant,
         "font_manager": font_manager,
         "fonts_dir": str(fonts_dir) if fonts_dir is not None else None,
         "assets_dir": str(assets_dir) if assets_dir is not None else None,
@@ -543,38 +545,23 @@ def search(
     cutoff = limit < len(specs)
     admitted: list[Candidate] = []
     failures: list[dict[str, Any]] = []
-    base_responses: dict[str, Mapping[str, Any]] = {}
     saw_incomplete = False
 
     for spec in specs[:limit]:
         try:
-            if spec.variant_index == 0:
-                response = _invoke_solver(
-                    spec,
-                    source,
-                    target_canvas,
-                    roles,
-                    font_manager=font_manager,
-                    fonts_dir=fonts_dir,
-                    assets_dir=assets_dir,
-                )
-                base_responses[spec.topology] = response
-            else:
-                base = base_responses.get(spec.topology)
-                if base is None:
-                    saw_incomplete = True
-                    failures.append(
-                        {
-                            "topology": spec.topology,
-                            "variant": spec.variant,
-                            "candidate_index": spec.candidate_index,
-                            "reason_code": InfeasibleReasonCode.INCOMPLETE_SEARCH.value,
-                            "reason": "base topology candidate was not available",
-                        }
-                    )
-                    continue
+            response = _invoke_solver(
+                spec,
+                source,
+                target_canvas,
+                roles,
+                variant=spec.variant,
+                font_manager=font_manager,
+                fonts_dir=fonts_dir,
+                assets_dir=assets_dir,
+            )
+            if spec.variant_index != 0:
                 response = _derive_variant_response(
-                    base,
+                    response,
                     source,
                     target_canvas,
                     roles,

@@ -1,6 +1,9 @@
 import unittest
+from unittest.mock import patch
 
 try:
+    import engine.layout.search as search_module
+    from engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
     from engine.layout.ranking import QualityScore, select_best
     from engine.layout.roles import infer_roles
     from engine.layout.search import (
@@ -13,6 +16,8 @@ try:
         enumerate_candidate_specs,
     )
 except ModuleNotFoundError:
+    import chameleon.engine.layout.search as search_module
+    from chameleon.engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
     from chameleon.engine.layout.ranking import QualityScore, select_best
     from chameleon.engine.layout.roles import infer_roles
     from chameleon.engine.layout.search import (
@@ -223,6 +228,33 @@ class SearchRankingTests(unittest.TestCase):
         self.assertGreater(copy["elements"][2]["height"], base["elements"][2]["height"])
         self.assertGreater(copy["elements"][2]["font_size"], base["elements"][2]["font_size"])
         self.assertEqual(media["elements"][2]["width"], base["elements"][2]["width"])
+    def test_variant_dispatch_continues_after_failed_base_generation(self):
+        source = {"canvas": {"width": 100, "height": 100}, "elements": []}
+        target = {"width": 200, "height": 100}
+        specs = (
+            CandidateSpec("near_isomorphic", "source_proportional", 0, 0, 0, 0),
+            CandidateSpec("near_isomorphic", "dominant_media", 0, 1, 0, 1),
+        )
+        calls = []
+
+        def solver(_source, _target, **kwargs):
+            calls.append(kwargs["variant"])
+            if kwargs["variant"] == "source_proportional":
+                raise InfeasibleLayoutError(
+                    InfeasibleReasonCode.INCOMPLETE_SEARCH,
+                    "base candidate unavailable",
+                )
+            return {"canvas": dict(target), "elements": []}
+
+        with patch.object(search_module, "enumerate_candidate_specs", return_value=specs):
+            with patch.object(search_module, "_TOPOLOGY_SOLVERS", (solver,)):
+                with patch.object(
+                    search_module, "_render_candidate", return_value=(b"png", ())
+                ):
+                    result = search_module.search(source, target)
+
+        self.assertEqual(calls, ["source_proportional", "dominant_media"])
+        self.assertEqual(result.selected.variant, "dominant_media")
 
 
 
