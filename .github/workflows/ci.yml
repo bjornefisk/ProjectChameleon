@@ -20,10 +20,12 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.11"
 
@@ -59,8 +61,18 @@ jobs:
           docker inspect chameleon-stage1 \
             --format 'image_id={{.Id}} architecture={{.Os}}/{{.Architecture}} repo_digests={{json .RepoDigests}}'
           docker sbom chameleon-stage1 \
-            --format syft-json --output "$RUNNER_TEMP/chameleon-stage1.sbom.json"
-          cat "$RUNNER_TEMP/chameleon-stage1.sbom.json"
+            > "$RUNNER_TEMP/chameleon-stage1.sbom.txt"
+          cat "$RUNNER_TEMP/chameleon-stage1.sbom.txt"
+      - name: Record packaged asset and font hashes
+        run: |
+          docker run --rm --network none --entrypoint sh chameleon-stage1 -c '
+            set -eu
+            for root in /app/brand_kit/assets /app/brand_kit/fonts; do
+              test -d "$root"
+              printf "root=%s\n" "$root"
+              find "$root" -type f -print0 | sort -z | xargs -0 -r sha256sum
+            done
+          '
       - name: Verify clean-cache amd64 rebuild
         run: |
           docker buildx build --no-cache --platform linux/amd64 --load \
@@ -81,22 +93,34 @@ jobs:
           grep -F "[chameleon_sample_level1_warmup.json] status=SUCCESS" "$RUNNER_TEMP/docker-test.log"
           grep -F "[chameleon_sample_level2_core.json] status=SUCCESS" "$RUNNER_TEMP/docker-test.log"
           grep -F "[chameleon_sample_level3_advanced.json] status=INCOMPLETE_SEARCH" "$RUNNER_TEMP/docker-test.log"
-          test -f chameleon/output/chameleon_sample_level1_warmup_output.json
-          test -f chameleon/output/chameleon_sample_level1_warmup_output.png
-          test -f chameleon/output/chameleon_sample_level2_core_output.json
-          test -f chameleon/output/chameleon_sample_level2_core_output.png
-          test ! -e chameleon/output/chameleon_sample_level3_advanced_output.json
-          test ! -e chameleon/output/chameleon_sample_level3_advanced_output.png
+          for path in \
+            chameleon/output/chameleon_sample_level1_warmup_output.json \
+            chameleon/output/chameleon_sample_level1_warmup_output.png \
+            chameleon/output/chameleon_sample_level2_core_output.json \
+            chameleon/output/chameleon_sample_level2_core_output.png; do
+            test ! -L "$path"
+            test -f "$path"
+          done
+          for path in \
+            chameleon/output/chameleon_sample_level3_advanced_output.json \
+            chameleon/output/chameleon_sample_level3_advanced_output.png; do
+            test ! -e "$path"
+            test ! -L "$path"
+          done
+          test -z "$(find chameleon/output -maxdepth 1 -type l -print -quit)"
       - name: Record native runtime measurements
         shell: bash
         run: |
           set -o pipefail
+          qualification_output="$RUNNER_TEMP/chameleon-qualification"
+          rm -rf "$qualification_output"
+          mkdir -p "$qualification_output"
           set +e
           docker run --rm --network none \
-            -v "$GITHUB_WORKSPACE/chameleon/input:/app/input" \
+            -v "$GITHUB_WORKSPACE/chameleon/input:/app/input:ro" \
             -v "$GITHUB_WORKSPACE/chameleon/output:/app/output" \
             -v "$GITHUB_WORKSPACE/scripts:/qualification-bin:ro" \
-            -v "$RUNNER_TEMP:/qualification-out" \
+            -v "$qualification_output:/qualification-out" \
             --entrypoint python chameleon-stage1 \
             /qualification-bin/qualify_runtime.py \
             --report /qualification-out/runtime.json -- python -m engine.main \
@@ -107,7 +131,45 @@ jobs:
           grep -F "[chameleon_sample_level1_warmup.json] status=SUCCESS" "$RUNNER_TEMP/runtime.log"
           grep -F "[chameleon_sample_level2_core.json] status=SUCCESS" "$RUNNER_TEMP/runtime.log"
           grep -F "[chameleon_sample_level3_advanced.json] status=INCOMPLETE_SEARCH" "$RUNNER_TEMP/runtime.log"
-          cat "$RUNNER_TEMP/runtime.json"
+          test -s "$qualification_output/runtime.json"
+          RUNTIME_STATUS="$status" .venv/bin/python - "$qualification_output/runtime.json" <<'PY'
+          import json
+          import os
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as report_file:
+              report = json.load(report_file)
+          expected_status = int(os.environ["RUNTIME_STATUS"])
+          if report["returncode"] != expected_status or report["returncode"] == 0:
+              raise SystemExit(f"unexpected runtime return code: {report['returncode']}")
+          if report["elapsed_seconds"] < 0:
+              raise SystemExit("negative elapsed time")
+          if report["cpu_seconds"]["user"] < 0 or report["cpu_seconds"]["system"] < 0:
+              raise SystemExit("negative CPU time")
+          if report["max_rss"]["value"] < 0:
+              raise SystemExit("negative RSS")
+          thread_count = report["thread_count"]
+          if thread_count["source"] != "procfs" or thread_count["peak"] < 1:
+              raise SystemExit("missing Linux thread-count measurement")
+          if not report["platform"]["machine"]:
+              raise SystemExit("missing platform metadata")
+          PY
+          for path in \
+            chameleon/output/chameleon_sample_level1_warmup_output.json \
+            chameleon/output/chameleon_sample_level1_warmup_output.png \
+            chameleon/output/chameleon_sample_level2_core_output.json \
+            chameleon/output/chameleon_sample_level2_core_output.png; do
+            test ! -L "$path"
+            test -f "$path"
+          done
+          for path in \
+            chameleon/output/chameleon_sample_level3_advanced_output.json \
+            chameleon/output/chameleon_sample_level3_advanced_output.png; do
+            test ! -e "$path"
+            test ! -L "$path"
+          done
+          test -z "$(find chameleon/output -maxdepth 1 -type l -print -quit)"
+          cat "$qualification_output/runtime.json"
           docker inspect chameleon-stage1 --format 'image_size_bytes={{.Size}}'
 
       - name: Verify repeated native artifact hashes
@@ -122,6 +184,11 @@ jobs:
             chameleon/output/.chameleon_sample_level1_warmup_output.commit
             chameleon/output/.chameleon_sample_level2_core_output.commit
           )
+          for artifact in "${artifacts[@]}"; do
+            test ! -L "$artifact"
+            test -f "$artifact"
+          done
+          test -z "$(find chameleon/output -maxdepth 1 -type l -print -quit)"
           sha256sum "${artifacts[@]}" | cut -d' ' -f1 > "$RUNNER_TEMP/first-artifacts.sha256"
           make clean
           set +e
@@ -132,6 +199,15 @@ jobs:
           grep -F "[chameleon_sample_level1_warmup.json] status=SUCCESS" "$RUNNER_TEMP/docker-test-repeat.log"
           grep -F "[chameleon_sample_level2_core.json] status=SUCCESS" "$RUNNER_TEMP/docker-test-repeat.log"
           grep -F "[chameleon_sample_level3_advanced.json] status=INCOMPLETE_SEARCH" "$RUNNER_TEMP/docker-test-repeat.log"
+          for artifact in "${artifacts[@]}"; do
+            test ! -L "$artifact"
+            test -f "$artifact"
+          done
+          test ! -e chameleon/output/chameleon_sample_level3_advanced_output.json
+          test ! -e chameleon/output/chameleon_sample_level3_advanced_output.png
+          test ! -L chameleon/output/chameleon_sample_level3_advanced_output.json
+          test ! -L chameleon/output/chameleon_sample_level3_advanced_output.png
+          test -z "$(find chameleon/output -maxdepth 1 -type l -print -quit)"
           sha256sum "${artifacts[@]}" | cut -d' ' -f1 > "$RUNNER_TEMP/repeat-artifacts.sha256"
           diff -u "$RUNNER_TEMP/first-artifacts.sha256" "$RUNNER_TEMP/repeat-artifacts.sha256"
 
@@ -143,7 +219,7 @@ jobs:
           mkdir -p "$clean_output"
           set +e
           docker run --rm --network none \
-            -v "$GITHUB_WORKSPACE/chameleon/input:/app/input" \
+            -v "$GITHUB_WORKSPACE/chameleon/input:/app/input:ro" \
             -v "$clean_output:/app/output" \
             chameleon-stage1-clean 2>&1 | tee "$RUNNER_TEMP/docker-test-clean.log"
           status=${PIPESTATUS[0]}
@@ -160,6 +236,17 @@ jobs:
             "$clean_output/.chameleon_sample_level1_warmup_output.commit"
             "$clean_output/.chameleon_sample_level2_core_output.commit"
           )
+          for artifact in "${clean_artifacts[@]}"; do
+            test ! -L "$artifact"
+            test -f "$artifact"
+          done
+          for path in \
+            "$clean_output/chameleon_sample_level3_advanced_output.json" \
+            "$clean_output/chameleon_sample_level3_advanced_output.png"; do
+            test ! -e "$path"
+            test ! -L "$path"
+          done
+          test -z "$(find "$clean_output" -maxdepth 1 -type l -print -quit)"
           sha256sum "${clean_artifacts[@]}" | cut -d' ' -f1 > "$RUNNER_TEMP/clean-artifacts.sha256"
           diff -u "$RUNNER_TEMP/first-artifacts.sha256" "$RUNNER_TEMP/clean-artifacts.sha256"
 

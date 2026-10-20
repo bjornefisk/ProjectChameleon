@@ -10,13 +10,34 @@ import platform
 import resource
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Sequence
 
 
+_THREAD_SAMPLE_INTERVAL_SECONDS = 0.01
+
+
 def _max_rss_unit() -> str:
     return "bytes" if sys.platform == "darwin" else "KiB"
+
+
+def _thread_count(pid: int) -> int | None:
+    if sys.platform != "linux":
+        return None
+    try:
+        status = Path(f"/proc/{pid}/status").read_text(encoding="utf-8")
+    except (FileNotFoundError, OSError):
+        return None
+    for line in status.splitlines():
+        if not line.startswith("Threads:"):
+            continue
+        try:
+            return int(line.split()[1])
+        except (IndexError, ValueError):
+            return None
+    return None
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -26,16 +47,55 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _write_report(report_path: Path, report: dict) -> None:
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    if report_path.is_symlink():
+        raise RuntimeError(f"report path must not be a symlink: {report_path}")
+
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=report_path.parent,
+            prefix=f".{report_path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temporary_file:
+            temporary_path = Path(temporary_file.name)
+            json.dump(report, temporary_file, indent=2, sort_keys=True)
+            temporary_file.write("\n")
+            temporary_file.flush()
+            os.fsync(temporary_file.fileno())
+        os.replace(temporary_path, report_path)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+
+
 def _run(command: Sequence[str], report_path: Path) -> int:
     before = resource.getrusage(resource.RUSAGE_CHILDREN)
     started = time.perf_counter()
-    completed = subprocess.run(command, check=False)
+    child = subprocess.Popen(command)
+    peak_threads: int | None = None
+    while True:
+        observed_threads = _thread_count(child.pid)
+        if observed_threads is not None:
+            peak_threads = (
+                observed_threads
+                if peak_threads is None
+                else max(peak_threads, observed_threads)
+            )
+        if child.poll() is not None:
+            break
+        time.sleep(_THREAD_SAMPLE_INTERVAL_SECONDS)
+    returncode = child.wait()
     elapsed = time.perf_counter() - started
     after = resource.getrusage(resource.RUSAGE_CHILDREN)
 
     report = {
         "command": list(command),
-        "returncode": completed.returncode,
+        "returncode": returncode,
         "elapsed_seconds": elapsed,
         "cpu_seconds": {
             "user": after.ru_utime - before.ru_utime,
@@ -46,15 +106,19 @@ def _run(command: Sequence[str], report_path: Path) -> int:
             "unit": _max_rss_unit(),
         },
         "available_cpu_count": os.cpu_count(),
+        "thread_count": {
+            "peak": peak_threads,
+            "source": "procfs" if peak_threads is not None else None,
+            "unit": "threads",
+        },
         "platform": {
             "machine": platform.machine(),
             "python": platform.python_version(),
             "system": platform.platform(),
         },
     }
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    return completed.returncode
+    _write_report(report_path, report)
+    return returncode
 
 
 def main() -> int:
