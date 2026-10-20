@@ -67,6 +67,7 @@ def _write_report(report_path: Path, report: dict) -> None:
             temporary_file.write("\n")
             temporary_file.flush()
             os.fsync(temporary_file.fileno())
+        os.chmod(temporary_path, 0o644)
         os.replace(temporary_path, report_path)
     finally:
         if temporary_path is not None:
