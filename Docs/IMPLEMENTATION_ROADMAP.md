@@ -52,7 +52,7 @@ Decision ratification is complete and documentation-only. Implementation of Tick
 - Start with the accepted bounded structured search: at most three source-derived variants per each of four topology families, renderer-in-loop hard validation, and fixed-point ranking. Ticket 06 MUST remain deterministic and MUST NOT add CP-SAT, OR-Tools, models, or model weights/runtime; any later solver-dependency proposal requires separate authority and change control.
 - Represent only source-separated pairs in no-overlap constraints. Keep intentional overlaps and rigid groups out of universal separation constraints.
 - Rank only hard-valid candidates using alignment, even spacing, hierarchy, balance, whitespace, readability, and source relationship preservation. A cutoff with no hard-valid candidate is `INCOMPLETE_SEARCH`, never proven infeasibility.
-- Acceptance: local integrated review evidence now covers hard-validation reports, reproducible candidate scores, deterministic variants, and solver PNG reuse. Held-out evaluation remains unverified.
+- Acceptance: focused tests cover hard-validation gating, fixed-point scoring, deterministic variants, and solver PNG reuse. The branch does not commit per-candidate hard-validation reports or selected quality tuples; Gate 5 evidence remains partial. Held-out evaluation remains unverified.
 
 ### Gate 6 — Offline submission qualification
 

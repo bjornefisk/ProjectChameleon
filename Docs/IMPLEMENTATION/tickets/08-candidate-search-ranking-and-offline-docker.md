@@ -26,6 +26,7 @@ Revert the Ticket 07 dependency merge to roll back integrated topology ownership
 - [x] Wire search and ranking through `resize()`.
 - [x] Run local public samples and record typed failure and artifact behavior.
 - [x] Build and run the offline `linux/amd64` image under `--network none`.
+- [ ] Run the contract fixture matrix and catalogue-sized synthetic target search qualification.
 - [ ] Establish native-amd64 runtime and peak-memory qualification.
 - [ ] Run held-out evaluation and repeated held-out determinism.
 - [ ] Produce a hard-valid public Level 3 sample output.

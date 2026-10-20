@@ -119,6 +119,8 @@ c75148701283de9f81663489ea09e76b7b757f36d0fefe110940b15644bc867f  output/chamele
 **Unverified:**
 
 - Native-amd64 runtime and peak RSS.
+- Contract fixture-matrix search qualification and catalogue-sized synthetic targets.
+- Per-candidate hard-validation reports and selected quality tuples.
 - Held-out evaluation and repeated held-out determinism.
 - Native renderer/library parity and renderer goldens.
 

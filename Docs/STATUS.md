@@ -105,14 +105,14 @@ The resize failure seam aggregates all attempted family outcomes and emits `NO_H
 ## PR #15 / Ticket 08 integrated review evidence — current
 
 This section records the stacked review branch, not merged `main`.
-The branch includes PR #15 base `9ca4802`, Ticket 07 `b11d7c3`, and current evidence revision `c254cd6`.
+The branch includes PR #15 base `9ca4802`, Ticket 07 `b11d7c3`, and evidence code revision `c254cd6`.
 
 - **Complete:** 33 focused layout/search-status tests, `make verify`, changed-file `py_compile`, 187 project tests, and 47 review tests.
 - **Complete:** local Level 1-2 sample pairs and typed Level 3 fail-closed behavior.
 - **Complete:** offline `linux/amd64` image build and `--network none` smoke under arm64-host emulation.
 - **Complete:** role-specific variants, independent variant dispatch, one final variant serialization, solver PNG reuse, and centralized hard validation.
 - **Incomplete:** public Level 3 still returns typed `INCOMPLETE_SEARCH` without output artifacts.
-- **Unverified:** native-amd64 runtime/RSS, held-out evaluation, repeated held-out determinism, and native renderer/library parity.
+- **Unverified:** native-amd64 runtime/RSS, contract fixture-matrix search qualification, catalogue-sized targets, per-candidate reports, selected quality tuples, held-out evaluation, repeated held-out determinism, and native renderer/library parity.
 
 Detailed commands, revisions, Docker identifiers, timings, and artifact hashes live in [Ticket 08 qualification evidence](IMPLEMENTATION/tickets/08-qualification-evidence.md).
 
