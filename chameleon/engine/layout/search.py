@@ -381,7 +381,6 @@ def search(
     admitted: list[Candidate] = []
     failures: list[dict[str, Any]] = []
     base_responses: dict[str, Mapping[str, Any]] = {}
-    saw_incomplete = False
 
     for spec in specs[:limit]:
         try:
@@ -447,9 +446,10 @@ def search(
         except InfeasibleLayoutError as error:
             if error.reason_code is InfeasibleReasonCode.RUNTIME_IO_FAILURE:
                 raise _runtime_error(error, spec) from error
-            saw_incomplete = saw_incomplete or (
-                error.reason_code is InfeasibleReasonCode.INCOMPLETE_SEARCH
-            )
+            details = deepcopy(error.details)
+            if not isinstance(details, dict):
+                details = {}
+            details["search_exhausted"] = details.get("search_exhausted") is True
             failures.append(
                 {
                     "topology": spec.topology,
@@ -457,7 +457,7 @@ def search(
                     "candidate_index": spec.candidate_index,
                     "reason_code": error.reason_code.value,
                     "reason": error.message,
-                    "details": deepcopy(error.details),
+                    "details": details,
                 }
             )
         except _renderer_classes() as error:
@@ -468,21 +468,26 @@ def search(
                     "candidate_index": spec.candidate_index,
                     "reason_code": InfeasibleReasonCode.TEXT_OVERFLOW.value,
                     "reason": str(error),
+                    "details": {"search_exhausted": False},
                 }
             )
         except Exception as error:
             raise _runtime_error(error, spec) from error
 
     if not admitted:
+        search_exhausted = bool(failures) and not cutoff and all(
+            failure.get("details", {}).get("search_exhausted") is True
+            for failure in failures
+        )
         status = (
-            TaskStatus.INCOMPLETE_SEARCH
-            if cutoff or saw_incomplete
-            else TaskStatus.INFEASIBLE_LAYOUT
+            TaskStatus.INFEASIBLE_LAYOUT
+            if search_exhausted
+            else TaskStatus.INCOMPLETE_SEARCH
         )
         reason = (
-            InfeasibleReasonCode.INCOMPLETE_SEARCH
-            if cutoff or saw_incomplete
-            else InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE
+            InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE
+            if search_exhausted
+            else InfeasibleReasonCode.INCOMPLETE_SEARCH
         )
         raise InfeasibleLayoutError(
             reason,
@@ -492,6 +497,7 @@ def search(
                 "evaluated_candidates": limit,
                 "candidate_count": len(specs),
                 "cutoff": cutoff,
+                "search_exhausted": search_exhausted,
                 "failures": failures,
             },
         )
