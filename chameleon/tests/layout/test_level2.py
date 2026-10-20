@@ -27,7 +27,6 @@ try:
     from engine.geometry.ratios import preserves_source_ratio
     from engine.layout.column_pivot import (
         _build_column_candidate,
-        _fit_serialized_text,
         _image_dimensions,
         _serialize_column_candidate,
         is_column_pivot_suitable,
@@ -47,7 +46,6 @@ except ModuleNotFoundError:
     from chameleon.engine.geometry.ratios import preserves_source_ratio
     from chameleon.engine.layout.column_pivot import (
         _build_column_candidate,
-        _fit_serialized_text,
         _image_dimensions,
         _serialize_column_candidate,
         is_column_pivot_suitable,
@@ -191,78 +189,6 @@ class Level2IntegrationTests(unittest.TestCase):
         self.assertEqual(output_copy["x"], 28)
         self.assertIs(type(output_copy["x"]), int)
 
-    def test_serialized_text_box_is_refit_after_half_even_geometry(self):
-        response = {
-            "canvas": {"width": 100, "height": 40},
-            "elements": [
-                {
-                    "id": "copy",
-                    "type": "text",
-                    "x": 0,
-                    "y": 0,
-                    "width": Fraction(21, 2),
-                    "height": 20,
-                    "content": "A",
-                    "font_family": "Solstice Sans",
-                    "font_size": 10,
-                    "color": "rgba(0,0,0,1)",
-                }
-            ],
-        }
-        serialized = _serialize_column_candidate(response)
-        self.assertEqual(serialized["elements"][0]["width"], 10)
-
-        def fit(element, font_size, _font_manager, _target):
-            self.assertEqual(element["width"], 10)
-            return font_size < 10
-
-        with patch("engine.layout.column_pivot._text_fits", side_effect=fit):
-            _fit_serialized_text(
-                response,
-                serialized,
-                response["canvas"],
-                font_manager=object(),
-            )
-
-        self.assertEqual(serialized["elements"][0]["font_size"], 9)
-
-    def test_serialized_text_box_retries_source_preferred_font_after_upward_rounding(self):
-        source = {
-            "canvas": {"width": 100, "height": 40},
-            "elements": [
-                {
-                    "id": "copy",
-                    "type": "text",
-                    "x": 0,
-                    "y": 0,
-                    "width": Fraction(53, 5),
-                    "height": 20,
-                    "content": "A",
-                    "font_family": "Solstice Sans",
-                    "font_size": 10,
-                    "color": "rgba(0,0,0,1)",
-                }
-            ],
-        }
-        response = copy.deepcopy(source)
-        response["elements"][0]["font_size"] = 9
-        serialized = _serialize_column_candidate(response)
-        self.assertEqual(serialized["elements"][0]["width"], 11)
-
-        def fit(element, font_size, _font_manager, _target):
-            self.assertEqual(element["width"], 11)
-            return font_size <= 10
-
-        with patch("engine.layout.column_pivot._text_fits", side_effect=fit):
-            _fit_serialized_text(
-                source,
-                serialized,
-                source["canvas"],
-                font_manager=object(),
-            )
-
-        self.assertEqual(serialized["elements"][0]["font_size"], 10)
-
     def test_image_ratio_lattice_uses_unrounded_desired_bounds(self):
         element = {"width": 2, "height": 1}
         self.assertIsNone(
@@ -319,10 +245,22 @@ class Level2IntegrationTests(unittest.TestCase):
         with self.assertRaises(InfeasibleLayoutError) as raised:
             resize(source, task["target_canvas"])
         self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.INCOMPLETE_SEARCH)
-        failures = raised.exception.details["candidate_failures"]
-        self.assertEqual(set(failures), {"column_pivot", "near_isomorphic"})
-        self.assertEqual(failures["column_pivot"]["reason_code"], InfeasibleReasonCode.INCOMPLETE_SEARCH.value)
-        self.assertEqual(failures["near_isomorphic"]["reason_code"], InfeasibleReasonCode.INCOMPLETE_SEARCH.value)
+        failures = raised.exception.details["failures"]
+        self.assertEqual(
+            {failure["topology"] for failure in failures},
+            {
+                "column_pivot",
+                "near_isomorphic",
+                "horizontal_ribbon",
+                "vertical_restack",
+            },
+        )
+        self.assertTrue(
+            all(
+                failure["reason_code"] == InfeasibleReasonCode.INCOMPLETE_SEARCH.value
+                for failure in failures
+            )
+        )
 
     def test_role_relationship_generation_is_lazy_for_large_sources(self):
         source = {

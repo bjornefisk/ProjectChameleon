@@ -22,6 +22,7 @@ from .near_isomorphic import (
     _preferred_font_size,
     _smallest_integral_scale,
 )
+from .candidate import RenderedCandidate
 from .roles import RoleKind, RoleModel, infer_roles
 
 _GEOMETRY_FIELDS = ("x", "y", "width", "height")
@@ -405,53 +406,6 @@ def _serialize_column_candidate(response: Mapping[str, Any]) -> dict[str, Any]:
     return serialized
 
 
-def _fit_serialized_text(
-    source: Mapping[str, Any],
-    response: dict[str, Any],
-    target_canvas: Mapping[str, Any],
-    *,
-    font_manager=None,
-    fonts_dir: str | None = None,
-) -> None:
-    """Re-run renderer text fitting against the serialized integer boxes."""
-
-    text_pairs = [
-        (source_element, response_element)
-        for source_element, response_element in zip(source["elements"], response["elements"])
-        if response_element.get("type") == "text"
-    ]
-    if not text_pairs:
-        return
-    manager = font_manager
-    if manager is None:
-        from .near_isomorphic import _renderer_components
-
-        load_brand_font_manager = _renderer_components()[0]
-        resolved_fonts_dir = fonts_dir or str(Path(__file__).resolve().parents[2] / "brand_kit" / "fonts")
-        manager = load_brand_font_manager(resolved_fonts_dir)
-    for source_element, element in text_pairs:
-        font_search: dict[str, Any] = {}
-        preferred = _preferred_font_size(
-            to_fraction(source_element.get("font_size", 1)),
-            Fraction(1),
-        )
-        selected = _largest_fitting_font_size(
-            element,
-            preferred,
-            manager,
-            target_canvas,
-            fit=_text_fits,
-            search_details=font_search,
-        )
-        if selected is None:
-            _fail(
-                "no serialized integer text size fits the renderer bounds",
-                element_id=element["id"],
-                font_search=font_search,
-            )
-        element["font_size"] = selected
-
-
 def _finalize_column_candidate(
     source: Mapping[str, Any],
     target_canvas: Mapping[str, Any],
@@ -460,15 +414,8 @@ def _finalize_column_candidate(
     assets_dir: str | None,
     fonts_dir: str | None,
     font_manager=None,
-) -> dict[str, Any]:
+) -> RenderedCandidate:
     serialized = _serialize_column_candidate(response)
-    _fit_serialized_text(
-        source,
-        serialized,
-        target_canvas,
-        font_manager=font_manager,
-        fonts_dir=fonts_dir,
-    )
     try:
         validate_response(source, target_canvas, serialized)
     except InfeasibleLayoutError as error:
@@ -478,9 +425,18 @@ def _finalize_column_candidate(
             reason=error.message,
             details=error.details,
         )
-    _render_candidate(serialized, assets_dir, fonts_dir, font_manager)
+    rendered_png, warnings = _render_candidate(
+        serialized,
+        assets_dir,
+        fonts_dir,
+        font_manager,
+    )
     validate_response(source, target_canvas, serialized)
-    return serialized
+    return RenderedCandidate(
+        response=serialized,
+        rendered_png=rendered_png,
+        warnings=warnings,
+    )
 
 
 def generate_column_pivot_candidate(
@@ -491,7 +447,7 @@ def generate_column_pivot_candidate(
     fonts_dir: str | None = None,
     assets_dir: str | None = None,
     roles: RoleModel | None = None,
-) -> dict[str, Any]:
+) -> RenderedCandidate:
     """Generate and serialize one source-aware column-pivot candidate."""
 
     validate_source(source)
@@ -524,7 +480,7 @@ def solve_column_pivot(
     fonts_dir: str | None = None,
     assets_dir: str | None = None,
     roles: RoleModel | None = None,
-) -> dict[str, Any]:
+) -> RenderedCandidate:
     validate_source(source)
     validate_target_canvas(target_canvas)
     model = roles or infer_roles(source)

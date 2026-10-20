@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — pre-implementation contract decision. This ADR ratifies the Stage 1 typography and renderer edge semantics for future implementation. It is documentation-only: acceptance does not claim that the adapter, fonts, validator, renderer, or runtime behavior is implemented or qualified, and it does not authorize code changes by itself.
+Accepted — normative contract decision. The bounded implementation and local evidence are recorded in `Docs/STATUS.md`; this ADR does not claim native-amd64, final-font, or organizer-controlled qualification.
 
 ## Date
 
@@ -12,12 +12,12 @@ Accepted — pre-implementation contract decision. This ADR ratifies the Stage 1
 
 The ratified contract already fixes the public text content, font family/weight/style, color, alignment, line height, letter spacing, style-run data, and allowed mutable `font_size`. It also requires explicit-newline preservation, deterministic adapter-owned wrapping, end-exclusive external style ranges, actual glyph-bound validation, `max_lines` and height enforcement, and rejection rather than truncation or rewriting. The pinned `cr-renderer` revision consumes an explicit internal line map; it does not supply the project's width-based wrapping policy.
 
-The current adapter has known conformance gaps: style-run application is inclusive, wrapping does not include style-face or letter-spacing widths, and `max_lines`, line-box height, and rectangle/ellipse strokes are not fully enforced or rasterized. Those gaps are evidence for this decision, not permission to weaken the ratified rules.
+The current adapter gaps listed here describe the pre-implementation baseline. They are evidence for this decision, not permission to weaken the ratified rules; the bounded adapter now implements the listed wrapping, measurement, overflow, and stroke behavior, with qualification boundaries recorded separately.
 
 ### Authority classification
 
 - **Ratified current contract:** `Docs/PROJECT_CONTRACT.md` §§4–6, ADR-002, and ADR-003. These preserve text and style data, use external `[start, end)` ranges, require measured renderer semantics and actual glyph bounds, and reject overflow without mutation.
-- **Accepted internal contract decision:** Unicode cluster/line-break policy, greedy line generation, overlapping-run resolution, line-count/height rejection, span-local measurement, and adapter shape-stroke policy below are ratified defaults for future implementation. They remain unimplemented until the relevant work is completed and evidenced.
+- **Accepted internal contract decision:** Unicode cluster/line-break policy, greedy line generation, overlapping-run resolution, line-count/height rejection, span-local measurement, and adapter shape-stroke policy below are ratified defaults. The current bounded adapter implements these behaviors locally; native renderer/font/platform qualification remains unverified.
 - **Externally unverified organizer fact:** final fonts/assets/licensing and native `amd64` qualification remain organizer or release facts. They determine which font bytes may be packaged and whether a submission can qualify, but they do not authorize substitution or metric invention.
 
 ## Decision
@@ -74,7 +74,7 @@ The check must include forced empty lines and must occur after final integer ser
 
 The adapter policy MUST rasterize rectangle and ellipse strokes inside the declared element box when `stroke_color` and positive `stroke_width` are present, while preserving all source fields exactly. Stroke rasterization is adapter behavior because the pinned upstream renderer has no native shape primitive. It must not expand the public geometry, alter `stroke_width`, or create pixels outside the declared shape bounds.
 
-This is a renderer-conformance decision, not a claim about current behavior: the current adapter's ignored rectangle/ellipse stroke effect remains a known gap until implementation and evidence close it. The contract's line shape behavior and all immutable shape fields remain unchanged.
+This is a renderer-conformance decision, not a claim about upstream native shape support. The local adapter rasterizes rectangle/ellipse strokes inside the declared box and covers them with local tests; platform/golden qualification remains separate. The contract's line-shape behavior and all immutable shape fields remain unchanged.
 
 ### 6. Keep typography deterministic and local
 
@@ -121,16 +121,16 @@ Rejected for this decision. The current wire schema does not expose one, and ADR
 - Line breaking is Unicode-safe, deterministic, and compatible with unchanged JSON content.
 - The same text can fail at a larger or differently styled `font_size` even when a rough character-count heuristic would pass; this is intentional renderer-in-loop validation.
 - Empty and forced lines consume line-count and height budget, making `max_lines` and height behavior explicit rather than renderer-dependent.
-- Style-run boundary, spacing, face-selection, and glyph-bearing cases become conformance blockers before typography can be claimed complete.
+- Style-run boundary, spacing, face-selection, and glyph-bearing cases are conformance obligations. The current bounded adapter has local evidence for them; official/native qualification remains a separate gate.
 - Missing or unlicensed final fonts remain an external qualification issue; Stage 1 must not hide that issue by substituting a different font.
-- Stroke rasterization requires adapter evidence and may expose existing renderer gaps, but it does not change the schema or the source record set.
-- No code, schema, fixture, Docker, dependency, font, or runtime change is claimed or authorized by this documentation-only ratification.
+- Stroke rasterization is implemented by the adapter and covered by local evidence; it does not change the schema or the source record set. Any platform/golden discrepancy remains a qualification issue.
+- This ADR does not authorize unrelated code, schema, dependency, font, or runtime changes. Its implementation evidence is tracked separately so documentation-only ratification is not confused with platform qualification.
 
 ## Affected files/schema fields
 
-When implemented, the affected work would touch the future text wrapping/line-map adapter, font loading and glyph measurement path, semantic validator, and shape rasterization adapter. Relevant existing fields are `content`, `font_family`, `font_size`, `font_weight`, `font_style`, `color`, `text_align`, `line_height`, `letter_spacing`, `max_lines`, `style_runs`, `shape_type`, `stroke_color`, `stroke_width`, and geometry/rotation fields.
+The implemented bounded work touches the text wrapping/line-map adapter, font loading and glyph measurement path, semantic validator, and shape rasterization adapter. Relevant existing fields are `content`, `font_family`, `font_size`, `font_weight`, `font_style`, `color`, `text_align`, `line_height`, `letter_spacing`, `max_lines`, `style_runs`, `shape_type`, `stroke_color`, `stroke_width`, and geometry/rotation fields.
 
-No public line-map field or new style-run field is added. The project continues to use the pinned `cr-renderer` revision and the ratified v0.9 wire schema. This documentation-only ratification changes project documentation only; implementation and qualification remain pending.
+No public line-map field or new style-run field is added. The project continues to use the pinned `cr-renderer` revision and the ratified v0.9 wire schema. The current bounded implementation and local evidence do not establish native-amd64, clean-cache, final-font, or organizer-controlled qualification.
 
 ## Required validation/evidence
 
@@ -150,7 +150,7 @@ Before implementation can claim conformance, the evidence must include at least:
 
 The external references used for this decision are [Unicode UAX #14](https://www.unicode.org/reports/tr14/), [Unicode UAX #29](https://www.unicode.org/reports/tr29/), and the pinned [cr-renderer commit](https://github.com/CyberAgentAILab/cr-renderer/commit/a17e1fb9a732959dd6c21ae168d5ee09d74bd64f) and source files linked above. The project contract and pinned dependency evidence remain authoritative over generic upstream behavior.
 
-No such tests, renderer changes, font changes, or runtime changes were run or made for this documentation-only ratification; acceptance does not imply qualification.
+The current tree provides local tests and renderer/artifact evidence for the bounded behavior described here; see `Docs/STATUS.md` and `Docs/IMPLEMENTATION/tickets/08-issue-23-evidence.md`. Native-amd64, final-font, and cross-platform hash qualification remain unverified.
 
 ### Organizer clarification required
 
