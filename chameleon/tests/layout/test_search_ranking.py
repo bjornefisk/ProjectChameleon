@@ -408,6 +408,7 @@ class SearchRankingTests(unittest.TestCase):
         self.assertTrue(copy_specs)
         self.assertEqual(copy_specs[0].source_order, 1)
 
+
     def test_ranker_uses_fixed_point_quality_and_stable_ties(self):
         quality = QualityScore(readability=900, balance=800, alignment=700, hierarchy=600)
         self.assertTrue(all(type(value) is int for value in quality.as_tuple()))
