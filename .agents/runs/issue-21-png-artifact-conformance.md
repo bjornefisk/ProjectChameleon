@@ -2,8 +2,8 @@
 
 - **Run ID:** `run-issue21-png-artifact-conformance-20261020`
 - **Branch:** `feat/issue-21-png-artifact-conformance`
-- **Base:** `58b697a` (`origin/main` at implementation start)
-- **Status:** Implementation complete; PR #51 is open and CI passed; partner review, merge, and issue closure remain pending.
+**Base:** `ffb6cc3` (`origin/main` at current verification)
+- **Status:** Implementation complete; PR #51 carries the implementation; verification evidence is recorded below.
 - **Issue:** [#21](https://github.com/bjornefisk/ProjectChameleon/issues/21)
 
 ## Goal
@@ -60,16 +60,16 @@ All commands below were run in the Issue-21 worktree with `/Users/charliefurlow/
 
 | Check | Command/result |
 | --- | --- |
-| Focused artifact suite | `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/artifact -t . -p 'test_*.py' -v` — **34 passed**. |
-| Renderer suite | `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/renderer -t . -p 'test_*.py' -v` — **24 passed**. |
-| Layout/candidate suite | `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — **35 passed**. |
-| Runner/publication suite | `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/runner -t . -p 'test_*.py' -v` — **72 passed**. |
-| Full source-tree suite | `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — **204 passed**. |
+| Focused artifact suite | `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m unittest discover -s tests/artifact -t . -p 'test_*.py' -v` — **17 passed**. |
+| Renderer suite | `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m unittest discover -s tests/renderer -t . -p 'test_*.py' -v` — **39 passed**. |
+| Layout/candidate suite | `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — **73 passed**. |
+| Runner/publication suite | `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m unittest discover -s tests/runner -t . -p 'test_*.py' -v` — **78 passed** after the full publication suite was rechecked. |
+| Full source-tree suite | `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py'` — **248 passed**. |
 | Repository governance | `python3 scripts/verify_repository.py` — passed; `make verify` — passed. |
-| Changed-file syntax | `../.venv/bin/python -m py_compile` over all changed Python files — passed. |
+| Changed-file syntax | `/Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m py_compile` over all changed Python files — passed. |
 | Whitespace | `git diff --check` — passed. |
-| Engine smoke | `cd chameleon && ../.venv/bin/python -m engine.main` — exit **1 expected**. Level 1 and Level 2 produced `SUCCESS` committed pairs; Level 3 produced `INCOMPLETE_SEARCH`; failed task had no pair. Generated smoke artifacts were removed afterward. |
-| Docker/buildx | Attempted `docker buildx build --platform linux/amd64 --load -t chameleon-stage1-issue21 .`; could not start because the local daemon was unavailable: `Cannot connect to the Docker daemon at unix:///Users/charliefurlow/.docker/run/docker.sock`. Offline Docker run was not attempted. |
+| Engine smoke | `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m engine.main` — exit **1 expected**. Level 1 and Level 2 produced `SUCCESS` committed pairs; Level 3 produced `INCOMPLETE_SEARCH`; failed task had no pair. Generated smoke artifacts were removed afterward. |
+| Docker/buildx | `docker buildx build --platform linux/amd64 --load -t chameleon-stage1-issue21 .` — passed with the existing `FromPlatformFlagConstDisallowed` warning. `docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1-issue21` — exit **1 expected** under amd64-on-arm64 emulation: Level 1 and Level 2 published pairs; Level 3 returned `INCOMPLETE_SEARCH`; generated artifacts were removed afterward. |
 
 ### Acceptance-specific behavior proven
 
@@ -82,13 +82,13 @@ All commands below were run in the Issue-21 worktree with `/Users/charliefurlow/
 
 ## Independent review and dispositions
 
-- **Contract reviewer (`ArtifactContractReview`):** confirmed seam wiring and acceptance coverage. Reported a possible zero-area mismatch because local rasters clamp to one pixel; direct pinned-renderer probes showed zero-area destination draws produce no ink. Added `test_zero_area_records_follow_renderer_noop_semantics`.
-- **Security reviewer (`ArtifactSecurityReview`):** identified arbitrary one-pixel exterior ink acceptance for non-exact layers. Fixed by retaining the renderer-edge allowance only for pixels/color matching a pinned reference render; added a regression requiring exterior mutations to fail. Also identified a pre-existing unbounded decoded-image/resource risk. No arbitrary resource policy was added: project instructions keep resource limits unverified and require contract/ADR authority for such a change.
-- **Coverage scout (`ArtifactCoverageScout`):** mapped publication, near-isomorphic, and column-pivot reuse; identified missing docs/run evidence, now added. Confirmed no separate ranking/topology seam exists on this branch.
+- **ArtifactAudit (scout):** confirmed candidate/publication seam wiring and the shared candidate gate; native-amd64 qualification remains a separate evidence boundary.
+- **ArtifactTests (reviewer):** identified that readable-invalid regressions needed explicit fixture-path and decode assertions; added publication, candidate, and direct-validation tests using a valid white PNG derived from `shape.json`.
+- **ArtifactSecurity (security reviewer):** identified header-dimension validation ordering and custom-asset font provenance risks. `staging.validate_png()` now rejects wrong dimensions before PNG verification/loading; `_reference_image()` checks dimensions before copying and uses the renderer's sibling font directory when present, with the packaged font fallback retained for isolated asset roots. No resource ceiling was invented; that remains outside this issue and requires contract/ADR authority.
 
-## Not run / blockers
+## Not run / boundaries
 
-- Native `linux/amd64` Docker build and offline container smoke: blocked by unavailable local Docker daemon; no native qualification claim.
+- Native `linux/amd64` hardware qualification: the local Docker image/run used amd64-on-arm64 emulation; no native-host claim is made.
 - Mutation testing: not run; no mutation tool is configured in the repository.
-- Resource-limit hardening: intentionally not run/implemented; outside Issue #21 and requires a future contract/ADR decision.
-- PR #51 was created and its `Verify and test` CI check passed; partner review, merge, and issue closure remain pending.
+- Resource-limit hardening: intentionally not implemented; outside Issue #21 and requires a future contract/ADR decision.
+- PR #51 carries the implementation and its `Verify and test` check passed; GitHub remains the source of truth for merge and issue state.

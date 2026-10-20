@@ -237,17 +237,31 @@ def _reference_image(
         from renderer.converter.convert import render_design_to_png
     except ModuleNotFoundError:
         from chameleon.renderer.converter.convert import render_design_to_png
+    if fonts_dir is not None:
+        resolved_fonts_dir = str(fonts_dir)
+    elif assets_dir is not None:
+        candidate_fonts_dir = Path(assets_dir).parent / "fonts"
+        resolved_fonts_dir = str(
+            candidate_fonts_dir if candidate_fonts_dir.is_dir() else _DEFAULT_FONTS
+        )
+    else:
+        resolved_fonts_dir = str(_DEFAULT_FONTS)
     with TemporaryDirectory(prefix=".chameleon-artifact-") as directory:
         path = Path(directory) / "reference.png"
         render_design_to_png(
             dict(design), str(assets_dir) if assets_dir is not None else "",
-            path, fonts_dir=str(fonts_dir or _DEFAULT_FONTS), font_manager=font_manager
+            path, fonts_dir=resolved_fonts_dir, font_manager=font_manager
         )
         with Image.open(path) as image:
+            if image.size != size:
+                _fail(
+                    "reference_dimensions",
+                    "pinned renderer reference has unexpected dimensions",
+                    expected_size=size,
+                    actual_size=image.size,
+                )
             image.load()
             result = _rgba(image).copy()
-    if result.size != size:
-        _fail("reference_dimensions", "pinned renderer reference has unexpected dimensions", expected_size=size, actual_size=result.size)
     return result
 
 

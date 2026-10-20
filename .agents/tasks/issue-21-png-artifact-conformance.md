@@ -7,7 +7,7 @@ request/source: User-authorized implementation of GitHub issue #21 (audit findin
 owner/role: implementer, with independent reviewer, false-accept hunter, and false-reject hunter subagents
 workflow/gate: Implement -> Verify -> Review; PR and merge only after the evidence below exists
 created/updated: 2026-10-20
-status: implementation complete; PR #51 open; merge pending
+status: implementation complete; PR #51 carries the implementation; merge gate and issue closure are tracked in GitHub
 
 Goal / observable outcome:
 A readable PNG that is not a conformant render of its design is never published and never accepted as a candidate render. The renderer seam checks expected dimensions, an opaque canvas, the missing-asset warning policy, rendered bounds, and source-pixel provenance. Fully opaque, integral, unrotated, one-to-one image/shape draws are replayed from adapter rasters; non-exact layers are compared with a second render from the pinned adapter after bounds validation. No output pixel is generated, repaired, or replaced. Soft contrast scoring stays out of hard validity.
@@ -42,7 +42,7 @@ Required capabilities:
 repo.read, repo.search, repo.edit, repo.write, git.inspect, local test execution, GitHub issue/PR access through gh, and subagent dispatch for independent review.
 
 Dependencies/blockers/owners:
-Local Docker daemon unavailable, so native-amd64 Docker evidence is pending; no code blocker. Main (origin/main 58b697a) is the base. Stacked PRs on the Ticket 08 branch do not touch these paths.
+Native-amd64 Docker qualification remains external/CI evidence; local Buildx/offline execution is supplemental on the arm64 workstation. Main (`origin/main` `ffb6cc3`) is the base. Stacked PRs on the Ticket 08 branch do not touch these paths.
 
 Verification plan and exact commands:
 cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py'; make verify; cd chameleon && ../.venv/bin/python -m engine.main (exit 1 is expected because the Level 3 sample reports INCOMPLETE_SEARCH); docker buildx build --platform linux/amd64 --load -t chameleon-stage1 chameleon/ and the offline docker run --network none sequence from AGENTS.md where Docker is available. Independent gates: spec reviewer, standards reviewer, false-accept hunter, false-reject hunter. Mutation check of the new tests against the validator.

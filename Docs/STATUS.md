@@ -39,19 +39,19 @@ The following evidence was produced on the current integration tree, not copied 
 
 The earlier sections below preserve historical ticket and transition records. Their counts, branch names, and environment results are not current Issue #16 verification evidence.
 
-## Issue #21 artifact-conformance implementation (local, not merged)
+## Issue #21 artifact-conformance implementation
 
 Issue #21 adds hard semantic PNG validation at both trust boundaries. `engine.artifact.validate_artifact()` checks the pinned `max_size=2048` dimensions, fully opaque canvas, exact missing-asset warnings, adapter-derived paint bounds, one-to-one opaque raster replay, and full pixel equality with a second pinned-adapter render for non-exact layers. The gate returns `RUNTIME_IO_FAILURE`; staging cleans the private pair before publication. Contrast remains outside hard validity.
 
-- **Changed production paths:** `chameleon/engine/artifact.py` (new), `engine/staging.py`, `engine/layout/near_isomorphic.py`, `renderer/converter/assets.py`, and `renderer/converter/convert.py`.
-- **Changed evidence paths:** artifact fixtures/tests under `chameleon/tests/fixtures/artifact/` and `chameleon/tests/artifact/`; conformant renderer doubles in `tests/runner`; `PROJECT_CONTRACT.md` traceability, `FINAL_ARCHITECTURE.md`, and `chameleon/README.md`.
-- **Focused artifact evidence:** `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/artifact -t . -p 'test_*.py' -v` — 34 passed.
-- **Related focused evidence:** renderer 24 passed; layout 35 passed; runner 72 passed.
-- **Full local evidence:** `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — 204 passed.
+- **Changed production paths:** `chameleon/engine/artifact.py` and `chameleon/engine/staging.py`; candidate validation is reused by near-isomorphic and column-pivot paths.
+- **Changed evidence paths:** artifact fixtures/tests under `chameleon/tests/fixtures/artifact/` and `chameleon/tests/artifact/`; readable-invalid renderer doubles and publication regressions remain under `tests/runner`.
+- **Focused artifact evidence:** `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m unittest discover -s tests/artifact -t . -p 'test_*.py' -v` — 17 passed.
+- **Related focused evidence:** renderer 39 passed; layout 73 passed; runner 78 passed.
+- **Full local evidence:** `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py'` — 248 passed.
 - **Repository evidence:** `python3 scripts/verify_repository.py`, `make verify`, changed-file `py_compile`, and `git diff --check` passed.
-- **Engine smoke:** `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1 expected; Level 1 and Level 2 committed valid pairs, Level 3 returned `INCOMPLETE_SEARCH` with no pair. Generated smoke artifacts were removed afterward.
-- **Docker evidence:** `docker buildx build --platform linux/amd64 --load ...` was not run to completion because the local Docker daemon was unavailable. Native-amd64 qualification remains unverified.
-- **Independent review:** contract review accepted the seam wiring; its zero-area concern was checked against the pinned renderer (zero-area draws are no-ops) and covered by a regression. Security review identified arbitrary non-exact edge-ink acceptance, fixed by requiring the pinned renderer's reference pixels, and separately noted the pre-existing unbounded image/resource risk. Resource policy changes remain outside this ticket and require contract/ADR authority.
+- **Engine smoke:** `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m engine.main` — exit 1 expected; Level 1 and Level 2 committed valid pairs, Level 3 returned `INCOMPLETE_SEARCH` with no pair. Generated smoke artifacts were removed afterward.
+- **Docker evidence:** Buildx succeeded with the documented constant-platform warning; the offline run is supplemental amd64-on-arm64 evidence, not native-amd64 qualification.
+- **Independent review:** subagent audit confirmed seam reuse; test review added explicit decoded readable-invalid fixtures at validation, publication, and candidate seams; security review drove header-dimension ordering and font-directory fallback hardening. Resource limits remain outside scope.
 
 ## PR12 merge gate — CLEARED
 
