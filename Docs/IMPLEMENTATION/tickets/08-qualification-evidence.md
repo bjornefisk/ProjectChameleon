@@ -3,8 +3,8 @@
 This record belongs to Ticket 08 and is intentionally separate from the parallel Ticket 07 implementation. The post-issue-32 integration evidence below was measured on the local Darwin arm64 workstation unless stated otherwise.
 The issue #23/F-07 normative evidence expansion is recorded separately in [`08-issue-23-evidence.md`](08-issue-23-evidence.md).
 
-## Implementation checks
-
+## Historical Ticket 08 implementation checks
+The measurements below are the earlier local Ticket 08 record. Current Issue #16 verification supersedes its counts for the integrated tree and is recorded in [`../../STATUS.md`](../../STATUS.md); no native-amd64 or official held-out qualification is inferred.
 | Check | Command | Observed result |
 | --- | --- | --- |
 | Focused integration | `cd chameleon && ../.venv/bin/python -m unittest tests.layout.test_level1 tests.layout.test_level2 tests.layout.test_search_ranking -v` | 22 tests, all passed. |
@@ -54,7 +54,7 @@ The source-only fixtures were exercised with their own canvas as the target; `in
 | `offcanvas_decoration.json` | `SUCCESS` |
 | `style_run_boundary.json` | typed `INCOMPLETE_SEARCH`; no output artifact |
 
-## Offline Docker smoke
+## Historical offline Docker smoke
 
 Command:
 

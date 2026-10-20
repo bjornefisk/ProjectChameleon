@@ -19,6 +19,7 @@ from typing import Any, NoReturn
 
 from PIL import Image
 
+from ..artifact import validate_artifact
 from ..contract import validate_response, validate_source, validate_target_canvas
 from ..errors import InfeasibleLayoutError, InfeasibleReasonCode
 from ..geometry.bounds import (
@@ -74,13 +75,6 @@ def _ceil_fraction(value: Fraction) -> int:
     return -((-value.numerator) // value.denominator)
 
 
-def _serialize_box(
-    raw_box: tuple[Fraction, Fraction, Fraction, Fraction],
-) -> tuple[int, int, int, int]:
-    """Perform the only geometry quantization step for one candidate box."""
-
-    x, y, width, height = (quantize_to_int(value) for value in raw_box)
-    return x, y, width, height
 
 
 def _fail(message: str, **details: Any) -> NoReturn:
@@ -200,7 +194,6 @@ def _position_candidates(x: Fraction, y: Fraction) -> list[tuple[Fraction, Fract
                 candidates.append(item)
     return candidates
 
-
 def _safe_geometry(
     element: Mapping[str, Any],
     x: int,
@@ -223,7 +216,6 @@ def _safe_geometry(
             and intersects_canvas(aabb, target)
         )
     return is_contained_in_canvas(aabb, target)
-
 
 def _preserves_source_separation(
     source_elements: list[Mapping[str, Any]],
@@ -259,7 +251,7 @@ def _choose_ratio_dimensions(
     expected_bleed: frozenset[str] | None,
     *,
     raw_positions: list[tuple[Fraction, Fraction]] | None = None,
-) -> tuple[int, int, int, int] | None:
+) -> tuple[Fraction, Fraction, Fraction, Fraction] | None:
     positions = raw_positions or _position_candidates(raw_x, raw_y)
     ratio = (
         reduced_ratio(element["width"], element["height"])
@@ -268,7 +260,7 @@ def _choose_ratio_dimensions(
     )
     if ratio is None:
         for x, y in positions:
-            geometry = _serialize_box((x, y, raw_width, raw_height))
+            geometry = (x, y, raw_width, raw_height)
             if _safe_geometry(element, *geometry, target, expected_bleed):
                 return geometry
         return None
@@ -276,8 +268,9 @@ def _choose_ratio_dimensions(
     p, q = ratio
     preferred = raw_width / p
     floor_multiplier = _floor_fraction(preferred)
-    # Prefer the source-proportional lattice point, then reduce only when
-    # serialized AABB containment rejects that point.
+    # Prefer the source-proportional lattice point, then reduce only when the
+    # exact AABB containment check rejects that point.
+
     multipliers: list[int] = []
     for multiplier in (floor_multiplier, floor_multiplier + 1):
         if multiplier >= 1 and multiplier not in multipliers:
@@ -292,7 +285,7 @@ def _choose_ratio_dimensions(
             raw_y + (raw_height - height) / 2,
         )
         for x, y in position_list:
-            geometry = _serialize_box((x, y, width, height))
+            geometry = (x, y, width, height)
             if _safe_geometry(element, *geometry, target, expected_bleed):
                 return geometry
     return None
@@ -306,7 +299,7 @@ def _group_candidate(
     cover_element_id: Any | None = None,
     preferred_translation: tuple[Fraction, Fraction] | None = None,
     occupied: list[tuple[Mapping[str, Any], Mapping[str, Any]]] | None = None,
-) -> tuple[dict[str, tuple[int, int, int, int]], Fraction] | None:
+) -> tuple[dict[str, tuple[Fraction, Fraction, Fraction, Fraction]], Fraction] | None:
     first = elements[0]
     first_x = to_fraction(first["x"])
     first_y = to_fraction(first["y"])
@@ -412,10 +405,10 @@ def _group_candidate(
             - group_scale * source_center
             + group_scale * first_coordinate
         )
-        proposed_anchors: list[int] = []
+        proposed_anchors: list[Fraction] = []
         if preferred_translation is not None:
             proposed_anchors.append(
-                quantize_to_int(group_scale * first_coordinate + preferred_translation)
+                group_scale * first_coordinate + preferred_translation
             )
         proposed_anchors.extend(
             (
@@ -425,9 +418,9 @@ def _group_candidate(
                 maximum_anchor,
             )
         )
-        anchors: list[int] = []
+        anchors: list[Fraction] = []
         for proposed in proposed_anchors:
-            anchor = min(maximum_anchor, max(minimum_anchor, proposed))
+            anchor = min(Fraction(maximum_anchor), max(Fraction(minimum_anchor), proposed))
             if anchor not in anchors:
                 anchors.append(anchor)
         return [anchor - group_scale * first_coordinate for anchor in anchors]
@@ -453,7 +446,7 @@ def _group_candidate(
         )
         for tx in x_translations:
             for ty in y_translations:
-                result: dict[str, tuple[int, int, int, int]] = {}
+                result: dict[str, tuple[Fraction, Fraction, Fraction, Fraction]] = {}
                 valid = True
                 for element in elements:
                     raw_box = (
@@ -462,7 +455,7 @@ def _group_candidate(
                         to_fraction(element["width"]) * group_scale,
                         to_fraction(element["height"]) * group_scale,
                     )
-                    geometry = _serialize_box(raw_box)
+                    geometry = raw_box
                     x, y, width, height = geometry
                     candidate = dict(element)
                     candidate.update(dict(zip(_GEOMETRY_FIELDS, geometry)))
@@ -500,8 +493,26 @@ def _group_candidate(
                         return result, group_scale
     return None
 
+def _serialize_candidate(response: Mapping[str, Any]) -> dict[str, Any]:
+    """Apply one half-even serialization at the complete response boundary."""
 
-def _text_fits(element: Mapping[str, Any], font_size: int, font_manager, target: Mapping[str, Any]) -> bool:
+    serialized = {"canvas": dict(response["canvas"]), "elements": []}
+    for element in response["elements"]:
+        serialized_element = dict(element)
+        for field in _GEOMETRY_FIELDS:
+            serialized_element[field] = quantize_to_int(element[field])
+        if element.get("type") == "text":
+            serialized_element["font_size"] = quantize_to_int(element["font_size"])
+        serialized["elements"].append(serialized_element)
+    return serialized
+
+
+def _text_fits(
+    element: Mapping[str, Any],
+    font_size: int,
+    font_manager,
+    target: Mapping[str, Any],
+) -> bool:
     _, convert_chameleon_to_crello, _, TextLayoutError = _renderer_components()
     candidate = dict(element)
     candidate["font_size"] = font_size
@@ -620,6 +631,16 @@ def _render_candidate(
             logger.warning("renderer warning: %r", warning)
         with Image.open(png_path) as image:
             image.verify()
+        with Image.open(png_path) as image:
+            image.load()
+            validate_artifact(
+                response,
+                image,
+                assets_dir=resolved_assets_dir,
+                fonts_dir=resolved_fonts_dir,
+                font_manager=font_manager,
+                warnings=warnings,
+            )
         return png_path.read_bytes(), warnings
 
 
@@ -764,10 +785,11 @@ def solve_near_isomorphic(
                 )
             response_elements[index]["font_size"] = selected
 
-    response = {
+    raw_response = {
         "canvas": {"width": int(target_width), "height": int(target_height)},
         "elements": response_elements,
     }
+    response = _serialize_candidate(raw_response)
     try:
         validate_response(source, target_canvas, response)
     except InfeasibleLayoutError as error:

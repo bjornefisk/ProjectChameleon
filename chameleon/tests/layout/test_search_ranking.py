@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 try:
     from engine.contract import validate_response
+    from engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
     from engine.layout.ranking import QualityScore, select_best
     from engine.layout.candidate import RenderedCandidate
     from engine.layout.roles import infer_roles
@@ -18,6 +19,7 @@ try:
     )
 except ModuleNotFoundError:
     from chameleon.engine.contract import validate_response
+    from chameleon.engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
     from chameleon.engine.layout.ranking import QualityScore, select_best
     from chameleon.engine.layout.candidate import RenderedCandidate
     from chameleon.engine.layout.roles import infer_roles
@@ -74,6 +76,91 @@ class SearchRankingTests(unittest.TestCase):
         )
 
         self.assertEqual(result.candidates[0].warnings, ("solver-warning",))
+
+    def test_selected_fixed_point_components_are_diagnostic_only(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [],
+        }
+        target = {"width": 200, "height": 100}
+        spec = CandidateSpec("near_isomorphic", "source_proportional", 0, 0, 0, 0)
+        solver_result = RenderedCandidate(
+            response={"canvas": target, "elements": []},
+            rendered_png=b"solver-render",
+        )
+        with (
+            patch("engine.layout.search.enumerate_candidate_specs", return_value=(spec,)),
+            patch("engine.layout.search._TOPOLOGY_SOLVERS", (lambda *args, **kwargs: solver_result,)),
+        ):
+            result = search(source, target)
+
+        self.assertEqual(
+            result.diagnostics["selected_quality"],
+            {
+                "readability": 1000,
+                "balance": 1000,
+                "alignment": 1000,
+                "hierarchy": 1000,
+            },
+        )
+        self.assertEqual(result.response, {"canvas": target, "elements": []})
+
+    def test_cutoff_without_candidate_is_incomplete_not_infeasible(self):
+        source = {"canvas": {"width": 100, "height": 100}, "elements": []}
+        target = {"width": 200, "height": 100}
+        specs = (
+            CandidateSpec("near_isomorphic", "source_proportional", 0, 0, 0, 0),
+            CandidateSpec("column_pivot", "source_proportional", 1, 0, 0, 1),
+        )
+
+        def exhausted_solver(*args, **kwargs):
+            raise InfeasibleLayoutError(
+                InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE,
+                "this work item is exhausted",
+                {"search_exhausted": True, "status": "INFEASIBLE_LAYOUT"},
+            )
+
+        with self.assertRaises(InfeasibleLayoutError) as raised:
+            with (
+                patch("engine.layout.search.enumerate_candidate_specs", return_value=specs),
+                patch("engine.layout.search._TOPOLOGY_SOLVERS", (exhausted_solver,)),
+            ):
+                search(source, target, max_candidates=1)
+
+        error = raised.exception
+        self.assertEqual(error.reason_code, InfeasibleReasonCode.INCOMPLETE_SEARCH)
+        self.assertEqual(error.details["status"], "INCOMPLETE_SEARCH")
+        self.assertTrue(error.details["cutoff"])
+        self.assertFalse(error.details["finite_work_exhausted"])
+        self.assertFalse(error.details["search_exhausted"])
+        self.assertTrue(error.details["failures"][0]["search_exhausted"])
+        self.assertEqual(error.details["failures"][0]["status"], "INFEASIBLE_LAYOUT")
+
+    def test_complete_explicitly_exhausted_work_is_infeasible(self):
+        source = {"canvas": {"width": 100, "height": 100}, "elements": []}
+        target = {"width": 200, "height": 100}
+        spec = CandidateSpec("near_isomorphic", "source_proportional", 0, 0, 0, 0)
+
+        def exhausted_solver(*args, **kwargs):
+            raise InfeasibleLayoutError(
+                InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE,
+                "this work item is exhausted",
+                {"search_exhausted": True, "status": "INFEASIBLE_LAYOUT"},
+            )
+
+        with self.assertRaises(InfeasibleLayoutError) as raised:
+            with (
+                patch("engine.layout.search.enumerate_candidate_specs", return_value=(spec,)),
+                patch("engine.layout.search._TOPOLOGY_SOLVERS", (exhausted_solver,)),
+            ):
+                search(source, target)
+
+        error = raised.exception
+        self.assertEqual(error.reason_code, InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE)
+        self.assertEqual(error.details["status"], "INFEASIBLE_LAYOUT")
+        self.assertTrue(error.details["finite_work_exhausted"])
+        self.assertTrue(error.details["search_exhausted"])
+        self.assertTrue(error.details["failures"][0]["search_exhausted"])
 
     def test_variant_translations_round_complete_coordinate_once(self):
         source = {
@@ -172,7 +259,7 @@ class SearchRankingTests(unittest.TestCase):
         )
         self.assertEqual(
             [(spec.topology, spec.variant_index) for spec in specs],
-            [("near_isomorphic", 0)],
+            [(topology, 0) for topology in TOPOLOGY_ORDER],
         )
 
     def test_ranker_uses_fixed_point_quality_and_stable_ties(self):

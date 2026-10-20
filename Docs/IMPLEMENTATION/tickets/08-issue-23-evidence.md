@@ -12,7 +12,7 @@ This record expands the normative regression evidence on the integrated Ticket 0
 - tests are deterministic and offline; and
 - persisted hashes are evidence, not a new response field or ranking input.
 
-The current phase explicitly defers a broad held-out evaluation and later native-amd64 qualification. This record keeps those limitations visible rather than converting local evidence into a qualification claim.
+The local checked-in held-out-style evaluator is now implemented and recorded in [`08-heldout-evaluation.md`](08-heldout-evaluation.md). Broad organizer-held-out evaluation and native-amd64 qualification remain unverified; this record keeps those limitations visible rather than converting local evidence into an official qualification claim.
 
 ## Evidence matrix
 
@@ -25,21 +25,21 @@ The current phase explicitly defers a broad held-out evaluation and later native
 | Persisted artifact hashes | `chameleon/tests/fixtures/renderer_artifact_hashes.json` records document, packaged-asset, font-tree, pinned-renderer, PNG hash, dimensions, and warning provenance. `test_issue23_artifact_corpus.py` recomputes every value. | Hashes are tied to the checked-in local corpus and dependency revision, not an external scorer. |
 | Renderer edge cases | `chameleon/tests/renderer/test_issue23_artifact_corpus.py` covers `contain`, `cover`, and `fill`, rotated geometry, negative letter spacing, right alignment, missing-asset diagnostics, and real PNG output. | Pixel behavior is qualified only for the pinned local adapter/runtime used by the test. |
 | Runtime qualification | `Docs/IMPLEMENTATION/tickets/08-qualification-evidence.md` records local engine/Docker observations, JSON/PNG hashes, image size, host RSS, runtime, and the hard/soft distinction. | The arm64-host Docker run is supplemental; native-amd64 runtime, container RSS, clean-cache parity, and organizer-controlled limits remain unverified. |
-| Held-out evaluation | Not added in this bounded slice. | ADR-009 and the current project phase defer held-out evaluation until the later qualification gate. |
+| Held-out evaluation | `chameleon/tests/layout/test_heldout_evaluation.py` and [`08-heldout-evaluation.md`](08-heldout-evaluation.md) exercise a five-case authored corpus, repeated search/PNG signatures, hard-validation metrics, selected topology distribution, and runtime/RSS observations. | Local held-out-style evidence only; it is not an organizer-held-out benchmark or native-amd64 qualification. |
 
 ## Hard validation versus soft quality
 
 Hard evidence consists of serialized `validate_response()` results, renderer conversion failures/warnings, expected PNG dimensions, source/asset/font provenance, and repeated byte hashes. Soft evidence consists of `QualityScore` values and deterministic rank ordering among candidates that already passed hard validation. No test treats a non-empty PNG, a copied response, or a proxy score as proof of contract validity.
 
-## Verification record
+## Current integration verification pointer
 
-The integration owner must run the focused evidence tests, the full unit suite, `python3 scripts/verify_repository.py`, `make verify`, and the documented engine/Docker smoke sequence. Results belong in the handoff and PR body. A system interpreter missing project dependencies, arm64-host emulation, or a warning-only baseline check must be recorded as a limitation, not a pass for native qualification.
+The current Issue #16 integration tree has run the focused suites, full 207-test suite, repository checks, held-out-style evaluator, and required local smoke sequence. Exact current results and unverified Docker/native boundaries are recorded in [`../../STATUS.md`](../../STATUS.md); the historical command records below remain provenance, not current counts.
 
 ## Disposition
 
-This closes the reachable F-07 rounding/search/renderer evidence gaps on the current review tree. It does not close the deferred held-out-evaluation or native-amd64 qualification criteria. Those require the later qualification gate and must not be represented as completed by this change.
+This closes the reachable F-07 rounding/search/renderer evidence gaps on the current review tree and adds local held-out-style search evidence. It does not close official/native-amd64 qualification criteria or the public Level 3 sample-pass gap. Those require new evidence and must not be represented as completed by this change.
 
-## Issue #29 focused verification
+## Historical Issue #29 focused verification
 
 - `cd chameleon && ../.venv/bin/python -m unittest tests.layout.test_search_ranking tests.geometry.test_issue23_rounding -v` — 9 tests passed, including both exact variant-translation axes.
 - `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — 191 tests passed.
@@ -52,7 +52,7 @@ This closes the reachable F-07 rounding/search/renderer evidence gaps on the cur
 
 The focused tests exercise hard serialized integer validation and the dominant-media/dominant-copy half-even regression. Docker/native-amd64 evidence remains unverified in this environment.
 
-## Observed integration commands
+## Historical observed integration commands
 
 | Command | Result |
 | --- | --- |

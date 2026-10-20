@@ -20,12 +20,12 @@ from ..errors import InfeasibleLayoutError, InfeasibleReasonCode, TaskStatus
 from ..geometry.bounds import rotated_aabb, source_bleed_sides
 from ..geometry.math_util import quantize_to_int, to_fraction
 from .candidate import RenderedCandidate
-from .column_pivot import is_column_pivot_suitable, solve_column_pivot
-from .horizontal_ribbon import is_horizontal_ribbon_suitable, solve_horizontal_ribbon
+from .column_pivot import solve_column_pivot
+from .horizontal_ribbon import solve_horizontal_ribbon
 from .near_isomorphic import solve_near_isomorphic
 from .ranking import QualityScore, score_candidate, select_best
 from .roles import RoleKind, RoleModel, infer_roles
-from .vertical_restack import is_vertical_restack_suitable, solve_vertical_restack
+from .vertical_restack import solve_vertical_restack
 
 
 TOPOLOGY_ORDER: tuple[str, ...] = (
@@ -158,16 +158,13 @@ def enumerate_candidate_specs(
     validate_target_canvas(target_canvas)
     role_model = roles or infer_roles(source)
     variant_indices = _source_variant_indices(source, role_model)
-    suitable: tuple[bool, ...] = (
-        True,
-        is_column_pivot_suitable(source, target_canvas, role_model),
-        is_horizontal_ribbon_suitable(source, target_canvas),
-        is_vertical_restack_suitable(source, target_canvas),
-    )
+    # Suitability is deliberately evaluated by each topology solver rather
+    # than during enumeration.  The bounded work set must retain every
+    # topology family so an unsuitable family is an explicit rejected
+    # attempt in search diagnostics, not a silently omitted option.
     specs: list[CandidateSpec] = []
-    for topology_order, (topology, is_suitable) in enumerate(zip(TOPOLOGY_ORDER, suitable)):
-        if not is_suitable:
-            continue
+    source_orders = _source_variant_orders(role_model)
+    for topology_order, topology in enumerate(TOPOLOGY_ORDER):
         for variant_index in variant_indices:
             specs.append(
                 CandidateSpec(
@@ -175,9 +172,7 @@ def enumerate_candidate_specs(
                     variant=_VARIANT_NAMES[variant_index],
                     topology_order=topology_order,
                     variant_index=variant_index,
-                    source_order=_source_variant_orders(role_model).get(
-                        variant_index, variant_index
-                    ),
+                    source_order=source_orders.get(variant_index, variant_index),
                     candidate_index=len(specs),
                 )
             )
@@ -370,6 +365,53 @@ def _invoke_solver(
     return result
 
 
+def _failure_record(
+    spec: CandidateSpec,
+    reason_code: str,
+    reason: str,
+    *,
+    details: Mapping[str, Any] | None = None,
+    search_exhausted: bool = False,
+    status: str | None = None,
+) -> dict[str, Any]:
+    """Return normalized per-work-item diagnostics.
+
+    ``search_exhausted`` is deliberately kept separate from the reason code:
+    a topology may report an incomplete search while still having no candidate
+    for its current work item, and a hard rejection is not a proof that other
+    permitted work was examined.
+    """
+
+    copied_details = deepcopy(dict(details or {}))
+    embedded_exhaustion = copied_details.get("search_exhausted")
+    if isinstance(embedded_exhaustion, bool):
+        search_exhausted = embedded_exhaustion
+    embedded_status = copied_details.get("status")
+    if status is None and isinstance(embedded_status, str):
+        status = embedded_status
+    if status is None:
+        status = (
+            TaskStatus.INCOMPLETE_SEARCH.value
+            if reason_code == InfeasibleReasonCode.INCOMPLETE_SEARCH.value
+            else (
+                TaskStatus.INFEASIBLE_LAYOUT.value
+                if search_exhausted
+                else TaskStatus.INCOMPLETE_SEARCH.value
+            )
+        )
+    return {
+        "topology": spec.topology,
+        "variant": spec.variant,
+        "candidate_index": spec.candidate_index,
+        "reason_code": reason_code,
+        "reason": reason,
+        "status": status,
+        "search_exhausted": search_exhausted,
+        "details": copied_details,
+    }
+
+
+
 def search(
     source: Mapping[str, Any],
     target_canvas: Mapping[str, Any],
@@ -396,12 +438,17 @@ def search(
     specs = enumerate_candidate_specs(source, target_canvas, roles=roles)
     limit = min(max_candidates, len(specs), MAX_CANDIDATES)
     cutoff = limit < len(specs)
+    work_set_topologies = tuple(dict.fromkeys(spec.topology for spec in specs))
     admitted: list[Candidate] = []
     failures: list[dict[str, Any]] = []
     base_candidates: dict[str, RenderedCandidate] = {}
-    saw_incomplete = False
+    # These state variables describe finite work independently of any
+    # candidate's reason code.  A reason alone cannot prove exhaustion.
+    finite_work_exhausted = not cutoff
+    unexamined_work = cutoff
 
     for spec in specs[:limit]:
+        candidate_generated = False
         try:
             rendered_png: bytes
             warnings: tuple[str, ...]
@@ -415,6 +462,7 @@ def search(
                     fonts_dir=fonts_dir,
                     assets_dir=assets_dir,
                 )
+                candidate_generated = True
                 base_candidates[spec.topology] = solver_candidate
                 response = solver_candidate.response
                 rendered_png = solver_candidate.rendered_png
@@ -422,17 +470,17 @@ def search(
             else:
                 base = base_candidates.get(spec.topology)
                 if base is None:
-                    saw_incomplete = True
+                    unexamined_work = True
+                    finite_work_exhausted = False
                     failures.append(
-                        {
-                            "topology": spec.topology,
-                            "variant": spec.variant,
-                            "candidate_index": spec.candidate_index,
-                            "reason_code": InfeasibleReasonCode.INCOMPLETE_SEARCH.value,
-                            "reason": "base topology candidate was not available",
-                        }
+                        _failure_record(
+                            spec,
+                            InfeasibleReasonCode.INCOMPLETE_SEARCH.value,
+                            "base topology candidate was not available",
+                        )
                     )
                     continue
+                candidate_generated = True
                 response = _derive_variant_response(
                     base.response,
                     source,
@@ -473,42 +521,56 @@ def search(
         except InfeasibleLayoutError as error:
             if error.reason_code is InfeasibleReasonCode.RUNTIME_IO_FAILURE:
                 raise _runtime_error(error, spec) from error
-            saw_incomplete = saw_incomplete or (
-                error.reason_code is InfeasibleReasonCode.INCOMPLETE_SEARCH
+            details = deepcopy(error.details)
+            explicit_exhaustion = details.get("search_exhausted")
+            attempt_exhausted = (
+                explicit_exhaustion
+                if isinstance(explicit_exhaustion, bool)
+                else candidate_generated
             )
+            if not attempt_exhausted:
+                finite_work_exhausted = False
+                unexamined_work = True
             failures.append(
-                {
-                    "topology": spec.topology,
-                    "variant": spec.variant,
-                    "candidate_index": spec.candidate_index,
-                    "reason_code": error.reason_code.value,
-                    "reason": error.message,
-                    "details": deepcopy(error.details),
-                }
+                _failure_record(
+                    spec,
+                    error.reason_code.value,
+                    error.message,
+                    details=details,
+                    search_exhausted=attempt_exhausted,
+                )
             )
         except _renderer_classes() as error:
+            # A renderer failure raised while a topology is generating its
+            # base candidate has no finite-exhaustion proof.  A renderer
+            # rejection of an already materialized derived variant is a
+            # complete work-item attempt, represented by candidate_generated.
+            attempt_exhausted = candidate_generated
+            if not attempt_exhausted:
+                finite_work_exhausted = False
+                unexamined_work = True
             failures.append(
-                {
-                    "topology": spec.topology,
-                    "variant": spec.variant,
-                    "candidate_index": spec.candidate_index,
-                    "reason_code": InfeasibleReasonCode.TEXT_OVERFLOW.value,
-                    "reason": str(error),
-                }
+                _failure_record(
+                    spec,
+                    InfeasibleReasonCode.TEXT_OVERFLOW.value,
+                    str(error),
+                    search_exhausted=attempt_exhausted,
+                )
             )
         except Exception as error:
             raise _runtime_error(error, spec) from error
 
+    search_exhausted = finite_work_exhausted and not unexamined_work
     if not admitted:
         status = (
-            TaskStatus.INCOMPLETE_SEARCH
-            if cutoff or saw_incomplete
-            else TaskStatus.INFEASIBLE_LAYOUT
+            TaskStatus.INFEASIBLE_LAYOUT
+            if search_exhausted
+            else TaskStatus.INCOMPLETE_SEARCH
         )
         reason = (
-            InfeasibleReasonCode.INCOMPLETE_SEARCH
-            if cutoff or saw_incomplete
-            else InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE
+            InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE
+            if search_exhausted
+            else InfeasibleReasonCode.INCOMPLETE_SEARCH
         )
         raise InfeasibleLayoutError(
             reason,
@@ -517,18 +579,38 @@ def search(
                 "status": status.value,
                 "evaluated_candidates": limit,
                 "candidate_count": len(specs),
+                "work_set_topologies": work_set_topologies,
+                "rejected_topologies": tuple(
+                    dict.fromkeys(failure["topology"] for failure in failures)
+                ),
                 "cutoff": cutoff,
+                "finite_work_exhausted": search_exhausted,
+                "unexamined_work": unexamined_work,
+                "search_exhausted": search_exhausted,
                 "failures": failures,
             },
         )
-
     selected = select_best(admitted)
+    selected_quality = {
+        "readability": selected.quality.readability,
+        "balance": selected.quality.balance,
+        "alignment": selected.quality.alignment,
+        "hierarchy": selected.quality.hierarchy,
+    }
     result_diagnostics = {
         "status": TaskStatus.SUCCESS.value,
         "candidate_count": len(specs),
         "evaluated_candidates": limit,
+        "work_set_topologies": work_set_topologies,
+        "rejected_topologies": tuple(
+            dict.fromkeys(failure["topology"] for failure in failures)
+        ),
         "hard_valid_candidates": len(admitted),
         "cutoff": cutoff,
+        "finite_work_exhausted": search_exhausted,
+        "unexamined_work": unexamined_work,
+        "search_exhausted": search_exhausted,
+        "selected_quality": selected_quality,
         "failures": tuple(failures),
     }
     return SearchResult(

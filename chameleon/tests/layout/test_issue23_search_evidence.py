@@ -77,11 +77,7 @@ class Issue23SearchEvidenceTests(unittest.TestCase):
             MAX_VARIANTS_PER_FAMILY,
         )
 
-        expected_families = (
-            "near_isomorphic",
-            "column_pivot",
-            "horizontal_ribbon",
-        )
+        expected_families = TOPOLOGY_ORDER
         expected_variants = (
             "source_proportional",
             "dominant_media",
@@ -110,12 +106,7 @@ class Issue23SearchEvidenceTests(unittest.TestCase):
             "tall": {"width": 200, "height": 1600},
             "extreme": {"width": 900, "height": 100},
         }
-        expected = {
-            "square": {"near_isomorphic"},
-            "wide": {"near_isomorphic", "column_pivot", "horizontal_ribbon"},
-            "tall": {"near_isomorphic", "vertical_restack"},
-            "extreme": {"near_isomorphic", "column_pivot", "horizontal_ribbon"},
-        }
+        expected = {name: set(TOPOLOGY_ORDER) for name in targets}
 
         observed = set()
         for name, target in targets.items():
@@ -157,6 +148,21 @@ class Issue23SearchEvidenceTests(unittest.TestCase):
                     )
                 )
             validate_response(SOURCE, SQUARE, result.response)
+            self.assertEqual(
+                result.diagnostics["work_set_topologies"], TOPOLOGY_ORDER
+            )
+            self.assertEqual(
+                set(result.diagnostics["work_set_topologies"]),
+                set(TOPOLOGY_ORDER),
+            )
+            self.assertTrue(all(candidate.hard_validity == 1 for candidate in result.candidates))
+            attempted_families = {
+                candidate.topology for candidate in result.candidates
+            }
+            attempted_families.update(
+                failure["topology"] for failure in result.diagnostics["failures"]
+            )
+            self.assertEqual(attempted_families, set(TOPOLOGY_ORDER))
             run_signatures.append(
                 (
                     result.selected.topology,
