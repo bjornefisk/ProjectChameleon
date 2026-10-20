@@ -245,7 +245,7 @@ def _make_plan(
     text_dimensions_by_index: Mapping[int, tuple[int, int]] | None = None,
     art_scale: Fraction = Fraction(1),
 ) -> dict[str, Any] | None:
-    if len(indices) > 1:
+    if len(indices) > 1 or source_elements[first].get("group_id") is not None:
         elements = [source_elements[index] for index in indices]
         span = _source_span(elements)
         primary_extent = span[2] - span[0] if axis == "horizontal" else span[3] - span[1]
@@ -259,6 +259,9 @@ def _make_plan(
         )
         scale = _group_scale(elements, desired)
         boxes = _relative_group_boxes(elements, scale)
+        if len(elements) == 1 and elements[0]["type"] == "text":
+            x, y, width, height = boxes[0]
+            boxes = ((x + 1, y + 1, width, height),)
         local = []
         for element, box in zip(elements, boxes):
             candidate = dict(element)
@@ -294,12 +297,21 @@ def _make_plan(
     if dimensions is None:
         return None
     width, height = dimensions
-    box_x = 1 if element["type"] == "text" else 0
-    box_y = 1 if element["type"] == "text" else 0
+    bleed = source_bleed_sides(element, rotated_aabb(element), source_canvas)
+    if element["type"] != "image":
+        if bleed and {"left", "right"} & bleed:
+            width = max(width, Fraction(2))
+        if bleed and {"top", "bottom"} & bleed:
+            height = max(height, Fraction(2))
+    if element["type"] == "text":
+        box_x = 1
+        box_y = 0 if axis == "horizontal" else 1
+    else:
+        box_x = 0
+        box_y = 0
     candidate = dict(element)
     candidate.update({"x": box_x, "y": box_y, "width": width, "height": height})
     base_aabb = rotated_aabb(candidate)
-    bleed = source_bleed_sides(element, rotated_aabb(element), source_canvas)
     return {
         "first": first,
         "indices": (first,),
@@ -311,7 +323,6 @@ def _make_plan(
         "pack_priority": 1 if element["type"] == "image" else 2 if element["type"] == "shape" else 3,
         "bleed": bleed,
     }
-
 
 
 def _materialize_plan(
@@ -368,6 +379,8 @@ def _valid_plan_placement(
 ) -> bool:
     bleed = plan["bleed"]
     for aabb in aabbs:
+        if aabb[2] <= aabb[0] or aabb[3] <= aabb[1]:
+            continue
         if bleed is None:
             if not is_contained_in_canvas(aabb, target_canvas):
                 return False
@@ -375,7 +388,11 @@ def _valid_plan_placement(
             return False
     for indices, occupied_aabbs in occupied:
         for new_index, new_aabb in zip(plan["indices"], aabbs):
+            if new_aabb[2] <= new_aabb[0] or new_aabb[3] <= new_aabb[1]:
+                continue
             for old_index, old_aabb in zip(indices, occupied_aabbs):
+                if old_aabb[2] <= old_aabb[0] or old_aabb[3] <= old_aabb[1]:
+                    continue
                 if model.overlaps(new_index, old_index):
                     continue
                 if positive_aabb_intersection(new_aabb, old_aabb):
@@ -422,9 +439,10 @@ def _build_extreme_candidate(
                 span[2] - span[0] if axis == "horizontal" else span[3] - span[1]
             )
     primary_limit = Fraction(target_width if axis == "horizontal" else target_height)
+    group_span = sum(group_source_spans)
     group_budget = min(
         Fraction(1),
-        primary_limit / sum(group_source_spans) if group_source_spans else Fraction(1),
+        primary_limit / group_span if group_span > 0 else Fraction(1),
     )
 
     text_variants: list[Mapping[int, tuple[int, int]] | None] = [None]
@@ -487,28 +505,28 @@ def _build_extreme_candidate(
                     ordered_plans = sorted(
                         plans,
                         key=lambda plan: (
+                            plan["first"],
                             -(plan["footprint"][0] * plan["footprint"][1]),
                             -max(plan["footprint"]),
-                            plan["first"],
                         ),
                     )
                 elif order == "primary":
                     ordered_plans = sorted(
                         plans,
                         key=lambda plan: (
+                            plan["first"],
                             -(plan["footprint"][0] if axis == "horizontal" else plan["footprint"][1]),
                             -(plan["footprint"][0] * plan["footprint"][1]),
-                            plan["first"],
                         ),
                     )
                 else:
                     ordered_plans = sorted(
                         plans,
                         key=lambda plan: (
+                            plan["first"],
                             plan["pack_priority"],
                             -(plan["footprint"][0] * plan["footprint"][1]),
                             -max(plan["footprint"]),
-                            plan["first"],
                         ),
                     )
                 response = [dict(element) for element in source_elements]

@@ -144,7 +144,16 @@ def _source_variant_orders(roles: RoleModel) -> dict[int, int]:
     orders = {0: 0}
     for variant_index, role_set in (
         (1, {RoleKind.HERO_MEDIA, RoleKind.LOGO, RoleKind.IMAGE}),
-        (2, {RoleKind.HEADLINE, RoleKind.SUPPORTING_TEXT, RoleKind.CTA, RoleKind.BADGE, RoleKind.TEXT}),
+        (
+            2,
+            {
+                RoleKind.HEADLINE,
+                RoleKind.SUPPORTING_TEXT,
+                RoleKind.CTA,
+                RoleKind.BADGE,
+                RoleKind.TEXT,
+            },
+        ),
     ):
         positions = [
             assignment.index
