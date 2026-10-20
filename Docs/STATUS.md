@@ -44,6 +44,20 @@ The following evidence was produced on the current integration tree, not copied 
 
 The earlier sections below preserve historical ticket and transition records. Their counts, branch names, and environment results are not current Issue #16 verification evidence.
 
+## Issue #21 artifact-conformance implementation
+
+Issue #21 adds hard semantic PNG validation at both trust boundaries. `engine.artifact.validate_artifact()` checks the pinned `max_size=2048` dimensions, fully opaque canvas, exact missing-asset warnings, adapter-derived paint bounds, one-to-one opaque raster replay, and full pixel equality with a second pinned-adapter render for non-exact layers. The gate returns `RUNTIME_IO_FAILURE`; staging cleans the private pair before publication. Contrast remains outside hard validity.
+
+- **Changed production paths:** `chameleon/engine/artifact.py` and `chameleon/engine/staging.py`; candidate validation is reused by near-isomorphic and column-pivot paths.
+- **Changed evidence paths:** artifact fixtures/tests under `chameleon/tests/fixtures/artifact/` and `chameleon/tests/artifact/`; readable-invalid renderer doubles and publication regressions remain under `tests/runner`.
+- **Focused artifact evidence:** `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m unittest discover -s tests/artifact -t . -p 'test_*.py' -v` — 17 passed.
+- **Related focused evidence:** renderer 39 passed; layout 73 passed; runner 78 passed.
+- **Full local evidence:** `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py'` — 248 passed.
+- **Repository evidence:** `python3 scripts/verify_repository.py`, `make verify`, changed-file `py_compile`, and `git diff --check` passed.
+- **Engine smoke:** `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m engine.main` — exit 1 expected; Level 1 and Level 2 committed valid pairs, Level 3 returned `INCOMPLETE_SEARCH` with no pair. Generated smoke artifacts were removed afterward.
+- **Docker evidence:** Buildx succeeded with the documented constant-platform warning; the offline run is supplemental amd64-on-arm64 evidence, not native-amd64 qualification.
+- **Independent review:** subagent audit confirmed seam reuse; test review added explicit decoded readable-invalid fixtures at validation, publication, and candidate seams; security review drove header-dimension ordering and font-directory fallback hardening. Resource limits remain outside scope.
+
 ## PR12 merge gate — CLEARED
 
 The bounded Ticket 05 implementation completes Gate 1 within its accepted scope. Gate 1 now cleared as follows:

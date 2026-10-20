@@ -1,0 +1,8 @@
+{
+  "canvas": {"width": 200, "height": 100},
+  "elements": [
+    {"id": "field", "type": "shape", "x": -20, "y": -10, "width": 120, "height": 60, "z_index": 0, "shape_type": "rectangle", "fill_color": "rgba(30,120,60,1)"},
+    {"id": "badge", "type": "shape", "x": 60, "y": 20, "width": 80, "height": 60, "z_index": 1, "shape_type": "ellipse", "fill_color": "rgba(250,200,40,1)"},
+    {"id": "corner", "type": "shape", "x": 160, "y": 70, "width": 60, "height": 50, "z_index": 2, "shape_type": "rectangle", "fill_color": "rgba(0,0,0,1)", "opacity": 0.5}
+  ]
+}
