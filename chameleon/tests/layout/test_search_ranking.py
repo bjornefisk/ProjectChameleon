@@ -1,4 +1,5 @@
 import unittest
+from fractions import Fraction
 from unittest.mock import patch
 
 try:
@@ -13,6 +14,7 @@ try:
         Candidate,
         CandidateSpec,
         _derive_variant_response,
+        _serialize_variant_response,
         enumerate_candidate_specs,
     )
 except ModuleNotFoundError:
@@ -28,6 +30,7 @@ except ModuleNotFoundError:
         CandidateSpec,
         _derive_variant_response,
         enumerate_candidate_specs,
+        _serialize_variant_response,
     )
 
 
@@ -255,6 +258,36 @@ class SearchRankingTests(unittest.TestCase):
 
         self.assertEqual(calls, ["source_proportional", "dominant_media"])
         self.assertEqual(result.selected.variant, "dominant_media")
+    def test_variant_translation_serializes_once_with_half_even_rounding(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                {
+                    "id": "hero",
+                    "type": "image",
+                    "x": 1,
+                    "y": 1,
+                    "width": 96,
+                    "height": 96,
+                    "asset_id": "hero.png",
+                    "fit": "contain",
+                }
+            ],
+        }
+        base = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [dict(source["elements"][0])],
+        }
+        exact = _derive_variant_response(
+            base,
+            source,
+            base["canvas"],
+            infer_roles(source),
+            CandidateSpec("near_isomorphic", "dominant_media", 0, 1, 0, 1),
+        )
+        self.assertEqual(exact["elements"][0]["x"], Fraction(3, 2))
+        serialized = _serialize_variant_response(exact)
+        self.assertEqual(serialized["elements"][0]["x"], 2)
 
 
 

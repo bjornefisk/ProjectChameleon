@@ -416,13 +416,13 @@ def _derive_variant_response(
     anchor_x = (anchor_box[0] + anchor_box[2]) / 2
     anchor_y = (anchor_box[1] + anchor_box[3]) / 2
     if spec.variant_index == 1:
-        desired = quantize_to_int((target_width / 2 - anchor_x) / 2)
-        translation = max(x_interval[0], min(x_interval[1], desired))
+        desired = (target_width / 2 - anchor_x) / 2
+        translation = max(Fraction(x_interval[0]), min(Fraction(x_interval[1]), desired))
         for index in eligible:
             response["elements"][index]["x"] += translation
     else:
-        desired = quantize_to_int((target_height / 2 - anchor_y) / 2)
-        translation = max(y_interval[0], min(y_interval[1], desired))
+        desired = (target_height / 2 - anchor_y) / 2
+        translation = max(Fraction(y_interval[0]), min(Fraction(y_interval[1]), desired))
         for index in eligible:
             response["elements"][index]["y"] += translation
     _apply_variant_emphasis(response, source, roles, target_canvas, spec)
