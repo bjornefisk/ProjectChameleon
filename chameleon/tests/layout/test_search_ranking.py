@@ -551,6 +551,10 @@ class SearchRankingTests(unittest.TestCase):
             CandidateSpec("near_isomorphic", "dominant_media", 0, 1, 0, 1),
         )
         calls = []
+        solver_result = RenderedCandidate(
+            response={"canvas": target, "elements": []},
+            rendered_png=b"solver-render",
+        )
 
         def solver(_source, _target, **kwargs):
             calls.append(kwargs["variant"])
@@ -559,7 +563,7 @@ class SearchRankingTests(unittest.TestCase):
                     InfeasibleReasonCode.INCOMPLETE_SEARCH,
                     "base candidate unavailable",
                 )
-            return {"canvas": dict(target), "elements": []}
+            return solver_result
 
         with patch.object(search_module, "enumerate_candidate_specs", return_value=specs):
             with patch.object(search_module, "_TOPOLOGY_SOLVERS", (solver,)):
