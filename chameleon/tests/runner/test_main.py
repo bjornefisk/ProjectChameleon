@@ -679,12 +679,15 @@ class RunnerPublicationTests(unittest.TestCase):
         output = {"canvas": target, "elements": []}
         with tempfile.TemporaryDirectory() as directory:
             output_dir = Path(directory)
+
+            def write_invalid_png(_design, _assets, path):
+                Path(path).write_bytes(b"not-a-png")
+                return []
+
             with patch.object(main, "OUTPUT_DIR", output_dir), patch.object(
                 main,
                 "render_to_png",
-                side_effect=lambda _design, _assets, path: Path(path).write_bytes(
-                    b"not-a-png"
-                ),
+                side_effect=write_invalid_png,
             ):
                 with self.assertRaises(OSError):
                     self._publish_pair(source, target, output, "task")
