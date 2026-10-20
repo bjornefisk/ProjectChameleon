@@ -10,7 +10,7 @@ Accepted
 
 ## Context
 
-`chameleon_design_schema_v0.9.json` is the only schema but calls itself provisional. It permits empty-coordinate ambiguity, does not enforce semantic identity or ratios, and describes `max_lines` behavior that the adapter does not implement. The upstream renderer consumes an internal explicit line map, while the project adapter performs its own wrapping. The dependency currently follows a moving Git branch.
+`chameleon_design_schema_v0.9.json` is the only schema but calls itself provisional. It permits empty-coordinate ambiguity, does not enforce semantic identity or ratios, and describes `max_lines` behavior that the adapter does not implement. The upstream renderer consumes an internal explicit line map, while the project adapter performs its own wrapping. The dependency currently follows a moving Git branch. These are the pre-ratification/pre-implementation conditions; current bounded implementation and evidence are recorded in `Docs/STATUS.md`.
 
 ## Decision
 
@@ -21,7 +21,7 @@ Accepted
 5. Keep external style-run indices end-exclusive. The adapter must convert them to the upstream renderer's inclusive internal line-map ranges. Wrapping is adapter behavior; upstream `cr-renderer` itself does not width-wrap.
 6. Renderer conformance includes measured glyph widths, style-run face changes, letter spacing, line height, max-lines, height, actual glyph bounds, explicit newlines, and deterministic unbreakable-word failure. It never changes JSON text content.
 
-The current adapter's inclusive style-run loop, spacing omission, style-width omission, and ignored `max_lines`/height are recorded as conformance gaps. They do not redefine the contract.
+The adapter's former inclusive style-run loop, spacing omission, style-width omission, and ignored `max_lines`/height are historical conformance gaps. The current adapter implements the ratified bounded behavior; renderer-golden, final-font, and platform qualification evidence remains separate and incomplete.
 
 ## Alternatives considered
 
@@ -45,8 +45,12 @@ Rejected. The current task schema does not expose one. The adapter owns determin
 
 - Renderer behavior is reproducible only when the VCS revision and compatibility pins stay fixed.
 - The response can preserve source JSON while the adapter uses transient newline and line-map data.
-- Renderer conformance work is required before the solver can claim typography correctness.
-- Rectangle/ellipse stroke fields remain fixed schema data even though the current raster adapter ignores their visual stroke; this gap must be resolved or explicitly removed in a future ADR.
+- The current bounded adapter and validator have local renderer/text evidence; native-amd64, final-font, and cross-platform qualification remain unverified.
+- Rectangle/ellipse stroke behavior is implemented in the local adapter and covered by local renderer tests; any remaining platform/golden discrepancy requires new evidence rather than a contract change.
+
+## Implementation evidence (non-normative)
+
+The decisions above remain authoritative. The current tree implements the bounded adapter behavior through `renderer/converter/{wrap,convert,shapes}.py`, `engine/contract.py`, and the renderer/artifact publication seams. Local conformance tests cover style ranges, effective face metrics, letter spacing, forced lines, line limits, glyph bounds, strokes, and missing assets. These observations do not establish native-amd64 or organizer-controlled qualification; see `Docs/STATUS.md`.
 
 ## Affected files/schema fields
 

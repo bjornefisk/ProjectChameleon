@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import math
+from functools import lru_cache
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from fractions import Fraction
@@ -100,6 +101,7 @@ def validate_response(
 
     validate_source(source)
     validate_target_canvas(target_canvas)
+
 
     if not isinstance(response, Mapping):
         _fail(
@@ -291,6 +293,92 @@ def validate_response(
         source_elements, response_elements, source_aabbs, response_aabbs
     )
     _validate_text_overflow(response_elements)
+
+def validate_renderer_response(
+    source: Mapping[str, Any],
+    target_canvas: Mapping[str, Any],
+    response: Mapping[str, Any],
+    *,
+    assets_dir: str | Path | None = None,
+    fonts_dir: str | Path | None = None,
+    font_manager: Any = None,
+) -> list[str]:
+    """Run the pinned local renderer preflight after structural validation.
+
+    ``validate_response`` remains the independent structural and geometry
+    oracle.  This seam deliberately invokes the same converter and local font
+    registry used by rendering, so effective style faces, wrapping, forced
+    lines, line boxes, and positioned glyph bounds are checked from the
+    serialized response without changing the public response shape.
+    """
+
+    validate_response(source, target_canvas, response)
+    resolved_assets = (
+        Path(assets_dir)
+        if assets_dir is not None
+        else Path(__file__).resolve().parents[1] / "brand_kit" / "assets"
+    )
+    resolved_fonts = (
+        Path(fonts_dir)
+        if fonts_dir is not None
+        else Path(__file__).resolve().parents[1] / "brand_kit" / "fonts"
+    )
+    try:
+        try:
+            from renderer.converter.brand_fonts import (
+                MissingFontError,
+                load_brand_font_manager,
+            )
+            from renderer.converter.convert import convert_chameleon_to_crello
+            from renderer.converter.wrap import MalformedTextError, TextLayoutError
+        except ModuleNotFoundError:
+            from chameleon.renderer.converter.brand_fonts import (
+                MissingFontError,
+                load_brand_font_manager,
+            )
+            from chameleon.renderer.converter.convert import convert_chameleon_to_crello
+            from chameleon.renderer.converter.wrap import MalformedTextError, TextLayoutError
+
+        manager = font_manager
+        if manager is None:
+            manager = _renderer_font_manager(str(resolved_fonts))
+        _converted, warnings = convert_chameleon_to_crello(
+            dict(response), manager, str(resolved_assets)
+        )
+        return list(warnings)
+    except MalformedTextError as error:
+        _fail(
+            InfeasibleReasonCode.MALFORMED_INPUT,
+            "renderer rejected serialized text metadata",
+            {"error": str(error)},
+        )
+    except TextLayoutError as error:
+        _fail(
+            InfeasibleReasonCode.TEXT_OVERFLOW,
+            "renderer rejected serialized text layout",
+            {"error": str(error)},
+        )
+    except MissingFontError as error:
+        _fail(
+            InfeasibleReasonCode.RUNTIME_IO_FAILURE,
+            "renderer could not load a required local font face",
+            {"error": str(error)},
+        )
+    except (ImportError, OSError, OverflowError, RuntimeError, ValueError) as error:
+        _fail(
+            InfeasibleReasonCode.RUNTIME_IO_FAILURE,
+            "renderer response preflight failed",
+            {"error": str(error)},
+        )
+
+
+@lru_cache(maxsize=4)
+def _renderer_font_manager(fonts_dir: str):
+    try:
+        from renderer.converter.brand_fonts import load_brand_font_manager
+    except ModuleNotFoundError:
+        from chameleon.renderer.converter.brand_fonts import load_brand_font_manager
+    return load_brand_font_manager(fonts_dir)
 
 
 def _schema_view(value: Any) -> Any:
@@ -694,4 +782,9 @@ def _fail(
     raise InfeasibleLayoutError(reason_code, message, details)
 
 
-__all__ = ["validate_response", "validate_source", "validate_target_canvas"]
+__all__ = [
+    "validate_renderer_response",
+    "validate_response",
+    "validate_source",
+    "validate_target_canvas",
+]

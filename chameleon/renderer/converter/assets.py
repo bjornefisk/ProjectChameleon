@@ -18,13 +18,12 @@ def asset_path(assets_dir: Optional[str], asset_id: Optional[str]) -> Optional[P
     return candidate if candidate.is_file() else None
 
 def missing_asset_warning(element_id: Optional[str], asset_id: Optional[str]) -> str:
-    """Return the stable diagnostic emitted for one missing image asset."""
+    """Return the deterministic warning for one missing source asset."""
 
     return (
         f"Missing asset '{asset_id}' for element '{element_id}' "
         "- rendered a placeholder."
     )
-
 
 
 def load_asset_image(

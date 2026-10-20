@@ -1,0 +1,236 @@
+{
+  "corpus": "stage1-heldout-search-v1",
+  "provenance": "Four source documents and target canvases authored for this checked-in evaluator; no public input sample is referenced.",
+  "cases": [
+    {
+      "id": "isomorphic-gallery",
+      "source": {
+        "canvas": {"width": 1000, "height": 1000},
+        "elements": [
+          {
+            "id": "gallery_backdrop",
+            "type": "shape",
+            "x": 0,
+            "y": 0,
+            "width": 1000,
+            "height": 1000,
+            "z_index": 0,
+            "shape_type": "rectangle",
+            "fill_color": "rgba(24,31,45,1)"
+          },
+          {
+            "id": "gallery_vessel",
+            "type": "image",
+            "x": 175,
+            "y": 120,
+            "width": 600,
+            "height": 580,
+            "asset_id": "solstice_bottle.png",
+            "fit": "contain",
+            "z_index": 1
+          },
+          {
+            "id": "gallery_title",
+            "type": "text",
+            "x": 120,
+            "y": 780,
+            "width": 760,
+            "height": 100,
+            "content": "A quiet evening collection",
+            "font_family": "Solstice Sans",
+            "font_size": 40,
+            "font_weight": "bold",
+            "color": "rgba(248,242,230,1)",
+            "text_align": "center",
+            "z_index": 2
+          }
+        ]
+      },
+      "target_canvas": {"width": 900, "height": 900}
+    },
+    {
+      "id": "column-pivot-catalog",
+      "source": {
+        "canvas": {"width": 1000, "height": 1000},
+        "elements": [
+          {
+            "id": "catalog_backdrop",
+            "type": "shape",
+            "x": 0,
+            "y": 0,
+            "width": 1000,
+            "height": 1000,
+            "z_index": 0,
+            "shape_type": "rectangle",
+            "fill_color": "rgba(32,24,38,1)"
+          },
+          {
+            "id": "catalog_product",
+            "type": "image",
+            "x": 170,
+            "y": 115,
+            "width": 610,
+            "height": 590,
+            "asset_id": "solstice_bottle.png",
+            "fit": "contain",
+            "z_index": 1
+          },
+          {
+            "id": "catalog_heading",
+            "type": "text",
+            "x": 105,
+            "y": 770,
+            "width": 790,
+            "height": 120,
+            "content": "Field notes for bright days",
+            "font_family": "Solstice Sans",
+            "font_size": 38,
+            "font_weight": "bold",
+            "color": "rgba(255,244,222,1)",
+            "text_align": "center",
+            "z_index": 2
+          }
+        ]
+      },
+      "target_canvas": {"width": 1500, "height": 500}
+    },
+    {
+      "id": "horizontal-ribbon-journal",
+      "source": {
+        "canvas": {"width": 1000, "height": 1000},
+        "elements": [
+          {
+            "id": "journal_backdrop",
+            "type": "shape",
+            "x": 0,
+            "y": 0,
+            "width": 1000,
+            "height": 1000,
+            "z_index": 0,
+            "shape_type": "rectangle",
+            "fill_color": "rgba(242,233,216,1)"
+          },
+          {
+            "id": "journal_bottle",
+            "type": "image",
+            "x": 150,
+            "y": 110,
+            "width": 620,
+            "height": 600,
+            "asset_id": "solstice_bottle.png",
+            "fit": "contain",
+            "z_index": 1
+          },
+          {
+            "id": "journal_line",
+            "type": "text",
+            "x": 100,
+            "y": 775,
+            "width": 800,
+            "height": 100,
+            "content": "Notes from the open road",
+            "font_family": "Solstice Sans",
+            "font_size": 40,
+            "font_weight": "bold",
+            "color": "rgba(39,28,39,1)",
+            "text_align": "center",
+            "z_index": 2
+          }
+        ]
+      },
+      "target_canvas": {"width": 800, "height": 200}
+    },
+    {
+      "id": "vertical-restack-studio",
+      "source": {
+        "canvas": {"width": 1000, "height": 1000},
+        "elements": [
+          {
+            "id": "studio_backdrop",
+            "type": "shape",
+            "x": 0,
+            "y": 0,
+            "width": 1000,
+            "height": 1000,
+            "z_index": 0,
+            "shape_type": "rectangle",
+            "fill_color": "rgba(27,38,43,1)"
+          },
+          {
+            "id": "studio_object",
+            "type": "image",
+            "x": 155,
+            "y": 105,
+            "width": 630,
+            "height": 605,
+            "asset_id": "solstice_bottle.png",
+            "fit": "contain",
+            "z_index": 1
+          },
+          {
+            "id": "studio_caption",
+            "type": "text",
+            "x": 110,
+            "y": 775,
+            "width": 780,
+            "height": 105,
+            "content": "A small ritual, carefully made",
+            "font_family": "Solstice Sans",
+            "font_size": 38,
+            "font_weight": "bold",
+            "color": "rgba(236,246,241,1)",
+            "text_align": "center",
+            "z_index": 2
+          }
+        ]
+      },
+      "target_canvas": {"width": 200, "height": 1600}
+    },
+    {
+      "id": "missing-asset-diagnostic",
+      "source": {
+        "canvas": {"width": 640, "height": 640},
+        "elements": [
+          {
+            "id": "diagnostic_backdrop",
+            "type": "shape",
+            "x": 0,
+            "y": 0,
+            "width": 640,
+            "height": 640,
+            "z_index": 0,
+            "shape_type": "rectangle",
+            "fill_color": "rgba(45,35,49,1)"
+          },
+          {
+            "id": "unpackaged_asset",
+            "type": "image",
+            "x": 120,
+            "y": 100,
+            "width": 400,
+            "height": 380,
+            "asset_id": "heldout_asset_not_packaged.png",
+            "fit": "contain",
+            "z_index": 1
+          },
+          {
+            "id": "diagnostic_caption",
+            "type": "text",
+            "x": 90,
+            "y": 510,
+            "width": 460,
+            "height": 70,
+            "content": "Unavailable source artwork",
+            "font_family": "Solstice Sans",
+            "font_size": 28,
+            "font_weight": "bold",
+            "color": "rgba(255,244,220,1)",
+            "text_align": "center",
+            "z_index": 2
+          }
+        ]
+      },
+      "target_canvas": {"width": 640, "height": 640}
+    }
+  ]
+}
