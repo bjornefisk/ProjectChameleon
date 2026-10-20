@@ -4,12 +4,12 @@
 A horizontal ribbon layout generator and spatial compression engine for Level 3 ($1080 \times 1350 \to 728 \times 90$) and other extreme aspect ratios. The solver packs source groups along the primary horizontal axis using inferred source order and relationships, not a universal logo/headline/product/CTA slot order. It proactively compresses text toward the readable preference near $10$–$12\text{px}$ unless the source is smaller, scales down artwork isotropically, preserves rotated elements, and handles missing assets without crashing or replacing files. It must fail through the typed protocol if no hard-valid candidate exists after the permitted feasibility levers are exhausted.
 
 **Blocked by:**  
-`06: Multi-Signal Role Inference and Level 2 Column Pivot Solver`
+`06: Multi-Signal Role Inference and Level 2 Column Pivot Solver` — ✅ COMPLETE
 
 **Status:**
-blocked-pending-pr-14-partner-review-and-merge
+next scoped ticket — implementation pending; PR #14 is merged and Ticket 06 is complete on `main`
 
-**Dispatch gate:** Do not create or modify Ticket 07 product files until PR #14 is merged and `Docs/STATUS.md` records Ticket 06 as complete. This brief is a handoff contract only; no Ticket 07 implementation has started.
+**Dispatch gate:** Ticket 06's merge and completion record clear this handoff gate. Do not expand Ticket 07 beyond its bounded topology slice or claim full ranking, held-out evaluation, or complete runtime qualification.
 
 - [ ] Create `chameleon/engine/layout/horizontal_ribbon.py` implementing horizontal ribbon layouts for extreme wide-and-short formats: allocate horizontal slots along the width while fitting within tight vertical height constraints.
 - [ ] Create `chameleon/engine/layout/vertical_restack.py` implementing vertical re-stacking for extreme tall-and-narrow formats.
