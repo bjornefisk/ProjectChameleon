@@ -72,8 +72,10 @@ jobs:
           dependency-snapshot: false
       - name: Record Docker image SBOM
         run: |
-          cat "${{ runner.temp }}/chameleon-stage1.sbom.spdx.json"
-          sha256sum "${{ runner.temp }}/chameleon-stage1.sbom.spdx.json"
+          sbom="${{ runner.temp }}/chameleon-stage1.sbom.spdx.json"
+          test -s "$sbom"
+          printf "sbom_sha256="
+          sha256sum "$sbom" | cut -d' ' -f1
       - name: Record packaged asset and font hashes
         run: |
           docker run --rm --network none --entrypoint sh chameleon-stage1 -c '
