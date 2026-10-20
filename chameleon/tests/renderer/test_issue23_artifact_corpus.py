@@ -16,8 +16,9 @@ import sys
 import tempfile
 import unittest
 from copy import deepcopy
-from pathlib import Path
 from importlib.metadata import distribution
+from pathlib import Path
+from unittest.mock import patch
 
 from PIL import Image
 
@@ -40,6 +41,14 @@ ASSETS = ROOT / "brand_kit" / "assets"
 FONTS = ROOT / "brand_kit" / "fonts"
 CORPUS = ROOT / "tests" / "fixtures" / "renderer_artifact_hashes.json"
 PINNED_RENDERER_SHA = "a17e1fb9a732959dd6c21ae168d5ee09d74bd64f"
+
+
+def _platform_hash_key() -> str:
+    machine = platform.machine().strip().lower().replace("-", "_")
+    return {
+        "amd64": "x86_64",
+        "x64": "x86_64",
+    }.get(machine, machine)
 
 
 def _canonical_digest(value: object) -> str:
@@ -199,10 +208,14 @@ class RendererArtifactCorpusTests(unittest.TestCase):
             self.assertEqual(expected["document_sha256"], _canonical_digest(document), name)
             payload, warnings, size = _render(document, self.font_manager)
             expected_hashes = expected.get("png_sha256_by_platform", {})
-            expected_hash = expected_hashes.get(platform.machine(), expected["png_sha256"])
+            expected_hash = expected_hashes.get(_platform_hash_key(), expected["png_sha256"])
             self.assertEqual(expected_hash, hashlib.sha256(payload).hexdigest(), name)
             self.assertEqual(tuple(expected["size"]), size, name)
             self.assertEqual(expected["warnings"], warnings, name)
+
+    def test_platform_aliases_select_persisted_hashes(self):
+        with patch.object(platform, "machine", return_value="AMD64"):
+            self.assertEqual(_platform_hash_key(), "x86_64")
 
     def test_fit_modes_have_distinct_rendered_provenance(self):
         payloads = {

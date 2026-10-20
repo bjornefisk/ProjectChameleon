@@ -28,8 +28,8 @@ The public Level 3 fixture remains intentionally typed `INCOMPLETE_SEARCH` with 
 
 The following evidence was produced on the current integration tree, not copied from the historical records below:
 
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — **208 tests passed**.
-- Focused suites: artifact **10**, renderer **29**, layout **56**, and runner **72** tests passed.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — **209 tests passed**.
+- Focused suites: artifact **10**, renderer **30**, layout **56**, and runner **72** tests passed.
 - `../.venv/bin/python ../scripts/evaluate_heldout_search.py --repeats 2` — five local authored cases, 12 candidates per case, hard-valid rate **0.45**, repeated PNG/search signatures stable, all four topology families present in the work set. This is not organizer-held-out or native-amd64 qualification.
 - `python3 scripts/verify_repository.py`, `make verify`, changed-file `py_compile`, and `git diff --check` — passed.
 - `cd chameleon && python -m engine.main` — not runnable because the system interpreter lacks `jsonschema`.
