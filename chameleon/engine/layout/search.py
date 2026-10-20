@@ -548,6 +548,7 @@ def search(
     admitted: list[Candidate] = []
     failures: list[dict[str, Any]] = []
 
+
     for spec in specs[:limit]:
         try:
             rendered_output: dict[str, Any] = {}
