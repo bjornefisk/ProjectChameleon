@@ -34,8 +34,6 @@ def _fail(message: str, **details: Any) -> NoReturn:
         {"search_kind": "column_pivot", "search_exhausted": False, **details},
     )
 
-def _ceil_fraction(value: Fraction) -> int:
-    return -((-value.numerator) // value.denominator)
 
 
 
@@ -56,25 +54,25 @@ def is_column_pivot_suitable(source: Mapping[str, Any], target_canvas: Mapping[s
     return target_ratio > source_ratio and has_media and has_copy
 
 
-def _serialize_box(raw_box: tuple[Fraction, Fraction, Fraction, Fraction]) -> tuple[int, int, int, int]:
-    return tuple(quantize_to_int(value) for value in raw_box)  # type: ignore[return-value]
 
 
-def _image_dimensions(element: Mapping[str, Any], desired_width: Fraction, desired_height: Fraction) -> tuple[int, int] | None:
+def _image_dimensions(
+    element: Mapping[str, Any],
+    desired_width: Fraction,
+    desired_height: Fraction,
+) -> tuple[Fraction, Fraction] | None:
     ratio = reduced_ratio(element["width"], element["height"])
     if ratio is None:
-        return quantize_to_int(desired_width), quantize_to_int(desired_height)
+        return desired_width, desired_height
     p, q = ratio
-    multiplier = min(
-        quantize_to_int(desired_width) // p,
-        quantize_to_int(desired_height) // q,
-    )
+    bound = min(desired_width / p, desired_height / q)
+    multiplier = bound.numerator // bound.denominator
     if multiplier < 1:
         return None
-    return multiplier * p, multiplier * q
+    return Fraction(multiplier * p), Fraction(multiplier * q)
 
 
-def _set_box(response: list[dict[str, Any]], index: int, box: tuple[int, int, int, int]) -> None:
+def _set_box(response: list[dict[str, Any]], index: int, box: tuple[Any, Any, Any, Any]) -> None:
     response[index].update(dict(zip(_GEOMETRY_FIELDS, box)))
 
 
@@ -125,13 +123,11 @@ def _place_group(
     ty = anchor_y - min_y * scale
     for index in indices:
         element = source_elements[index]
-        box = _serialize_box(
-            (
-                to_fraction(element["x"]) * scale + tx,
-                to_fraction(element["y"]) * scale + ty,
-                to_fraction(element["width"]) * scale,
-                to_fraction(element["height"]) * scale,
-            )
+        box = (
+            to_fraction(element["x"]) * scale + tx,
+            to_fraction(element["y"]) * scale + ty,
+            to_fraction(element["width"]) * scale,
+            to_fraction(element["height"]) * scale,
         )
         _set_box(response, index, box)
     return True
@@ -139,7 +135,7 @@ def _place_group(
 
 def _safe_box(
     source_element: Mapping[str, Any],
-    box: tuple[int, int, int, int],
+    box: tuple[Any, Any, Any, Any],
     target: Mapping[str, Any],
     bleed: frozenset[str] | None,
 ) -> bool:
@@ -164,17 +160,23 @@ def _role_indices(model: RoleModel) -> dict[RoleKind, list[int]]:
         result.setdefault(assignment.role, []).append(assignment.index)
     return result
 
-def _bleed_position(size: int, canvas_size: int, sides: frozenset[str], low: str, high: str) -> int:
-    """Return integer placement that crosses one side and keeps overlap positive."""
+def _bleed_position(
+    size: Fraction,
+    canvas_size: Fraction,
+    sides: frozenset[str],
+    low: str,
+    high: str,
+) -> Fraction:
+    """Return exact placement that crosses one side and keeps overlap positive."""
 
     if low in sides and high in sides:
-        return -1 if size > canvas_size + 1 else canvas_size - size + 1
-    overshoot = min(max(1, size // 5), size - 1)
+        return Fraction(-1) if size > canvas_size + 1 else canvas_size - size + 1
+    overshoot = min(max(Fraction(1), size / 5), size - 1)
     if low in sides:
         return -overshoot
     if high in sides:
         return canvas_size - size + overshoot
-    return max(0, canvas_size - size)
+    return max(Fraction(0), canvas_size - size)
 
 
 
@@ -222,15 +224,15 @@ def _build_column_candidate(
     if right_width <= 0:
         _fail("target has no positive copy column")
 
-    # The hero extent is target-proportional and source-derived, then snapped to
-    # its exact reduced image-ratio lattice.
+    # The hero extent is target-proportional and selected on its exact reduced
+    # image-ratio lattice. Position remains fractional until final serialization.
     hero_side = min(target_height * media_fraction, target_height * Fraction(3, 4))
     dimensions = _image_dimensions(hero, hero_side, hero_side)
     if dimensions is None:
         _fail("hero image ratio has no positive integer lattice point")
     hero_width, hero_height = dimensions
-    hero_x = quantize_to_int((left_slot - hero_width) / 2)
-    hero_y = quantize_to_int(target_height - hero_height - target_height * Fraction(7, 100))
+    hero_x = (left_slot - hero_width) / 2
+    hero_y = target_height - hero_height - target_height * Fraction(7, 100)
     hero_box = (hero_x, hero_y, hero_width, hero_height)
     if not _safe_box(hero, hero_box, target_canvas, None):
         _fail("hero image cannot fit the media column", element_id=hero["id"])
@@ -249,10 +251,10 @@ def _build_column_candidate(
         if dimensions is None:
             _fail("image ratio has no positive integer lattice point", element_id=element["id"])
         width, height = dimensions
-        x = quantize_to_int((left_slot - width) / 2)
-        y = quantize_to_int(target_height * to_fraction(element["y"]) / source_height)
+        x = (left_slot - width) / 2
+        y = target_height * to_fraction(element["y"]) / source_height
         if y + height > hero_y and x + width > hero_x and x < hero_x + hero_width:
-            y = max(0, hero_y - height - quantize_to_int(gutter))
+            y = max(Fraction(0), hero_y - height - gutter)
         box = (x, y, width, height)
         if not _safe_box(element, box, target_canvas, None):
             _fail("image cannot fit the media column", element_id=element["id"])
@@ -288,23 +290,29 @@ def _build_column_candidate(
     for index in text_indices:
         element = source_elements[index]
         # Derive box height from source geometry only; font_size is mutable.
-        width = max(1, quantize_to_int(right_width))
+        width = max(Fraction(1), right_width)
         source_height_fraction = to_fraction(element["height"]) / source_height
-        height = max(1, quantize_to_int(target_height * source_height_fraction))
+        height = max(Fraction(1), target_height * source_height_fraction)
         if index in transformed:
             continue
         if model.assignments[index].role == RoleKind.HEADLINE:
-            y = quantize_to_int(target_height * Fraction(1, 4))
+            y = target_height * Fraction(1, 4)
         else:
             headline_indices = roles.get(RoleKind.HEADLINE, [])
-            headline_end = 0
+            headline_end = Fraction(0)
             if headline_indices:
-                headline_end = quantize_to_int(target_height * Fraction(1, 4)) + max(
-                    1, quantize_to_int(target_height * (to_fraction(source_elements[headline_indices[0]]["height"]) / source_height)))
-            y = headline_end + quantize_to_int(target_height * Fraction(1, 25))
-        x = quantize_to_int(right_x)
+                headline_end = target_height * Fraction(1, 4) + max(
+                    Fraction(1),
+                    target_height
+                    * (
+                        to_fraction(source_elements[headline_indices[0]]["height"])
+                        / source_height
+                    ),
+                )
+            y = headline_end + target_height * Fraction(1, 25)
+        x = right_x
         if y + height > target_height:
-            y = max(0, int(target_height) - height - quantize_to_int(gutter))
+            y = max(Fraction(0), target_height - height - gutter)
         box = (x, y, width, height)
         if not _safe_box(element, box, target_canvas, None):
             _fail("text cannot fit the copy column", element_id=element["id"])
@@ -320,18 +328,18 @@ def _build_column_candidate(
         element = source_elements[index]
         source_aabb = rotated_aabb(element)
         bleed = source_bleed_sides(element, source_aabb, source["canvas"])
-        width = max(1, quantize_to_int(target_height * to_fraction(element["width"]) / source_width))
-        height = max(1, quantize_to_int(target_height * to_fraction(element["height"]) / source_height))
+        width = max(Fraction(1), target_height * to_fraction(element["width"]) / source_width)
+        height = max(Fraction(1), target_height * to_fraction(element["height"]) / source_height)
         if bleed is not None:
             if "left" in bleed or "right" in bleed:
-                width = max(2, width)
+                width = max(Fraction(2), width)
             if "top" in bleed or "bottom" in bleed:
-                height = max(2, height)
-            x = _bleed_position(width, int(target_width), bleed, "left", "right")
-            y = _bleed_position(height, int(target_height), bleed, "top", "bottom")
+                height = max(Fraction(2), height)
+            x = _bleed_position(width, target_width, bleed, "left", "right")
+            y = _bleed_position(height, target_height, bleed, "top", "bottom")
         else:
-            x = max(0, int(target_width) - width - quantize_to_int(gutter))
-            y = max(0, int(target_height) - height - quantize_to_int(gutter))
+            x = max(Fraction(0), target_width - width - gutter)
+            y = max(Fraction(0), target_height - height - gutter)
         box = (x, y, width, height)
         if not _safe_box(element, box, target_canvas, bleed):
             _fail("decoration cannot preserve source containment or bleed", element_id=element["id"])
@@ -344,7 +352,8 @@ def _build_column_candidate(
         missing = [source_elements[index]["id"] for index in range(len(source_elements)) if index not in transformed]
         _fail("column pivot has no source-derived placement for records", element_ids=missing)
 
-    # Renderer-in-loop text fitting is performed after geometry is serialized.
+    # Renderer-in-loop text fitting reads exact geometry; serialization follows
+    # only after all placements and font-size probes finish.
     manager = font_manager
     text_all = [index for index, element in enumerate(source_elements) if element.get("type") == "text"]
     if text_all:
@@ -374,12 +383,94 @@ def _build_column_candidate(
                 )
             response_elements[index]["font_size"] = selected
 
-    response = {
+    return {
         "canvas": {"width": int(target_width), "height": int(target_height)},
         "elements": response_elements,
     }
+
+
+def _serialize_column_candidate(response: Mapping[str, Any]) -> dict[str, Any]:
+    """Apply one final half-even serialization to candidate mutable values."""
+
+    serialized = dict(response)
+    serialized["canvas"] = dict(response["canvas"])
+    serialized["elements"] = []
+    for element in response["elements"]:
+        serialized_element = dict(element)
+        for field in _GEOMETRY_FIELDS:
+            serialized_element[field] = quantize_to_int(element[field])
+        if element.get("type") == "text":
+            serialized_element["font_size"] = quantize_to_int(element["font_size"])
+        serialized["elements"].append(serialized_element)
+    return serialized
+
+
+def _fit_serialized_text(
+    source: Mapping[str, Any],
+    response: dict[str, Any],
+    target_canvas: Mapping[str, Any],
+    *,
+    font_manager=None,
+    fonts_dir: str | None = None,
+) -> None:
+    """Re-run renderer text fitting against the serialized integer boxes."""
+
+    text_pairs = [
+        (source_element, response_element)
+        for source_element, response_element in zip(source["elements"], response["elements"])
+        if response_element.get("type") == "text"
+    ]
+    if not text_pairs:
+        return
+    manager = font_manager
+    if manager is None:
+        from .near_isomorphic import _renderer_components
+
+        load_brand_font_manager = _renderer_components()[0]
+        resolved_fonts_dir = fonts_dir or str(Path(__file__).resolve().parents[2] / "brand_kit" / "fonts")
+        manager = load_brand_font_manager(resolved_fonts_dir)
+    for source_element, element in text_pairs:
+        font_search: dict[str, Any] = {}
+        preferred = _preferred_font_size(
+            to_fraction(source_element.get("font_size", 1)),
+            Fraction(1),
+        )
+        selected = _largest_fitting_font_size(
+            element,
+            preferred,
+            manager,
+            target_canvas,
+            fit=_text_fits,
+            search_details=font_search,
+        )
+        if selected is None:
+            _fail(
+                "no serialized integer text size fits the renderer bounds",
+                element_id=element["id"],
+                font_search=font_search,
+            )
+        element["font_size"] = selected
+
+
+def _finalize_column_candidate(
+    source: Mapping[str, Any],
+    target_canvas: Mapping[str, Any],
+    response: Mapping[str, Any],
+    *,
+    assets_dir: str | None,
+    fonts_dir: str | None,
+    font_manager=None,
+) -> dict[str, Any]:
+    serialized = _serialize_column_candidate(response)
+    _fit_serialized_text(
+        source,
+        serialized,
+        target_canvas,
+        font_manager=font_manager,
+        fonts_dir=fonts_dir,
+    )
     try:
-        validate_response(source, target_canvas, response)
+        validate_response(source, target_canvas, serialized)
     except InfeasibleLayoutError as error:
         _fail(
             "column-pivot candidate failed serialized hard validation",
@@ -387,7 +478,9 @@ def _build_column_candidate(
             reason=error.message,
             details=error.details,
         )
-    return response
+    _render_candidate(serialized, assets_dir, fonts_dir, font_manager)
+    validate_response(source, target_canvas, serialized)
+    return serialized
 
 
 def generate_column_pivot_candidate(
@@ -413,9 +506,14 @@ def generate_column_pivot_candidate(
         font_manager=font_manager,
         fonts_dir=fonts_dir,
     )
-    _render_candidate(response, assets_dir, fonts_dir, font_manager)
-    validate_response(source, target_canvas, response)
-    return response
+    return _finalize_column_candidate(
+        source,
+        target_canvas,
+        response,
+        assets_dir=assets_dir,
+        fonts_dir=fonts_dir,
+        font_manager=font_manager,
+    )
 
 
 def solve_column_pivot(
@@ -439,9 +537,14 @@ def solve_column_pivot(
         font_manager=font_manager,
         fonts_dir=fonts_dir,
     )
-    _render_candidate(response, assets_dir, fonts_dir, font_manager)
-    validate_response(source, target_canvas, response)
-    return response
+    return _finalize_column_candidate(
+        source,
+        target_canvas,
+        response,
+        assets_dir=assets_dir,
+        fonts_dir=fonts_dir,
+        font_manager=font_manager,
+    )
 
 
 # Short alias for callers that treat topology families as candidate functions.
