@@ -1,9 +1,9 @@
 # Project Chameleon status
 
-**Date:** 2026-10-19
+**Date:** 2026-10-20
 
 **Phase:** Gate 1 cleared. Tickets 01-06 are complete on `main` at commit `58b697a` (PR #14 merged). Ticket 07 is next separately scoped work; Ticket 08, full candidate ranking, and held-out evaluation remain later work.
-**Decision status:** Gate 1 renderer/validator qualification is recorded. The current main tree includes bounded source-aware routing, exact column-pivot geometry serialization, and renderer-aware response text validation. Native runtime measurements and cross-platform parity remain evidence work, not unverified hard limits.
+**Decision status:** Gate 1 renderer/validator qualification is recorded. The current main tree includes bounded source-aware routing, exact column-pivot geometry serialization, and renderer-aware response text validation. Native amd64 qualification, cross-platform parity, apt-version locks, and the complete hash-locked wheelhouse remain unverified follow-up evidence; no arm64-host run is native qualification.
 **Ticket 06 authority:** User-requested GitHub issue #13; owner @bjornefisk; PR #14 merged into `main` at `58b697a`. Source revision `2166392` and transition revision `77b3368` remain historical provenance.
 
 ## PR12 merge gate — CLEARED
@@ -25,7 +25,7 @@ The bounded Ticket 05 implementation completes Gate 1 within its accepted scope.
 **Ticket 05 acceptance:**
 - ✅ Bounded Level 1 near-isomorphic path implemented
 - ✅ Levels 1-2 commit valid pairs; Level 3 correctly reports `INCOMPLETE_SEARCH`
-- ✅ 20 Ticket 05 layout tests at its boundary; current tree has 37 layout tests and 177 project tests passing
+- ✅ 20 Ticket 05 layout tests at its boundary; current main tree has 35 layout tests and 170 project tests passing
 
 **Cutoff semantics disposition (accepted):**
 The bounded deterministic search with `INCOMPLETE_SEARCH` status satisfies Gate 1. Ticket 06 now supplies the bounded source-aware column-pivot family; horizontal-ribbon, vertical-restack, ranking, and held-out evaluation belong to Tickets 07-08 and are not Gate 1 prerequisites. The current Level 3 `INCOMPLETE_SEARCH` result is contract-correct bounded behavior, not a Gate 1 blocker.
@@ -66,7 +66,7 @@ Ticket 06 is merged into `main`. The bounded deterministic role inference and so
 - **Inherited Gate 1 paths:** renderer converter, contract validator, runner, and renderer tests remain shared qualification paths. No renderer resource ceiling or solver dependency is part of Ticket 06.
 - **Current hardening paths:** `chameleon/engine/contract.py` now invokes renderer-aware text preflight after structural checks; column-pivot geometry stays exact until one final serialization step.
 - **Historical PR evidence:** focused/full tests and Level 2 sample evidence passed on PR #14. Current verification for this follow-up is recorded after implementation; prior arm64-host Docker output remains supplemental.
-- **Current follow-up verification:** `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 37 passed; `make test` — 177 project tests and 47 review tests passed; contract suite — 33 passed.
+- **Current follow-up verification:** `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 35 passed; `make test` — 170 project tests and 47 review tests passed; contract suite — 28 passed.
 - **Review state:** PR #14 is merged. Ticket 07 dispatch is open as a separate bounded slice. Native amd64, cross-platform hash parity, apt locks, and wheelhouse closure remain qualification gaps.
 
 ## Follow-up qualification evidence (supplemental arm64-host run)
@@ -225,7 +225,7 @@ The following smoke sequence verifies Gate 1 exit criteria:
 ```bash
 cd chameleon
 python -m engine.main                                    # ✅ Levels 1-2 SUCCESS, Level 3 INCOMPLETE_SEARCH
-python -m unittest discover -s tests -p 'test_*.py' -v  # ✅ 177 current tests passing
+python -m unittest discover -s tests -t . -p 'test_*.py' -v  # ✅ 170 current project tests passing
 docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .  # ✅ Clean build
 docker run --rm --network none \
   -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" \
