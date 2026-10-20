@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +10,22 @@ try:
     from renderer.converter.shapes import render_shape
 except ModuleNotFoundError:
     from chameleon.renderer.converter.shapes import render_shape
+
+
+FIXTURE_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "artifact"
+
+
+def load_artifact_fixture(name: str) -> dict[str, Any]:
+    return json.loads((FIXTURE_DIR / name).read_text(encoding="utf-8"))
+
+
+def write_readable_blank_png(design: dict[str, Any], path: Path) -> None:
+    canvas = design["canvas"]
+    Image.new(
+        "RGBA",
+        (int(canvas["width"]), int(canvas["height"])),
+        (255, 255, 255, 255),
+    ).save(path, format="PNG")
 
 
 def shape_design(width: int = 16, height: int = 12) -> dict[str, Any]:
