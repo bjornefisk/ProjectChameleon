@@ -71,10 +71,16 @@ def resize(
                 InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE,
             }:
                 raise
+            details = (
+                dict(error.details)
+                if isinstance(error.details, Mapping)
+                else {}
+            )
+            details["search_exhausted"] = details.get("search_exhausted") is True
             failures[name] = {
                 "reason_code": error.reason_code.value,
                 "message": error.message,
-                "details": error.details,
+                "details": details,
             }
             continue
         try:
@@ -87,24 +93,32 @@ def resize(
                     "reason_code": error.reason_code.value,
                     "reason": error.message,
                     "details": error.details,
+                    "search_exhausted": False,
                 },
             }
             continue
         return response
 
+    all_exhausted = bool(failures) and all(
+        failure["details"].get("search_exhausted") is True
+        for failure in failures.values()
+    )
     if failures:
-        first = next(iter(failures.values()))
-        try:
-            reason_code = InfeasibleReasonCode(first["reason_code"])
-        except ValueError:
-            reason_code = InfeasibleReasonCode.INCOMPLETE_SEARCH
+        reason_code = (
+            InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE
+            if all_exhausted
+            else InfeasibleReasonCode.INCOMPLETE_SEARCH
+        )
         raise InfeasibleLayoutError(
             reason_code,
             "bounded candidate families failed",
-            {"candidate_failures": failures},
+            {
+                "candidate_failures": failures,
+                "search_exhausted": all_exhausted,
+            },
         )
     raise InfeasibleLayoutError(
         InfeasibleReasonCode.INCOMPLETE_SEARCH,
         "no bounded candidate family was suitable",
-        {"candidate_failures": {}},
+        {"candidate_failures": {}, "search_exhausted": False},
     )
