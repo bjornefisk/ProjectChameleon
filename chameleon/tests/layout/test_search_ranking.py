@@ -2,26 +2,32 @@ import unittest
 from unittest.mock import patch
 
 try:
+    from engine.contract import validate_response
     from engine.layout.ranking import QualityScore, select_best
     from engine.layout.candidate import RenderedCandidate
+    from engine.layout.roles import infer_roles
     from engine.layout.search import (
         MAX_CANDIDATES,
         MAX_VARIANTS_PER_FAMILY,
         TOPOLOGY_ORDER,
         Candidate,
         CandidateSpec,
+        _derive_variant_response,
         enumerate_candidate_specs,
         search,
     )
 except ModuleNotFoundError:
+    from chameleon.engine.contract import validate_response
     from chameleon.engine.layout.ranking import QualityScore, select_best
     from chameleon.engine.layout.candidate import RenderedCandidate
+    from chameleon.engine.layout.roles import infer_roles
     from chameleon.engine.layout.search import (
         MAX_CANDIDATES,
         MAX_VARIANTS_PER_FAMILY,
         TOPOLOGY_ORDER,
         Candidate,
         CandidateSpec,
+        _derive_variant_response,
         enumerate_candidate_specs,
         search,
     )
@@ -68,6 +74,45 @@ class SearchRankingTests(unittest.TestCase):
         )
 
         self.assertEqual(result.candidates[0].warnings, ("solver-warning",))
+
+    def test_variant_translations_round_complete_coordinate_once(self):
+        source = {
+            "canvas": {"width": 10, "height": 10},
+            "elements": [
+                {
+                    "id": "shape",
+                    "type": "shape",
+                    "x": 1,
+                    "y": 1,
+                    "width": 2,
+                    "height": 2,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(0,0,0,1)",
+                }
+            ],
+        }
+        target = {"width": 6, "height": 6}
+        base = {
+            "canvas": dict(target),
+            "elements": [dict(source["elements"][0])],
+        }
+        roles = infer_roles(source)
+
+        for variant_index, field in ((1, "x"), (2, "y")):
+            with self.subTest(field=field):
+                spec = CandidateSpec(
+                    "near_isomorphic",
+                    "dominant_media" if variant_index == 1 else "dominant_copy",
+                    0,
+                    variant_index,
+                    0,
+                    variant_index,
+                )
+                response = _derive_variant_response(base, source, target, roles, spec)
+
+                self.assertEqual(response["elements"][0][field], 2)
+                self.assertIs(type(response["elements"][0][field]), int)
+                validate_response(source, target, response)
 
     def test_derived_response_is_validated_before_render(self):
         source = {
