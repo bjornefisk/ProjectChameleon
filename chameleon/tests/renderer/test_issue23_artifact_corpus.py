@@ -50,7 +50,6 @@ def _platform_hash_key() -> str:
         "x64": "x86_64",
     }.get(machine, machine)
 
-
 def _canonical_digest(value: object) -> str:
     payload = json.dumps(
         value,
@@ -216,7 +215,6 @@ class RendererArtifactCorpusTests(unittest.TestCase):
     def test_platform_aliases_select_persisted_hashes(self):
         with patch.object(platform, "machine", return_value="AMD64"):
             self.assertEqual(_platform_hash_key(), "x86_64")
-
     def test_fit_modes_have_distinct_rendered_provenance(self):
         payloads = {
             name: _render(self.documents[name], self.font_manager)[0]
