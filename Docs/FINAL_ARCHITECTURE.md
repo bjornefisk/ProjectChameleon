@@ -1,6 +1,6 @@
 # Project Chameleon final architecture
 
-**Status:** Gate 1 qualification is cleared and Tickets 06-08 have bounded implementation on the integrated review tree. The search enumerates all four topology families with source-derived variants, renderer-gated hard validation, fixed-point ranking, and local held-out-style evidence. The public Level 3 sample remains a typed fail-closed result; native-amd64, broad organizer-held-out, and release qualification remain unverified.
+**Status:** Gate 1 qualification is cleared and Tickets 06-08 have bounded implementation on the integrated review tree. The search enumerates all four topology families with source-derived variants, renderer-gated hard validation, fixed-point ranking, and local held-out-style evidence. The public Level 3 sample remains a typed fail-closed result; native-amd64 F-06 runtime/sample-output evidence is recorded, while cross-platform, broad organizer-held-out, and release qualification remain unverified.
 
 **Scope:** Stage 1 retargeting engine and the separate finale integration boundary.
 
@@ -23,7 +23,7 @@ The architecture must:
 - produce deterministic results in an offline `linux/amd64` container; and
 - keep the autonomous Stage 1 engine separate from the interactive finale.
 
-The current phase is **bounded four-topology search review after Gate 1 qualification**. Source-aware role inference, column pivot, horizontal ribbon, vertical restack, candidate variants, renderer-in-loop admission, and fixed-point ranking are implemented without changing the public schema or hard contract. The public Level 3 sample-pass criterion remains unresolved and must not be addressed by shedding records, changing copy/font attributes, substituting fonts, or relaxing hard validation. Local held-out-style evidence is recorded separately from official/native qualification.
+The current phase is **bounded four-topology search review after Gate 1 qualification**. Source-aware role inference, column pivot, horizontal ribbon, vertical restack, candidate variants, renderer-in-loop admission, and fixed-point ranking are implemented without changing the public schema or hard contract. The public Level 3 sample-pass criterion remains unresolved and must not be addressed by shedding records, changing copy/font attributes, substituting fonts, or relaxing hard validation. Local held-out-style evidence and native-amd64 F-06 runtime evidence are recorded separately from organizer-held-out and release qualification.
 
 ### Terminology
 

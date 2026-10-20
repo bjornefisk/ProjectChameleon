@@ -49,6 +49,7 @@ test:
 	@echo "Running unit tests..."
 	@cd chameleon && $(PYTHON) -m unittest discover -s tests -t . -p 'test_*.py' -v
 	@$(PYTHON) -m unittest scripts.test_review_pr -v
+	@$(PYTHON) -m unittest scripts.test_qualify_runtime -v
 
 run:
 	@echo "Running engine.main on chameleon/input/..."
@@ -75,7 +76,7 @@ docker-test:
 	@echo "Running offline container test with --network none..."
 	@mkdir -p chameleon/output
 	@docker run --rm --network none \
-		-v "$(ROOT_DIR)/chameleon/input:/app/input" \
+		-v "$(ROOT_DIR)/chameleon/input:/app/input:ro" \
 		-v "$(ROOT_DIR)/chameleon/output:/app/output" \
 		chameleon-stage1
 	@echo "Docker test completed."
