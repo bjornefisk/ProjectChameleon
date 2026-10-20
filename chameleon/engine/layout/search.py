@@ -122,7 +122,13 @@ def _source_variant_indices(source: Mapping[str, Any], roles: RoleModel) -> tupl
     has_media = bool(role_values & {RoleKind.HERO_MEDIA, RoleKind.IMAGE, RoleKind.LOGO})
     has_copy = bool(
         role_values
-        & {RoleKind.HEADLINE, RoleKind.SUPPORTING_TEXT, RoleKind.CTA, RoleKind.TEXT}
+        & {
+            RoleKind.HEADLINE,
+            RoleKind.SUPPORTING_TEXT,
+            RoleKind.CTA,
+            RoleKind.BADGE,
+            RoleKind.TEXT,
+        }
     )
     indices = [0]
     if has_media:
@@ -138,7 +144,7 @@ def _source_variant_orders(roles: RoleModel) -> dict[int, int]:
     orders = {0: 0}
     for variant_index, role_set in (
         (1, {RoleKind.HERO_MEDIA, RoleKind.LOGO, RoleKind.IMAGE}),
-        (2, {RoleKind.HEADLINE, RoleKind.SUPPORTING_TEXT, RoleKind.CTA, RoleKind.TEXT}),
+        (2, {RoleKind.HEADLINE, RoleKind.SUPPORTING_TEXT, RoleKind.CTA, RoleKind.BADGE, RoleKind.TEXT}),
     ):
         positions = [
             assignment.index

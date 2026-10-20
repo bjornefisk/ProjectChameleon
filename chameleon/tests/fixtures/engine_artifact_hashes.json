@@ -43,11 +43,11 @@
       }
     },
     "darwin-arm64": {
-      "observed_on": "Local macOS arm64 run with the repository .venv (pinned dependency versions); repeated runs and different PYTHONHASHSEED values were byte-identical. Level 2 JSON differs from Linux because Skia glyph advances are fractional on macOS and hinted integers on Linux, which changes the largest fitting text font size.",
+      "observed_on": "Local macOS arm64 run with the repository .venv after source-role emphasis variants; repeated runs and different PYTHONHASHSEED values were byte-identical. Level 2 JSON differs from Linux because Skia glyph advances are fractional on macOS and hinted integers on Linux, which changes the largest fitting text font size.",
       "artifacts": {
         "chameleon_sample_level1_warmup": {
-          "json_sha256": "237a8a9eeeeae02ab954bf820fc0294b2501890097c390b3bb6c0c148d2744ba",
-          "png_sha256": "e04df5d20fb99784765fe3dc5d67268b73c34e7ac7a8c631b4907117f3ff4b9e"
+          "json_sha256": "7b93fdfd44ad8e669c00aeae3a8e96931f85a761a60e67cc31d2bb02b10853b9",
+          "png_sha256": "f8d171f1fc9866acef85f587039c86f372ce0a2d1d48f8bc3dd20fbe98bf8c00"
         },
         "chameleon_sample_level2_core": {
           "json_sha256": "9618cc72bfde603d505fbfcff646f797b219cb2644484b93d815a8bd1ef8c2e4",
