@@ -262,6 +262,75 @@ class SearchRankingTests(unittest.TestCase):
             [(topology, 0) for topology in TOPOLOGY_ORDER],
         )
 
+    def test_role_variants_change_role_relevant_geometry(self):
+        source = {
+            "canvas": {"width": 400, "height": 300},
+            "elements": [
+                {
+                    "id": "bg",
+                    "type": "image",
+                    "x": 0,
+                    "y": 0,
+                    "width": 400,
+                    "height": 300,
+                    "asset_id": "background.png",
+                    "fit": "cover",
+                },
+                {
+                    "id": "hero",
+                    "type": "image",
+                    "x": 40,
+                    "y": 80,
+                    "width": 100,
+                    "height": 100,
+                    "asset_id": "hero.png",
+                    "fit": "contain",
+                },
+                {
+                    "id": "headline",
+                    "type": "text",
+                    "x": 220,
+                    "y": 80,
+                    "width": 120,
+                    "height": 40,
+                    "content": "Headline",
+                    "font_family": "Solstice Sans",
+                    "font_size": 20,
+                    "color": "rgba(255,255,255,1)",
+                },
+            ],
+        }
+        base = {
+            "canvas": {"width": 600, "height": 300},
+            "elements": [
+                {**source["elements"][0], "x": 0, "y": 0, "width": 600, "height": 300},
+                {**source["elements"][1], "x": 80, "y": 100, "width": 120, "height": 120},
+                {**source["elements"][2], "x": 340, "y": 100, "width": 180, "height": 50},
+            ],
+        }
+        roles = infer_roles(source)
+        media = _derive_variant_response(
+            base,
+            source,
+            base["canvas"],
+            roles,
+            CandidateSpec("near_isomorphic", "dominant_media", 0, 1, 1, 1),
+        )
+        copy = _derive_variant_response(
+            base,
+            source,
+            base["canvas"],
+            roles,
+            CandidateSpec("near_isomorphic", "dominant_copy", 0, 2, 2, 2),
+        )
+
+        self.assertGreater(media["elements"][1]["width"], base["elements"][1]["width"])
+        self.assertGreater(media["elements"][1]["height"], base["elements"][1]["height"])
+        self.assertGreater(copy["elements"][2]["width"], base["elements"][2]["width"])
+        self.assertGreater(copy["elements"][2]["height"], base["elements"][2]["height"])
+        self.assertGreater(copy["elements"][2]["font_size"], base["elements"][2]["font_size"])
+        self.assertEqual(media["elements"][2]["width"], base["elements"][2]["width"])
+
     def test_ranker_uses_fixed_point_quality_and_stable_ties(self):
         quality = QualityScore(readability=900, balance=800, alignment=700, hierarchy=600)
         self.assertTrue(all(type(value) is int for value in quality.as_tuple()))
