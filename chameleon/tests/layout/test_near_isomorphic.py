@@ -56,7 +56,7 @@ class NearIsomorphicTests(unittest.TestCase):
         task = json.loads(
             (ROOT / "input" / "chameleon_sample_level1_warmup.json").read_text()
         )
-        response = solve_near_isomorphic(task["source"], task["target_canvas"])
+        response = solve_near_isomorphic(task["source"], task["target_canvas"]).response
         self.assertEqual(response["canvas"], task["target_canvas"])
         self.assertEqual(response["elements"][0]["x"], 0)
         self.assertEqual(response["elements"][0]["y"], 0)
@@ -91,7 +91,7 @@ class NearIsomorphicTests(unittest.TestCase):
                 },
             ],
         }
-        response = solve_near_isomorphic(source, source["canvas"])
+        response = solve_near_isomorphic(source, source["canvas"]).response
         self.assertEqual(
             response["elements"][0]["x"],
             0,
@@ -130,7 +130,7 @@ class NearIsomorphicTests(unittest.TestCase):
         }
 
         target_canvas = {"width": 100, "height": 150}
-        response = solve_near_isomorphic(source, target_canvas)
+        response = solve_near_isomorphic(source, target_canvas).response
 
         validate_response(source, target_canvas, response)
         background, label = response["elements"]
@@ -194,7 +194,7 @@ class NearIsomorphicTests(unittest.TestCase):
             ],
         }
 
-        response = solve_near_isomorphic(source, {"width": 200, "height": 100})
+        response = solve_near_isomorphic(source, {"width": 200, "height": 100}).response
 
         validate_response(source, {"width": 200, "height": 100}, response)
         self.assertEqual(response["elements"][0]["x"], -10)
@@ -228,7 +228,7 @@ class NearIsomorphicTests(unittest.TestCase):
             ],
         }
 
-        response = solve_near_isomorphic(source, {"width": 80, "height": 80})
+        response = solve_near_isomorphic(source, {"width": 80, "height": 80}).response
 
         validate_response(source, {"width": 80, "height": 80}, response)
         self.assertEqual(response["elements"][0]["width"], 1)
@@ -241,7 +241,7 @@ class NearIsomorphicTests(unittest.TestCase):
             parse_float=Decimal,
         )
 
-        response = solve_near_isomorphic(task["source"], task["target_canvas"])
+        response = solve_near_isomorphic(task["source"], task["target_canvas"]).response
 
         validate_response(task["source"], task["target_canvas"], response)
 
@@ -266,7 +266,7 @@ class NearIsomorphicTests(unittest.TestCase):
             source,
             {"width": 200, "height": 200},
             font_manager=manager,
-        )
+        ).response
 
         self.assertLessEqual(response["elements"][0]["font_size"], 5)
 
@@ -320,7 +320,7 @@ class NearIsomorphicTests(unittest.TestCase):
             source,
             source["canvas"],
             font_manager=manager,
-        )
+        ).response
 
         self.assertEqual(response["elements"][0]["font_size"], 11)
 
@@ -353,7 +353,7 @@ class NearIsomorphicTests(unittest.TestCase):
                 source["canvas"],
                 font_manager=manager,
                 fonts_dir=str(FONTS),
-            )
+            ).response
 
         self.assertEqual(response["elements"][0]["font_family"], "Custom Family")
 
@@ -401,7 +401,7 @@ class NearIsomorphicTests(unittest.TestCase):
                 }
             ],
         }
-        response = solve_near_isomorphic(source, {"width": 180, "height": 120})
+        response = solve_near_isomorphic(source, {"width": 180, "height": 120}).response
         element = response["elements"][0]
         self.assertEqual(reduced_ratio(element["width"], element["height"]), (2, 1))
         self.assertGreater(element["width"], 0)
@@ -425,7 +425,7 @@ class NearIsomorphicTests(unittest.TestCase):
             ],
         }
         before = copy.deepcopy(source)
-        response = solve_near_isomorphic(source, {"width": 120, "height": 80})
+        response = solve_near_isomorphic(source, {"width": 120, "height": 80}).response
         self.assertEqual(source, before)
         self.assertEqual(response["elements"][0]["_extension"], {"keep": True})
         self.assertEqual(response["elements"][0]["id"], "shape")
@@ -453,7 +453,7 @@ class NearIsomorphicTests(unittest.TestCase):
             source,
             {"width": 200, "height": 200},
             font_manager=manager,
-        )
+        ).response
 
         self.assertEqual(response["elements"][0]["font_size"], 8)
     def test_text_measurement_selects_smaller_fitting_integer(self):
@@ -462,7 +462,7 @@ class NearIsomorphicTests(unittest.TestCase):
             "elements": [text_element(x=10, y=10, width=45, height=40, content="WWWW", font_size=20, text_align="center")],
         }
         manager = load_brand_font_manager(str(FONTS))
-        response = solve_near_isomorphic(source, source["canvas"], font_manager=manager)
+        response = solve_near_isomorphic(source, source["canvas"], font_manager=manager).response
         self.assertGreaterEqual(response["elements"][0]["font_size"], 1)
         self.assertLess(response["elements"][0]["font_size"], source["elements"][0]["font_size"])
 
@@ -494,7 +494,7 @@ class NearIsomorphicTests(unittest.TestCase):
             ],
         }
 
-        response = solve_near_isomorphic(source, {"width": 2, "height": 1})
+        response = solve_near_isomorphic(source, {"width": 2, "height": 1}).response
 
         validate_response(source, {"width": 2, "height": 1}, response)
         self.assertEqual(

@@ -19,6 +19,7 @@ from ..contract import validate_response, validate_source, validate_target_canva
 from ..errors import InfeasibleLayoutError, InfeasibleReasonCode, TaskStatus
 from ..geometry.bounds import rotated_aabb, source_bleed_sides
 from ..geometry.math_util import quantize_to_int, to_fraction
+from .candidate import RenderedCandidate
 from .column_pivot import is_column_pivot_suitable, solve_column_pivot
 from .horizontal_ribbon import is_horizontal_ribbon_suitable, solve_horizontal_ribbon
 from .near_isomorphic import solve_near_isomorphic
@@ -98,7 +99,7 @@ class SearchResult:
 
 # Kept as a discoverable seam for tests and future topology additions.  Values
 # are imported solver functions and are never reordered at runtime.
-_TOPOLOGY_SOLVERS: tuple[Callable[..., Mapping[str, Any]], ...] = (
+_TOPOLOGY_SOLVERS: tuple[Callable[..., RenderedCandidate], ...] = (
     solve_near_isomorphic,
     solve_column_pivot,
     solve_horizontal_ribbon,
@@ -335,7 +336,7 @@ def _invoke_solver(
     font_manager: Any,
     fonts_dir: str | Path | None,
     assets_dir: str | Path | None,
-) -> Mapping[str, Any]:
+) -> RenderedCandidate:
     solver = _TOPOLOGY_SOLVERS[spec.topology_order]
     kwargs: dict[str, Any] = {
         "font_manager": font_manager,
@@ -346,10 +347,10 @@ def _invoke_solver(
         kwargs["roles"] = roles
     # Every solver receives private copies: a topology implementation cannot
     # mutate caller-owned source data or leak mutations between variants.
-    response = solver(deepcopy(source), deepcopy(target_canvas), **kwargs)
-    if not isinstance(response, Mapping):
-        raise ValueError("topology solver did not return a design mapping")
-    return response
+    result = solver(deepcopy(source), deepcopy(target_canvas), **kwargs)
+    if not isinstance(result, RenderedCandidate):
+        raise TypeError("topology solver did not return a rendered candidate")
+    return result
 
 
 def search(
@@ -380,13 +381,15 @@ def search(
     cutoff = limit < len(specs)
     admitted: list[Candidate] = []
     failures: list[dict[str, Any]] = []
-    base_responses: dict[str, Mapping[str, Any]] = {}
+    base_candidates: dict[str, RenderedCandidate] = {}
     saw_incomplete = False
 
     for spec in specs[:limit]:
         try:
+            rendered_png: bytes
+            warnings: tuple[str, ...]
             if spec.variant_index == 0:
-                response = _invoke_solver(
+                solver_candidate = _invoke_solver(
                     spec,
                     source,
                     target_canvas,
@@ -395,9 +398,12 @@ def search(
                     fonts_dir=fonts_dir,
                     assets_dir=assets_dir,
                 )
-                base_responses[spec.topology] = response
+                base_candidates[spec.topology] = solver_candidate
+                response = solver_candidate.response
+                rendered_png = solver_candidate.rendered_png
+                warnings = solver_candidate.warnings
             else:
-                base = base_responses.get(spec.topology)
+                base = base_candidates.get(spec.topology)
                 if base is None:
                     saw_incomplete = True
                     failures.append(
@@ -411,23 +417,26 @@ def search(
                     )
                     continue
                 response = _derive_variant_response(
-                    base,
+                    base.response,
                     source,
                     target_canvas,
                     roles,
                     spec,
                 )
-            # Reject serialized structural failures before spending renderer
-            # work.  The renderer then supplies the actual text/glyph gate.
+            # The centralized semantic gate remains authoritative and runs
+            # before rendering every derived response.
             validate_response(source, target_canvas, response)
-            rendered_png, warnings = _render_candidate(
-                response,
-                assets_dir=assets_dir,
-                fonts_dir=fonts_dir,
-                font_manager=font_manager,
-            )
-            # Re-read the candidate at the renderer boundary as an explicit
-            # post-serialization hard gate before fixed-point scoring.
+            if spec.variant_index != 0:
+                rendered_png, warnings = _render_candidate(
+                    response,
+                    assets_dir=assets_dir,
+                    fonts_dir=fonts_dir,
+                    font_manager=font_manager,
+                )
+            # Re-read the serialized response after the solver or derived
+            # render boundary before fixed-point scoring.  The bytes for the
+            # base variant came from the solver; derived bytes were rendered
+            # exactly once above.
             validate_response(source, target_canvas, response)
             quality = score_candidate(source, response, rendered_png, roles=roles)
             admitted.append(

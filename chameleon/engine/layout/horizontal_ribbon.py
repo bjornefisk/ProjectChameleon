@@ -28,6 +28,7 @@ from .near_isomorphic import (
     _render_candidate,
     _smallest_integral_scale,
 )
+from .candidate import RenderedCandidate
 from .roles import RoleModel, infer_roles
 
 _GEOMETRY_FIELDS = ("x", "y", "width", "height")
@@ -608,14 +609,18 @@ def generate_horizontal_ribbon_candidate(
     font_manager=None,
     fonts_dir: str | None = None,
     assets_dir: str | None = None,
-) -> dict[str, Any]:
+) -> RenderedCandidate:
     validate_source(source)
     validate_target_canvas(target_canvas)
     if not is_horizontal_ribbon_suitable(source, target_canvas):
         _fail("source and target proportions do not support a horizontal ribbon")
     response = _build_extreme_candidate(source, target_canvas, font_manager=font_manager, fonts_dir=fonts_dir)
-    _render_candidate(response, assets_dir, fonts_dir, font_manager)
-    return response
+    rendered_png, warnings = _render_candidate(response, assets_dir, fonts_dir, font_manager)
+    return RenderedCandidate(
+        response=response,
+        rendered_png=rendered_png,
+        warnings=warnings,
+    )
 
 
 solve_horizontal_ribbon = generate_horizontal_ribbon_candidate

@@ -184,7 +184,7 @@ class Level2IntegrationTests(unittest.TestCase):
         failures = raised.exception.details["failures"]
         self.assertEqual(
             {failure["topology"] for failure in failures},
-            {"column_pivot", "horizontal_ribbon", "near_isomorphic"},
+            {"column_pivot", "near_isomorphic"},
         )
         self.assertTrue(
             all(

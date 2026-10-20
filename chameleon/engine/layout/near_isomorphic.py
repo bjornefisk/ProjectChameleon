@@ -31,6 +31,7 @@ from ..geometry.bounds import (
 )
 from ..geometry.math_util import quantize_to_int, to_fraction
 from ..geometry.ratios import reduced_ratio
+from .candidate import RenderedCandidate
 
 
 @lru_cache(maxsize=1)
@@ -601,24 +602,25 @@ def _render_candidate(
     assets_dir: str | None,
     fonts_dir: str | None,
     font_manager,
-) -> bytes:
+) -> tuple[bytes, tuple[str, ...]]:
     _, _, render_candidate_to_png, _ = _renderer_components()
     resolved_assets_dir = assets_dir or str(Path(__file__).resolve().parents[2] / "brand_kit" / "assets")
     resolved_fonts_dir = fonts_dir or str(Path(__file__).resolve().parents[2] / "brand_kit" / "fonts")
     with TemporaryDirectory(prefix=".chameleon-layout-") as directory:
         png_path = Path(directory) / "candidate.png"
-        warnings = render_candidate_to_png(
+        raw_warnings = render_candidate_to_png(
             dict(response),
             resolved_assets_dir,
             png_path,
             fonts_dir=resolved_fonts_dir,
             font_manager=font_manager,
         )
-        for warning in warnings or []:
+        warnings = tuple(str(warning) for warning in raw_warnings or [])
+        for warning in warnings:
             logger.warning("renderer warning: %r", warning)
         with Image.open(png_path) as image:
             image.verify()
-        return png_path.read_bytes()
+        return png_path.read_bytes(), warnings
 
 
 def _preferred_font_size(source_size: Fraction, scale: Fraction) -> int:
@@ -642,7 +644,7 @@ def solve_near_isomorphic(
     font_manager=None,
     fonts_dir: str | None = None,
     assets_dir: str | None = None,
-) -> dict[str, Any]:
+) -> RenderedCandidate:
     """Return one hard-safe, centered near-isomorphic candidate.
 
     Source mappings are shallow-copied at every preserved level; no source
@@ -775,8 +777,12 @@ def solve_near_isomorphic(
             reason=error.message,
             details=error.details,
         )
-    _render_candidate(response, assets_dir, fonts_dir, font_manager)
-    return response
+    rendered_png, warnings = _render_candidate(response, assets_dir, fonts_dir, font_manager)
+    return RenderedCandidate(
+        response=response,
+        rendered_png=rendered_png,
+        warnings=warnings,
+    )
 
 
 __all__ = ["solve_near_isomorphic"]

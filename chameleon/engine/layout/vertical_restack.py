@@ -14,6 +14,7 @@ from .horizontal_ribbon import (
     _fail,
     _render_candidate,
 )
+from .candidate import RenderedCandidate
 from .roles import infer_roles
 
 
@@ -51,7 +52,7 @@ def generate_vertical_restack_candidate(
     font_manager=None,
     fonts_dir: str | None = None,
     assets_dir: str | None = None,
-) -> dict[str, Any]:
+) -> RenderedCandidate:
     validate_source(source)
     validate_target_canvas(target_canvas)
     if not is_vertical_restack_suitable(source, target_canvas):
@@ -63,8 +64,12 @@ def generate_vertical_restack_candidate(
         font_manager=font_manager,
         fonts_dir=fonts_dir,
     )
-    _render_candidate(response, assets_dir, fonts_dir, font_manager)
-    return response
+    rendered_png, warnings = _render_candidate(response, assets_dir, fonts_dir, font_manager)
+    return RenderedCandidate(
+        response=response,
+        rendered_png=rendered_png,
+        warnings=warnings,
+    )
 
 
 solve_vertical_restack = generate_vertical_restack_candidate

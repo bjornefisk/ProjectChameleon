@@ -22,6 +22,7 @@ from .near_isomorphic import (
     _preferred_font_size,
     _smallest_integral_scale,
 )
+from .candidate import RenderedCandidate
 from .roles import RoleKind, RoleModel, infer_roles
 
 _GEOMETRY_FIELDS = ("x", "y", "width", "height")
@@ -398,7 +399,7 @@ def generate_column_pivot_candidate(
     fonts_dir: str | None = None,
     assets_dir: str | None = None,
     roles: RoleModel | None = None,
-) -> dict[str, Any]:
+) -> RenderedCandidate:
     """Generate and serialize one source-aware column-pivot candidate."""
 
     validate_source(source)
@@ -413,9 +414,13 @@ def generate_column_pivot_candidate(
         font_manager=font_manager,
         fonts_dir=fonts_dir,
     )
-    _render_candidate(response, assets_dir, fonts_dir, font_manager)
+    rendered_png, warnings = _render_candidate(response, assets_dir, fonts_dir, font_manager)
     validate_response(source, target_canvas, response)
-    return response
+    return RenderedCandidate(
+        response=response,
+        rendered_png=rendered_png,
+        warnings=warnings,
+    )
 
 
 def solve_column_pivot(
@@ -426,7 +431,7 @@ def solve_column_pivot(
     fonts_dir: str | None = None,
     assets_dir: str | None = None,
     roles: RoleModel | None = None,
-) -> dict[str, Any]:
+) -> RenderedCandidate:
     validate_source(source)
     validate_target_canvas(target_canvas)
     model = roles or infer_roles(source)
@@ -439,9 +444,13 @@ def solve_column_pivot(
         font_manager=font_manager,
         fonts_dir=fonts_dir,
     )
-    _render_candidate(response, assets_dir, fonts_dir, font_manager)
+    rendered_png, warnings = _render_candidate(response, assets_dir, fonts_dir, font_manager)
     validate_response(source, target_canvas, response)
-    return response
+    return RenderedCandidate(
+        response=response,
+        rendered_png=rendered_png,
+        warnings=warnings,
+    )
 
 
 # Short alias for callers that treat topology families as candidate functions.
