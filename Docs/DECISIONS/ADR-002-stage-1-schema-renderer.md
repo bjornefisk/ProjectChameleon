@@ -10,7 +10,7 @@ Accepted
 
 ## Context
 
-`chameleon_design_schema_v0.9.json` is the only schema but calls itself provisional. It permits empty-coordinate ambiguity, does not enforce semantic identity or ratios, and describes `max_lines` behavior that the adapter does not implement. The upstream renderer consumes an internal explicit line map, while the project adapter performs its own wrapping. The dependency currently follows a moving Git branch.
+At the time of this decision, `chameleon_design_schema_v0.9.json` was the only schema but called itself provisional. It permitted empty-coordinate ambiguity, did not enforce semantic identity or ratios, and described `max_lines` behavior that the adapter did not implement. The upstream renderer consumed an internal explicit line map, while the project adapter performed its own wrapping. The dependency followed a moving Git branch.
 
 ## Decision
 
@@ -21,7 +21,7 @@ Accepted
 5. Keep external style-run indices end-exclusive. The adapter must convert them to the upstream renderer's inclusive internal line-map ranges. Wrapping is adapter behavior; upstream `cr-renderer` itself does not width-wrap.
 6. Renderer conformance includes measured glyph widths, style-run face changes, letter spacing, line height, max-lines, height, actual glyph bounds, explicit newlines, and deterministic unbreakable-word failure. It never changes JSON text content.
 
-The current adapter's inclusive style-run loop, spacing omission, style-width omission, and ignored `max_lines`/height are recorded as conformance gaps. They do not redefine the contract.
+**Historical pre-implementation note (superseded):** at acceptance, the adapter's inclusive style-run loop, spacing omission, style-width omission, and ignored `max_lines`/height were recorded as conformance gaps. They did not redefine the contract. The bounded local adapter now implements the corresponding style-run, spacing, line-count/height, glyph-bound, and in-box-stroke behavior in `chameleon/renderer/converter/wrap.py`, `convert.py`, and `shapes.py`, with focused evidence in `chameleon/tests/renderer/test_renderer_conformance.py`; this does not claim full qualification.
 
 ## Alternatives considered
 
@@ -35,7 +35,7 @@ Rejected. The project adapter supplies font bytes, fit preprocessing, shape rast
 
 ### Adopt the current adapter as-is
 
-Rejected. Its behavior conflicts with the schema's end-exclusive ranges and the required typography measurements.
+**Historical pre-implementation alternative:** rejected at acceptance. Its then-current behavior conflicted with the schema's end-exclusive ranges and the required typography measurements.
 
 ### Add a public line-map field now
 
@@ -45,8 +45,8 @@ Rejected. The current task schema does not expose one. The adapter owns determin
 
 - Renderer behavior is reproducible only when the VCS revision and compatibility pins stay fixed.
 - The response can preserve source JSON while the adapter uses transient newline and line-map data.
-- Renderer conformance work is required before the solver can claim typography correctness.
-- Rectangle/ellipse stroke fields remain fixed schema data even though the current raster adapter ignores their visual stroke; this gap must be resolved or explicitly removed in a future ADR.
+- Historical consequence: renderer conformance work was required before typography correctness could be claimed. The bounded implementation now supplies that local behavior, while qualification and external runtime evidence remain separate gates.
+- Historical gap note superseded by the bounded in-box stroke implementation; rectangle/ellipse stroke fields remain fixed schema data and the normative decision is unchanged.
 
 ## Affected files/schema fields
 

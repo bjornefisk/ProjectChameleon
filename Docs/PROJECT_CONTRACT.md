@@ -1,6 +1,6 @@
 # Project Chameleon Project Contract
 
-**Status:** Accepted pre-implementation Stage 1 contract; implementation and qualification pending
+**Status:** Accepted Stage 1 contract; bounded implementation is present, and qualification remains pending
 
 **Contract version:** 1.0
 
@@ -8,7 +8,7 @@
 
 **Ratified:** 2026-10-06
 
-This document is the normative behavioral contract for the autonomous Stage 1 retargeting engine. It resolves conflicts in the earlier design notes and starter comments. It does not describe an implementation and does not make the current `engine/resize.py` baseline conforming.
+This document is the normative behavioral contract for the autonomous Stage 1 retargeting engine. It resolves conflicts in the earlier design notes and starter comments. It defines behavior, not implementation status; current implementation and qualification evidence are recorded in `STATUS.md` and the implementation ticket evidence.
 
 ## 1. Scope
 
@@ -30,7 +30,7 @@ Use the following precedence. A lower item never silently overrides a higher ite
 4. The challenge brief and `chameleon/RULES.md` for organizer-supplied scoring and submission restrictions, as clarified by this contract.
 5. The sample inputs as conformance fixtures, not as authority for undocumented behavior.
 6. Other `Docs/*.md` architecture and roadmap documents as proposed design guidance.
-7. Starter implementation, comments, and warning-only self-checks. `engine/resize.py` is explicitly a deliberately incorrect baseline.
+7. Starter comments and warning-only self-checks; implementation artifacts and local tests are evidence, not authority.
 
 If two normative artifacts disagree, update the lower artifact or write a superseding ADR. Do not choose whichever document was read last.
 
@@ -213,17 +213,17 @@ The finale may wrap the engine in an Adobe Express add-on and may explore user-a
 | Requirement | Contract/ADR | Structural or semantic rule | Conformance evidence | Implementation status |
 | --- | --- | --- | --- | --- |
 | Authority hierarchy | ADR-001 | This document's precedence list | `PROJECT_CONTRACT.md` §2 | Ratified |
-| Exact mutable fields and identity | ADR-002 | §5 plus schema required fields | Planned identity-mutation validator cases | Baseline intentionally nonconformant |
-| Empty designs and source degenerates | ADR-003 | Schema `elements.minItems=0`; no new zero-size records | `empty_design.json`, planned empty/degenerate cases | Ratified; solver pending |
-| Rotated containment and bleed | ADR-003 | §7 AABB and source-bleed predicate | `offcanvas_decoration.json`, planned rotation cases | Validator/solver pending |
-| Foreground image ratios | ADR-003 | Cross-product equality after rounding | `image_ratio.json`, planned ratio cases | Validator/solver pending |
-| Renderer/text semantics | ADR-002 | §6 and pinned source revision | `style_run_boundary.json`, renderer conformance matrix | Adapter gaps open |
-| Infeasible target behavior | ADR-003 | Typed failure, no misleading output | `infeasible_target.json`, runner integration evidence | Runner fail-closed path implemented; solver search pending |
+| Exact mutable fields and identity | ADR-002 | §5 plus schema required fields | `chameleon/tests/contract/test_contract.py` identity, immutable-field, and serialization cases | Validator implemented and regression-covered; qualification remains evidence-scoped |
+| Empty designs and source degenerates | ADR-003 | Schema `elements.minItems=0`; no new zero-size records | `chameleon/tests/contract/test_contract.py` empty/degenerate cases | Validator and bounded solver behavior implemented; broader qualification remains pending |
+| Rotated containment and bleed | ADR-003 | §7 AABB and source-bleed predicate | `chameleon/tests/contract/test_contract.py` rotated containment and bleed cases | Geometry and validator implemented and regression-covered; solver qualification remains bounded |
+| Foreground image ratios | ADR-003 | Cross-product equality after rounding | `chameleon/tests/contract/test_contract.py` exact image-ratio cases | Exact ratio validator and bounded solver handling implemented; broader qualification remains pending |
+| Renderer/text semantics | ADR-002 | §6 and pinned source revision | `chameleon/tests/renderer/test_renderer_conformance.py`, `test_renderer_golden.py`, `style_run_boundary.json` | Adapter behavior implemented and locally regression-covered; native/parity qualification remains partially unverified |
+| Infeasible target behavior | ADR-003 | Typed failure, no misleading output | `chameleon/tests/runner/test_runner.py`, layout failure cases | Runner fail-closed path and bounded search status handling implemented; public Level 3 and broader qualification remain open |
 | Offline runtime and platform | ADR-004 | Docker/request pins and network rule | Docker/buildx smoke plan in `STATUS.md` | Buildx smoke completed; native-amd64 qualification pending |
 | Stage split | ADR-005 | §10 | Stage boundary review | Ratified |
-| Failure protocol and search status | ADR-006 | Typed internal statuses; no failure envelope; no failed-task artifacts; logical JSON/PNG pair publication; conservative cutoff semantics; nonzero aggregate failure | `tests/runner/test_runner.py` publication/failure cases | Runner staging, cleanup, status, and aggregate exit implemented; cutoff semantics pending |
-| Numeric and geometry semantics | ADR-007 | Exact rational ingress; one half-even serialization; reduced image-ratio lattice; rigid group transform; AABB and positive-area overlap rules | Runner exact-ingress/serialization cases; geometry fixtures | Runner ingress and serialization implemented; geometry/search pending |
-| Typography and renderer edge semantics | ADR-008 | Grapheme-safe UAX #14/UAX #29 wrapping; style-run semantics; effective span metrics; overflow rejection; in-box strokes; no public line map | Planned renderer conformance matrix | Adapter gaps open |
-| Initial deterministic search | ADR-009 | Four topology families, bounded source-derived variants, renderer-in-loop validation, fixed-point ranking, no model/CP-SAT initially | Planned held-out search evaluation | Search not started |
+| Failure protocol and search status | ADR-006 | Typed internal statuses; no failure envelope; no failed-task artifacts; logical JSON/PNG pair publication; conservative cutoff semantics; nonzero aggregate failure | `chameleon/tests/runner/test_runner.py` publication/failure cases; `chameleon/tests/layout/test_search_ranking.py` and `test_level3.py` status cases | Runner staging, cleanup, pair publication, and bounded cutoff/exhaustion status handling implemented; full runtime qualification pending |
+| Numeric and geometry semantics | ADR-007 | Exact rational ingress; one half-even serialization; reduced image-ratio lattice; rigid group transform; AABB and positive-area overlap rules | Runner exact-ingress/serialization cases; geometry and contract fixtures | Exact ingress, geometry predicates, and serialized validation implemented; broader solver/runtime qualification remains open |
+| Typography and renderer edge semantics | ADR-008 | Grapheme-safe UAX #14/UAX #29 wrapping; style-run semantics; effective span metrics; overflow rejection; in-box strokes; no public line map | `chameleon/tests/renderer/test_renderer_conformance.py`, `test_renderer_golden.py` | Adapter behavior implemented and locally regression-covered; native-amd64/repeated-render qualification remains unverified |
+| Initial deterministic search | ADR-009 | Four topology families, bounded source-derived variants, renderer-in-loop validation, fixed-point ranking, no model/CP-SAT initially | `chameleon/tests/layout/test_search_ranking.py`, `test_level3.py`; Ticket 08 evidence | Bounded four-family search and fixed-point ranking implemented; held-out evaluation and public Level 3 qualification remain pending |
 
 The source-driven verification record and external URLs are in [DEPENDENCY_EVIDENCE.md](DEPENDENCY_EVIDENCE.md). Current implementation gaps are tracked in [STATUS.md](STATUS.md).

@@ -1,10 +1,11 @@
 # Project Chameleon implementation specification
 
-**Status:** Ready for Gate 1 implementation; solver and model work remain blocked until Gate 1 evidence.
+**Status:** Bounded Stage 1 implementation present; public Level 3 remains typed `INCOMPLETE_SEARCH` where the bounded search cannot complete, and native-amd64/parity/held-out/performance qualification remains open.
 **Date:** 2026-10-06
 **Normative Authority:** [`../PROJECT_CONTRACT.md`](../PROJECT_CONTRACT.md) and [`../DECISIONS/`](../DECISIONS/) (ADR-001 through ADR-009)
 
 **Consolidated architecture:** [`../FINAL_ARCHITECTURE.md`](../FINAL_ARCHITECTURE.md) summarizes the implementation boundary and remains subordinate to the contract and Accepted ADRs.
+**Implementation boundary:** This specification distinguishes the implemented bounded modules from the broader target architecture. The contract and Accepted ADRs remain authoritative; module presence is not evidence of complete qualification.
 
 ---
 
@@ -23,9 +24,9 @@ Naive programs stretch the picture; good ones move the furniture. The challenge 
 
 ---
 
-## Solution
+## Target architecture
 
-A deterministic, renderer-aware adaptive layout engine that separates macro-topology selection from coordinate solving and micro-typography optimization:
+A deterministic, renderer-aware adaptive layout engine separates macro-topology selection from coordinate solving and micro-typography optimization. The bounded implementation covers the contract validator, renderer adapter, exact geometry, bounded topology dispatch, renderer-gated candidate search, fixed-point ranking, and staged publication. Broader qualification and difficult-target coverage remain open:
 
 1. **Ingest & validate:** Parse the input task JSON using exact rational arithmetic (`fractions.Fraction` / `decimal.Decimal`) to prevent floating-point drift.
 2. **Infer roles & intent:** Compute a scene graph of element roles (background, brand lockup, product hero, primary text, supporting text, button/badge containers, decorative shapes) using multi-signal geometric heuristics (coverage, layer index, fit mode, opacity, content type) without requiring semantic labels.
@@ -74,45 +75,40 @@ A deterministic, renderer-aware adaptive layout engine that separates macro-topo
 ## Implementation decisions
 
 ### Module breakdown
-1. **`chameleon/engine/errors.py`:**
-   - Defines `InfeasibleReasonCode` enum: `INVALID_SOURCE`, `INVALID_TARGET`, `MALFORMED_INPUT`, `IMMUTABLE_FIELD_CHANGED`, `CONTAINMENT_VIOLATION`, `IMAGE_RATIO_VIOLATION`, `GROUP_VIOLATION`, `SOURCE_SEPARATION_VIOLATION`, `TEXT_OVERFLOW`, `NO_HARD_VALID_CANDIDATE`, `INCOMPLETE_SEARCH`.
-   - Defines `InfeasibleLayoutError(reason_code, message, details)`.
-2. **`chameleon/engine/contract.py`:**
-   - Standalone semantic validator: `validate_source(source)`, `validate_response(source, target_canvas, response)`.
-   - Checks IDs, count, order, types, immutable fields, integer geometry, rotated AABB containment, foreground image cross-product ratio equality, group integrity, and source-separated non-collision.
-3. **`chameleon/renderer/converter/wrap.py` & `convert.py`:**
-   - Updates text wrapping to measure using effective style-run font faces and span-local letter spacing.
-   - Enforces visual line count against `max_lines` (including forced newlines) and element box height.
-   - Implements $[start, end)$ code-point indexing for style runs and converts to upstream inclusive indices.
-   - Updates `shapes.py` to rasterize declared rectangle/ellipse strokes inside the bounding box.
-4. **`chameleon/engine/geometry/`:**
-   - `math_util.py`: Converts parser-owned exact integer/decimal values to `Fraction`, provides deliberate `round-half-even` quantization, and never reconstructs lexical values from binary floats.
-   - `bounds.py`: Rotated axis-aligned bounding box formula $a = |w\cos\theta| + |h\sin\theta|$, $b = |w\sin\theta| + |h\cos\theta|$, containment predicate, source-bleed predicate.
-   - `ratios.py`: Reduced integer lattice point calculation for foreground images.
-   - `groups.py`: Uniform macro-scale and translation vector computation.
-5. **`chameleon/engine/layout/`:**
-   - `roles.py`: Deterministic multi-signal role classifier (background, logo, hero, headline, subhead, cta, badge, decoration).
-   - `topologies.py`: Four archetype generator functions: `generate_near_isomorphic()`, `generate_column_pivot()`, `generate_horizontal_ribbon()`, `generate_vertical_restack()`.
-   - `typography.py`: Binary-search font size optimizer against Skia typeface measurements.
-   - `search.py`: Structured macro-candidate orchestrator generating at most 12 candidates.
-   - `ranking.py`: Fixed-point lexicographic scorer: `(hard_validity, quality_tuple, topology_order, candidate_index, source_order)`.
-6. **`chameleon/engine/staging.py` & `main.py`:**
-   - JSON ingress: `main.py` uses `parse_int=int`, `parse_float=Decimal`, and a rejecting `parse_constant` hook (or an equivalent decoder) before validation and geometry; output serialization emits only contract-approved JSON values.
-   - Task isolation: `run_task(task_path, input_dir, output_dir)`.
-   - Atomic pair publisher: stages `<task>_output.json.tmp` and `<task>_output.png.tmp`, validates both, commits atomically to final names.
-   - Stale artifact cleanup: deletes pre-existing outputs on task failure.
-   - Main runner: loops over input tasks, handles typed exceptions, returns exit code `0` only on total batch success.
 
-### Key data structures
-```text
-TaskEnvelope       = { "source": DesignDocument, "target_canvas": Canvas }
-DesignDocument     = { "canvas": Canvas, "elements": list[Element] }
-Canvas             = { "width": int, "height": int }
-Element            = dict (id, type, x, y, width, height, rotation, opacity, z_index, group_id, ...)
-RotatedAABB        = (min_x: Fraction, min_y: Fraction, max_x: Fraction, max_y: Fraction)
-SceneGraph         = { "roles": dict[str, Role], "groups": dict[str, list[str]], "source_overlaps": set[tuple] }
-LayoutCandidate    = { "topology": str, "variant": str, "elements": list[Element], "report": ValidationReport }
-```
+The following paths are implemented bounded modules unless explicitly marked as a target or qualification boundary:
+
+1. **`chameleon/engine/errors.py`:**
+   - Defines `InfeasibleReasonCode`, including `INCOMPLETE_SEARCH` and `RUNTIME_IO_FAILURE`, plus `InfeasibleLayoutError` and task status values.
+2. **`chameleon/engine/contract.py`:**
+   - Provides `validate_source(source)`, `validate_target_canvas(target_canvas)`, and `validate_response(source, target_canvas, response)`.
+   - Checks identity/order/type preservation, immutable fields, serialized integer geometry, rotated AABB containment, foreground image ratios, group integrity, and source-separated non-collision.
+3. **`chameleon/renderer/converter/`:**
+   - `wrap.py` implements Unicode-safe wrapping, effective style-span measurement, external `[start, end)` handling, line-count/height overflow rejection, and glyph-bound checks.
+   - `convert.py` integrates the adapter and pinned renderer; `shapes.py` rasterizes declared rectangle/ellipse strokes inside the element box; `brand_fonts.py` loads exact packaged faces.
+4. **`chameleon/engine/geometry/`:**
+   - `math_util.py`: Converts parser-owned exact integer/decimal values to `Fraction` and provides deliberate `round-half-even` quantization.
+   - `bounds.py`: Rotated axis-aligned bounding boxes, containment, and source-bleed predicates.
+   - `ratios.py`: Reduced integer lattice point calculation for foreground images.
+   - `groups.py`: Uniform macro-scale and translation-vector computation.
+5. **`chameleon/engine/layout/`:**
+   - `roles.py`: Deterministic multi-signal role and relationship inference.
+   - Bounded topology behavior is split across `near_isomorphic.py`, `column_pivot.py`, `horizontal_ribbon.py`, and `vertical_restack.py`; there is no `topologies.py` compatibility module.
+   - `search.py`: Bounded topology/variant enumeration, renderer/contract gating, and candidate diagnostics (at most 12 candidates).
+   - `ranking.py`: Fixed-point lexicographic scoring and deterministic candidate selection.
+   - There is no separate `typography.py`; bounded text sizing is implemented in the topology/renderer paths and is gated by the renderer.
+6. **`chameleon/engine/resize.py`, `staging.py`, and `main.py`:**
+   - `resize(source, target_canvas)` is the public flat-design seam and delegates to bounded search.
+   - `main.py` decodes exact numeric JSON, validates task envelopes, handles typed failures including `RUNTIME_IO_FAILURE`, and drives independent batch tasks.
+   - `staging.py` validates and publishes JSON/PNG pairs through private task staging and a hash-checked commit marker; failed tasks leave no committed pair.
+
+### Runtime data structures and API boundary
+
+The task envelope and design document remain JSON contract shapes, not public Python data classes. The actual internal search records are `CandidateSpec`, `Candidate`, and `SearchResult` in `chameleon/engine/layout/search.py`; they are not wire fields. The public Python API is `engine.resize.resize(source, target_canvas)`. Task-level loading and publication are runner behavior in `engine.main`/`engine.staging`; there is no `run_task()` API.
+
+### Qualification boundary
+
+The bounded paths are implementation evidence, not complete qualification. Public Level 3 remains typed `INCOMPLETE_SEARCH` where the bounded search does not produce a hard-valid candidate. Native-amd64 qualification, renderer/native parity, held-out evaluation, and performance qualification remain open.
 
 ---
 
@@ -124,7 +120,7 @@ LayoutCandidate    = { "topology": str, "variant": str, "elements": list[Element
 2. **Renderer conversion seam (`renderer.converter`):**  
    Feed synthetic and contract element dictionaries into `convert_chameleon_to_crello` and `wrap_text`. Verify that measured line counts, style-run maps, and glyph bounds strictly match Skia rendering outputs.
 3. **Solver entrypoint seam (`engine.resize`):**  
-   Call `resize(source, target_canvas)` directly with level 1, 2, and 3 fixtures. Verify that returned designs pass full semantic validation and maintain ratio and grouping invariants.
+   Call `resize(source, target_canvas)` directly with level 1 and level 2 fixtures; verify returned designs pass full semantic validation and maintain ratio and grouping invariants. For bounded Level 3 cases that cannot complete, verify the typed `INCOMPLETE_SEARCH` result rather than assuming public Level 3 success.
 4. **End-to-end batch runner seam (`engine.main`):**  
    Execute `python -m engine.main` against fixture directories. Verify exit code, file generation, atomic staging, and stale file cleanup.
 
