@@ -28,6 +28,7 @@ from .near_isomorphic import (
     _render_candidate,
     _smallest_integral_scale,
 )
+from .candidate import RenderedCandidate
 from .roles import RoleModel, infer_roles
 
 _GEOMETRY_FIELDS = ("x", "y", "width", "height")
@@ -128,17 +129,18 @@ def _group_scale(elements: list[Mapping[str, Any]], desired: Fraction) -> Fracti
 
 def _relative_group_boxes(
     elements: list[Mapping[str, Any]], scale: Fraction
-) -> list[tuple[int, int, int, int]]:
+) -> list[tuple[Fraction, Fraction, Fraction, Fraction]]:
+    """Construct exact group-relative geometry; serialization happens later."""
     first_x = to_fraction(elements[0]["x"])
     first_y = to_fraction(elements[0]["y"])
-    boxes: list[tuple[int, int, int, int]] = []
+    boxes: list[tuple[Fraction, Fraction, Fraction, Fraction]] = []
     for element in elements:
         boxes.append(
             (
-                quantize_to_int((to_fraction(element["x"]) - first_x) * scale),
-                quantize_to_int((to_fraction(element["y"]) - first_y) * scale),
-                quantize_to_int(to_fraction(element["width"]) * scale),
-                quantize_to_int(to_fraction(element["height"]) * scale),
+                (to_fraction(element["x"]) - first_x) * scale,
+                (to_fraction(element["y"]) - first_y) * scale,
+                to_fraction(element["width"]) * scale,
+                to_fraction(element["height"]) * scale,
             )
         )
     return boxes
@@ -187,25 +189,25 @@ def _singleton_dimensions(
     *,
     text_dimensions: tuple[int, int] | None = None,
     art_scale: Fraction = Fraction(1),
-) -> tuple[int, int] | None:
+) -> tuple[Fraction, Fraction] | None:
     source_width = to_fraction(element["width"])
     source_height = to_fraction(element["height"])
     if source_width <= 0 or source_height <= 0:
-        return 0, 0
+        return Fraction(0), Fraction(0)
     if element["type"] == "image":
         if axis == "horizontal":
             scale = min(Fraction(1), Fraction(target_height, 1) / to_fraction(source_canvas["height"]))
         else:
             scale = min(Fraction(1), Fraction(target_width, 1) / to_fraction(source_canvas["width"]))
         scale *= art_scale
-        desired_width = max(1, quantize_to_int(source_width * scale))
-        desired_height = max(1, quantize_to_int(source_height * scale))
+        desired_width = max(Fraction(1), source_width * scale)
+        desired_height = max(Fraction(1), source_height * scale)
         return _image_dimensions(element, desired_width, desired_height)
     if element["type"] == "text":
         if text_dimensions is not None:
             return (
-                min(target_width, max(1, text_dimensions[0])),
-                min(target_height, max(1, text_dimensions[1])),
+                Fraction(min(target_width, max(1, text_dimensions[0]))),
+                Fraction(min(target_height, max(1, text_dimensions[1]))),
             )
     if element["type"] == "text":
         if axis == "horizontal":
@@ -217,14 +219,15 @@ def _singleton_dimensions(
         else:
             width = max(8, target_width // 2)
             height = max(12, target_height // max(3, unit_count // 2 + 1))
-        return min(target_width, width), min(target_height, height)
+        return Fraction(min(target_width, width)), Fraction(min(target_height, height))
     if axis == "horizontal":
         scale = min(Fraction(1), Fraction(target_height, 1) / to_fraction(source_canvas["height"]))
     else:
         scale = min(Fraction(1), Fraction(target_width, 1) / to_fraction(source_canvas["width"]))
     scale *= art_scale
-    return max(1, min(target_width, quantize_to_int(source_width * scale))), max(
-        1, min(target_height, quantize_to_int(source_height * scale))
+    return (
+        max(Fraction(1), min(Fraction(target_width), source_width * scale)),
+        max(Fraction(1), min(Fraction(target_height), source_height * scale)),
     )
 
 
@@ -378,6 +381,20 @@ def _valid_plan_placement(
                 if positive_aabb_intersection(new_aabb, old_aabb):
                     return False
     return True
+
+
+def _serialize_extreme_candidate(response: Mapping[str, Any]) -> dict[str, Any]:
+    """Apply the single half-even serialization at the render boundary."""
+
+    serialized = {"canvas": dict(response["canvas"]), "elements": []}
+    for element in response["elements"]:
+        serialized_element = dict(element)
+        for field in _GEOMETRY_FIELDS:
+            serialized_element[field] = quantize_to_int(element[field])
+        if element.get("type") == "text":
+            serialized_element["font_size"] = quantize_to_int(element["font_size"])
+        serialized["elements"].append(serialized_element)
+    return serialized
 
 
 def _build_extreme_candidate(
@@ -584,10 +601,11 @@ def _build_extreme_candidate(
                     response[index]["font_size"] = selected_size
                 if text_failed:
                     continue
-                result = {
+                raw_result = {
                     "canvas": {"width": target_width, "height": target_height},
                     "elements": response,
                 }
+                result = _serialize_extreme_candidate(raw_result)
                 try:
                     validate_response(source, target_canvas, result)
                 except InfeasibleLayoutError:
@@ -608,14 +626,18 @@ def generate_horizontal_ribbon_candidate(
     font_manager=None,
     fonts_dir: str | None = None,
     assets_dir: str | None = None,
-) -> dict[str, Any]:
+) -> RenderedCandidate:
     validate_source(source)
     validate_target_canvas(target_canvas)
     if not is_horizontal_ribbon_suitable(source, target_canvas):
         _fail("source and target proportions do not support a horizontal ribbon")
     response = _build_extreme_candidate(source, target_canvas, font_manager=font_manager, fonts_dir=fonts_dir)
-    _render_candidate(response, assets_dir, fonts_dir, font_manager)
-    return response
+    rendered_png, warnings = _render_candidate(response, assets_dir, fonts_dir, font_manager)
+    return RenderedCandidate(
+        response=response,
+        rendered_png=rendered_png,
+        warnings=warnings,
+    )
 
 
 solve_horizontal_ribbon = generate_horizontal_ribbon_candidate

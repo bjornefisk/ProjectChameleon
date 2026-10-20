@@ -116,9 +116,13 @@ class Level3IntegrationTests(unittest.TestCase):
             resize(source, task["target_canvas"])
         self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.INCOMPLETE_SEARCH)
         self.assertEqual(source, before)
-        failures = raised.exception.details["candidate_failures"]
-        self.assertIn("horizontal_ribbon", failures)
-        self.assertTrue(failures["horizontal_ribbon"]["details"]["search_exhausted"])
+        failures = [
+            failure
+            for failure in raised.exception.details["failures"]
+            if failure["topology"] == "horizontal_ribbon"
+        ]
+        self.assertTrue(failures)
+        self.assertTrue(failures[0]["details"]["search_exhausted"])
 
     def test_horizontal_ribbon_preserves_rotated_groups(self):
         source, target = self._horizontal_fixture()

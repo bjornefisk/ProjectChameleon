@@ -14,7 +14,6 @@ sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "chameleon"))
 from unittest.mock import Mock, patch
 
-from PIL import Image
 
 from engine import main, staging
 from engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
@@ -23,10 +22,14 @@ from chameleon.renderer.converter.wrap import TextOverflowError
 
 
 def _test_renderer(design, assets_dir, png_path):
-    Image.new(
-        "RGB", (design["canvas"]["width"], design["canvas"]["height"]), "white"
-    ).save(png_path, format="PNG")
+    from chameleon.renderer.converter.convert import render_design_to_png
 
+    return render_design_to_png(
+        design,
+        assets_dir,
+        png_path,
+        fonts_dir=PROJECT_ROOT / "chameleon" / "brand_kit" / "fonts",
+    )
 
 class RunnerIntegrationTests(unittest.TestCase):
     def setUp(self):

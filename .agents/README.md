@@ -14,7 +14,7 @@ The source of truth remains:
 6. this operating system;
 7. existing implementation details, fixtures, and external content.
 
-A role MUST surface conflicts instead of silently choosing a lower-priority source. Gate 1 renderer/validator qualification is cleared and PR #14's bounded Ticket 06 source-aware routing and column-pivot implementation is merged. Ticket 07 horizontal-ribbon and vertical-restack work is active; focused/full local evidence covers feasible synthetic candidates while the adversarial Level 3 sample remains a typed fail-closed case pending contract review. Tickets 08, full candidate ranking, and held-out evaluation remain later work. Nothing here authorizes a model, model weights/runtime, CP-SAT, OR-Tools, generated pixels, source-record shedding, invented resource ceilings, runtime network access, or a contract/API/dependency change.
+A role MUST surface conflicts instead of silently choosing a lower-priority source. Gate 1 renderer/validator qualification is cleared; PR #14's bounded Ticket 06 source-aware routing and column-pivot implementation is merged into `main` at commit `58b697a`. Current tree includes exact column-pivot serialization and renderer-aware response text validation; focused/full local evidence and supplemental arm64-host container evidence pass with the documented expected Level 3 failure. Native amd64, cross-platform parity, apt locks, and wheelhouse closure remain unverified. Tickets 07-08, full candidate ranking, and held-out evaluation remain later work. Nothing here authorizes a model, model weights/runtime, CP-SAT, OR-Tools, generated pixels, source-record shedding, invented resource ceilings, runtime network access, or a contract/API/dependency change.
 
 ## Load order
 

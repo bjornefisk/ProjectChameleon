@@ -1,12 +1,14 @@
-# CHAMELEON — starter repo
+# CHAMELEON — Stage 1 engine
 
-This is the scaffolding for the Stage 1 engine. It includes starter input
-loading, output writing, rendering, and Docker packaging. The public function
-is `resize(source, target_canvas) -> target_design`; the batch envelope and
-task-level artifact handling belong to the orchestrator. `engine/resize.py` is
-the starter baseline entry point, but conformance work MAY touch the
-orchestrator and renderer adapter as required by the contract.
-The behavioral source of truth is `../Docs/PROJECT_CONTRACT.md`; Accepted ADRs and the pinned dependency evidence under `../Docs/` resolve ambiguities that this starter README does not.
+This repository contains the bounded, deterministic Stage 1 retargeting engine.
+It includes exact-ingress task loading, source-preserving topology search,
+renderer-aware hard validation, fixed-point ranking, atomic output publication,
+and offline Docker packaging. The public function is
+`resize(source, target_canvas) -> target_design`; the batch envelope and
+task-level artifact handling belong to the orchestrator.
+The behavioral source of truth is `../Docs/PROJECT_CONTRACT.md`; Accepted ADRs
+and the pinned dependency evidence under `../Docs/` resolve implementation
+ambiguities.
 
 ```
 input:  a batch task envelope (source design + target canvas)
@@ -53,31 +55,23 @@ already there — one per difficulty level). Successful tasks write an
 gate: final files without a matching marker are uncommitted and consumers
 must reject them. From the repository root, `make inspect` enforces this gate.
 
-The included baseline is a **uniform stretch** — deliberately the wrong
-approach (see the main brief: "a naive program stretches the picture; a
-good one moves the furniture"). It's there so the pipeline runs on day
-one. Run it once, look at `output/*_output.png`, and you'll see exactly
-why it's not good enough — that's the point. Replace the body of
-`resize()` in `engine/resize.py`, not just its constants.
+The current engine tries four bounded topology families — near-isomorphic,
+column pivot, horizontal ribbon, and vertical restack — with at most three
+source-derived variants per family. Candidates are serialized once, validated
+against the structural and renderer contracts, and ranked only after hard
+validation. A finite cutoff or incomplete topology attempt returns the typed
+`INCOMPLETE_SEARCH` result rather than claiming infeasibility; an exhausted
+finite work set may fail closed as `INFEASIBLE_LAYOUT`.
 
 ## What the self-check does (and doesn't do)
 
-`main.py` runs a quick structural check after every task — same element
-`id`s as the source, required fields present, nothing off-canvas. **This
-is not the official scorer or the contract validator.** It exists to catch
-obvious mistakes before you waste a submission on them. See `RULES.md` and
-`../Docs/PROJECT_CONTRACT.md` for what's actually checked and graded.
-
-The accepted failure protocol is defined by `../Docs/PROJECT_CONTRACT.md`:
-failed tasks publish neither artifact, while successful JSON and PNG are
-staged in a private task directory and exposed with a matching hidden commit
-manifest; the aggregate process status is nonzero if any task fails. Do not
-consume raw `_output.json` files while the runner is still executing. The
-starter baseline may not yet implement every accepted rule, so a warning or
-written artifact is not conformance evidence.
-Read the warning; decide whether it identifies a real problem or, like the
-Level 2 sample's intentionally corner-bleeding decorative circle, an expected
-fixture case.
+`main.py` runs the contract validator, renderer preflight, and artifact gate
+before committing a pair. It verifies source identity and immutable fields,
+finite integer mutable values, rotated bounds, ratios, groups, source
+separation, renderer-aware text limits/glyph bounds, PNG dimensions/opacity,
+missing-asset warning provenance, and adapter-backed pixel provenance. These
+hard checks are separate from soft quality scores. A failed task publishes no
+JSON/PNG pair and the aggregate process returns nonzero.
 
 The hidden `.<stem>_output.commit` marker is written last with both artifact hashes; only marked pairs are committed results.
 

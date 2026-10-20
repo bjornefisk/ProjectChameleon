@@ -2,6 +2,7 @@ import copy
 import hashlib
 import json
 import sys
+from fractions import Fraction
 from unittest.mock import patch
 import tempfile
 import unittest
@@ -24,7 +25,12 @@ try:
     )
     from engine.geometry.groups import has_common_transform
     from engine.geometry.ratios import preserves_source_ratio
-    from engine.layout.column_pivot import _build_column_candidate, is_column_pivot_suitable
+    from engine.layout.column_pivot import (
+        _build_column_candidate,
+        _image_dimensions,
+        _serialize_column_candidate,
+        is_column_pivot_suitable,
+    )
     from engine.layout.near_isomorphic import _largest_fitting_font_size
     from engine.layout.roles import RoleKind, infer_roles
     from engine.resize import resize
@@ -38,7 +44,12 @@ except ModuleNotFoundError:
     )
     from chameleon.engine.geometry.groups import has_common_transform
     from chameleon.engine.geometry.ratios import preserves_source_ratio
-    from chameleon.engine.layout.column_pivot import _build_column_candidate, is_column_pivot_suitable
+    from chameleon.engine.layout.column_pivot import (
+        _build_column_candidate,
+        _image_dimensions,
+        _serialize_column_candidate,
+        is_column_pivot_suitable,
+    )
     from chameleon.engine.layout.near_isomorphic import _largest_fitting_font_size
     from chameleon.engine.layout.roles import RoleKind, infer_roles
     from chameleon.engine.resize import resize
@@ -121,15 +132,68 @@ class Level2IntegrationTests(unittest.TestCase):
                 font_manager=object(),
             )
         expected_height = max(
-            1,
-            round(
-                task["target_canvas"]["height"]
-                * source["elements"][source["elements"].index(headline)]["height"]
-                / source["canvas"]["height"]
-            ),
+            Fraction(1),
+            Fraction(task["target_canvas"]["height"])
+            * Fraction(
+                source["elements"][source["elements"].index(headline)]["height"]
+            )
+            / Fraction(source["canvas"]["height"]),
         )
         output_headline = next(element for element in response["elements"] if element["id"] == "headline")
         self.assertEqual(output_headline["height"], expected_height)
+
+    def test_column_candidate_keeps_fractional_geometry_until_final_serialization(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                {
+                    "id": "hero",
+                    "type": "image",
+                    "x": 10,
+                    "y": 10,
+                    "width": 20,
+                    "height": 20,
+                    "asset_id": "hero.png",
+                    "fit": "contain",
+                },
+                {
+                    "id": "copy",
+                    "type": "text",
+                    "x": 60,
+                    "y": 60,
+                    "width": 30,
+                    "height": 20,
+                    "content": "A",
+                    "font_family": "Solstice Sans",
+                    "font_size": 20,
+                    "color": "rgba(0,0,0,1)",
+                },
+            ],
+        }
+        roles = infer_roles(source)
+        with patch("engine.layout.column_pivot._largest_fitting_font_size", return_value=10):
+            response = _build_column_candidate(
+                source,
+                {"width": 101, "height": 50},
+                roles,
+                font_manager=object(),
+            )
+
+        raw_copy = next(element for element in response["elements"] if element["id"] == "copy")
+        self.assertIsInstance(raw_copy["x"], Fraction)
+        self.assertEqual(raw_copy["x"], Fraction(1111, 40))
+
+
+        serialized = _serialize_column_candidate(response)
+        output_copy = next(element for element in serialized["elements"] if element["id"] == "copy")
+        self.assertEqual(output_copy["x"], 28)
+        self.assertIs(type(output_copy["x"]), int)
+
+    def test_image_ratio_lattice_uses_unrounded_desired_bounds(self):
+        element = {"width": 2, "height": 1}
+        self.assertIsNone(
+            _image_dimensions(element, Fraction(3, 2), Fraction(3, 2))
+        )
 
     def test_grouped_cover_background_falls_back_without_losing_coverage(self):
         task = self._load_task()
@@ -184,7 +248,12 @@ class Level2IntegrationTests(unittest.TestCase):
         failures = raised.exception.details["failures"]
         self.assertEqual(
             {failure["topology"] for failure in failures},
-            {"column_pivot", "horizontal_ribbon", "near_isomorphic"},
+            {
+                "column_pivot",
+                "near_isomorphic",
+                "horizontal_ribbon",
+                "vertical_restack",
+            },
         )
         self.assertTrue(
             all(

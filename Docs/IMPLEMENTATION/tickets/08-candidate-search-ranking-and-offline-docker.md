@@ -1,16 +1,15 @@
 # 08: Bounded Macro-Search, Fixed-Point Ranking, and Offline Docker Qualification
 
-**What to build:**  
+**What to build:**
 A bounded macro-candidate search coordinating all four layout topologies, paired with offline `linux/amd64` qualification. For any task, the engine generates at most 12 candidates across the four families, validates each through the actual renderer, ranks only hard-valid survivors, selects deterministically, and records qualification evidence rather than assuming every task is feasible.
 
-**Blocked by:**  
-`07: Horizontal Ribbon Topology and Level 3 Extreme Leaderboard Solver`
+**Dependency:**
+`07: Horizontal Ribbon Topology and Level 3 Extreme Leaderboard Solver` supplies topology interfaces. The bounded Ticket 08 integration is present even though the public Level 3 sample acceptance and official qualification remain open.
 
-**Status:**  
-implemented; offline evidence recorded; native-amd64 qualification remains unverified on the arm64 workstation
-## Integration ownership
+**Status:**
+implemented; local evidence recorded; native-amd64 and organizer-held-out qualification remain unverified on the arm64 workstation
 
-Ticket 08 owns `chameleon/engine/resize.py` integration through `layout.search.search()`. Ticket 07 supplies the horizontal-ribbon and vertical-restack solver exports consumed by that orchestrator. The integrated review revision includes Ticket 07 at `b11d7c3`; a clean checkout must include both revisions before importing `layout.search`. Roll back by reverting the Ticket 07 dependency merge, then restore the previous bounded topology owner.
+The command checkboxes below preserve the earlier local evidence record. Current Issue #16 verification is recorded in [`../../STATUS.md`](../../STATUS.md), including the current full-suite count and the blocked Docker daemon.
 
 - [x] Create `chameleon/engine/layout/search.py` orchestrating candidate generation across the four topology families (near-isomorphic, column-pivot, horizontal-ribbon, vertical-restack) with at most 3 source-derived variants each (maximum 12 macro-candidates).
 - [x] Connect renderer-in-the-loop hard validation: pass every candidate through Skia rendering and `validate_response()`, immediately discarding any candidate that violates containment, ratios, groups, or text bounds.

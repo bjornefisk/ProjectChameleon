@@ -1,4 +1,5 @@
 """Deterministic Stage 1 layout solvers."""
+from .candidate import RenderedCandidate
 
 from .column_pivot import (
     column_pivot_candidate,
@@ -36,6 +37,7 @@ __all__ = [
     "RoleAssignment",
     "RoleKind",
     "RoleModel",
+    "RenderedCandidate",
     "generate_horizontal_ribbon",
     "generate_horizontal_ribbon_candidate",
     "horizontal_ribbon_candidate",
