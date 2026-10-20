@@ -15,17 +15,20 @@ from tempfile import TemporaryDirectory
 from types import MappingProxyType
 from typing import Any, Callable, Mapping
 
+from PIL import Image
+
+from ..artifact import validate_artifact
 from ..contract import validate_response, validate_source, validate_target_canvas
 from ..errors import InfeasibleLayoutError, InfeasibleReasonCode, TaskStatus
 from ..geometry.bounds import rotated_aabb, source_bleed_sides
 from ..geometry.math_util import quantize_to_int, to_fraction
-from ..geometry.ratios import reduced_ratio
-from .column_pivot import is_column_pivot_suitable, solve_column_pivot
-from .horizontal_ribbon import is_horizontal_ribbon_suitable, solve_horizontal_ribbon
+from .candidate import RenderedCandidate
+from .column_pivot import solve_column_pivot
+from .horizontal_ribbon import solve_horizontal_ribbon
 from .near_isomorphic import solve_near_isomorphic
 from .ranking import QualityScore, score_candidate, select_best
 from .roles import RoleKind, RoleModel, infer_roles
-from .vertical_restack import is_vertical_restack_suitable, solve_vertical_restack
+from .vertical_restack import solve_vertical_restack
 
 
 TOPOLOGY_ORDER: tuple[str, ...] = (
@@ -36,6 +39,7 @@ TOPOLOGY_ORDER: tuple[str, ...] = (
 )
 MAX_VARIANTS_PER_FAMILY = 3
 MAX_CANDIDATES = len(TOPOLOGY_ORDER) * MAX_VARIANTS_PER_FAMILY
+_VARIANT_MUTABLE_FIELDS = ("x", "y", "width", "height")
 _VARIANT_NAMES: tuple[str, ...] = (
     "source_proportional",
     "dominant_media",
@@ -99,7 +103,7 @@ class SearchResult:
 
 # Kept as a discoverable seam for tests and future topology additions.  Values
 # are imported solver functions and are never reordered at runtime.
-_TOPOLOGY_SOLVERS: tuple[Callable[..., Mapping[str, Any]], ...] = (
+_TOPOLOGY_SOLVERS: tuple[Callable[..., RenderedCandidate], ...] = (
     solve_near_isomorphic,
     solve_column_pivot,
     solve_horizontal_ribbon,
@@ -157,16 +161,13 @@ def enumerate_candidate_specs(
     validate_target_canvas(target_canvas)
     role_model = roles or infer_roles(source)
     variant_indices = _source_variant_indices(source, role_model)
-    suitable: tuple[bool, ...] = (
-        True,
-        is_column_pivot_suitable(source, target_canvas, role_model),
-        is_horizontal_ribbon_suitable(source, target_canvas),
-        is_vertical_restack_suitable(source, target_canvas),
-    )
+    # Suitability is deliberately evaluated by each topology solver rather
+    # than during enumeration.  The bounded work set must retain every
+    # topology family so an unsuitable family is an explicit rejected
+    # attempt in search diagnostics, not a silently omitted option.
     specs: list[CandidateSpec] = []
-    for topology_order, (topology, is_suitable) in enumerate(zip(TOPOLOGY_ORDER, suitable)):
-        if not is_suitable:
-            continue
+    source_orders = _source_variant_orders(role_model)
+    for topology_order, topology in enumerate(TOPOLOGY_ORDER):
         for variant_index in variant_indices:
             specs.append(
                 CandidateSpec(
@@ -174,9 +175,7 @@ def enumerate_candidate_specs(
                     variant=_VARIANT_NAMES[variant_index],
                     topology_order=topology_order,
                     variant_index=variant_index,
-                    source_order=_source_variant_orders(role_model).get(
-                        variant_index, variant_index
-                    ),
+                    source_order=source_orders.get(variant_index, variant_index),
                     candidate_index=len(specs),
                 )
             )
@@ -193,173 +192,15 @@ def _integer_bounds(low: Fraction, high: Fraction) -> tuple[int, int] | None:
     return (lower, upper) if lower <= upper else None
 
 
-_MEDIA_ROLES = frozenset({RoleKind.HERO_MEDIA, RoleKind.LOGO, RoleKind.IMAGE})
-_COPY_ROLES = frozenset(
-    {RoleKind.HEADLINE, RoleKind.SUPPORTING_TEXT, RoleKind.CTA, RoleKind.BADGE, RoleKind.TEXT}
-)
+def _serialize_variant_response(response: dict[str, Any]) -> dict[str, Any]:
+    """Apply one half-even serialization to a complete derived candidate."""
 
-
-def _variant_focus_indices(
-    source: Mapping[str, Any], roles: RoleModel, variant_index: int
-) -> frozenset[int]:
-    role_set = _MEDIA_ROLES if variant_index == 1 else _COPY_ROLES
-    return frozenset(
-        assignment.index
-        for assignment in roles.assignments
-        if assignment.role in role_set
-        and assignment.index != roles.background_index
-    )
-
-
-def _variant_lattice_dimensions(
-    source_element: Mapping[str, Any],
-    response_element: Mapping[str, Any],
-    factor: Fraction,
-) -> tuple[int, int]:
-    ratio = reduced_ratio(source_element["width"], source_element["height"])
-    if ratio is None:
-        return (
-            quantize_to_int(to_fraction(response_element["width"]) * factor),
-            quantize_to_int(to_fraction(response_element["height"]) * factor),
-        )
-    numerator, denominator = ratio
-    current_width = to_fraction(response_element["width"])
-    current_height = to_fraction(response_element["height"])
-    current_multiplier = min(
-        current_width.numerator // (current_width.denominator * numerator),
-        current_height.numerator // (current_height.denominator * denominator),
-    )
-    desired_multiplier = min(
-        (current_width * factor).numerator
-        // ((current_width * factor).denominator * numerator),
-        (current_height * factor).numerator
-        // ((current_height * factor).denominator * denominator),
-    )
-    multiplier = max(current_multiplier, desired_multiplier, 1)
-    return multiplier * numerator, multiplier * denominator
-
-
-def _scaled_variant_records(
-    response: dict[str, Any],
-    source: Mapping[str, Any],
-    indices: Sequence[int],
-    *,
-    origin: tuple[Fraction, Fraction],
-    factor: Fraction,
-    lattice_images: bool,
-) -> None:
-    origin_x, origin_y = origin
-    for index in indices:
-        source_element = source["elements"][index]
-        element = response["elements"][index]
-        center_x = to_fraction(element["x"]) + to_fraction(element["width"]) / 2
-        center_y = to_fraction(element["y"]) + to_fraction(element["height"]) / 2
-        next_center_x = origin_x + (center_x - origin_x) * factor
-        next_center_y = origin_y + (center_y - origin_y) * factor
-        if lattice_images and element.get("type") == "image":
-            next_width, next_height = _variant_lattice_dimensions(
-                source_element, element, factor
-            )
-        else:
-            next_width = to_fraction(element["width"]) * factor
-            next_height = to_fraction(element["height"]) * factor
-        element["x"] = next_center_x - to_fraction(next_width) / 2
-        element["y"] = next_center_y - to_fraction(next_height) / 2
-        element["width"] = next_width
-        element["height"] = next_height
+    for element in response["elements"]:
+        for field in _VARIANT_MUTABLE_FIELDS:
+            element[field] = quantize_to_int(element[field])
         if element.get("type") == "text":
-            element["font_size"] = to_fraction(element["font_size"]) * factor
-
-
-def _variant_fits(
-    response: Mapping[str, Any],
-    indices: Sequence[int],
-    target_canvas: Mapping[str, Any],
-) -> bool:
-    target_width = to_fraction(target_canvas["width"])
-    target_height = to_fraction(target_canvas["height"])
-    for index in indices:
-        box = rotated_aabb(response["elements"][index])
-        if box[0] < 0 or box[1] < 0 or box[2] > target_width or box[3] > target_height:
-            return False
-    return True
-
-
-def _apply_variant_emphasis(
-    response: dict[str, Any],
-    source: Mapping[str, Any],
-    roles: RoleModel,
-    target_canvas: Mapping[str, Any],
-    spec: CandidateSpec,
-) -> None:
-    focus = _variant_focus_indices(source, roles, spec.variant_index)
-    if not focus:
-        return
-    groups: dict[Any, list[int]] = {}
-    individual: list[int] = []
-    for index in sorted(focus):
-        group_id = source["elements"][index].get("group_id")
-        if group_id is None:
-            individual.append(index)
-            continue
-        groups.setdefault(group_id, [])
-    for group_id in groups:
-        groups[group_id] = [
-            index
-            for index, element in enumerate(source["elements"])
-            if element.get("group_id") == group_id
-        ]
-    for indices in groups.values():
-        if roles.background_index in indices:
-            continue
-        aabbs = [rotated_aabb(response["elements"][index]) for index in indices]
-        origin = (
-            (min(box[0] for box in aabbs) + max(box[2] for box in aabbs)) / 2,
-            (min(box[1] for box in aabbs) + max(box[3] for box in aabbs)) / 2,
-        )
-        for factor in (Fraction(2), Fraction(3, 2), Fraction(1)):
-            trial = deepcopy(response)
-            _scaled_variant_records(
-                trial,
-                source,
-                indices,
-                origin=origin,
-                factor=factor,
-                lattice_images=False,
-            )
-            if _variant_fits(trial, indices, target_canvas):
-                response["elements"] = trial["elements"]
-                break
-    for index in individual:
-        element = response["elements"][index]
-        origin = (
-            to_fraction(element["x"]) + to_fraction(element["width"]) / 2,
-            to_fraction(element["y"]) + to_fraction(element["height"]) / 2,
-        )
-        for factor in (Fraction(5, 4), Fraction(9, 8), Fraction(1)):
-            trial = deepcopy(response)
-            _scaled_variant_records(
-                trial,
-                source,
-                [index],
-                origin=origin,
-                factor=factor,
-                lattice_images=True,
-            )
-            if _variant_fits(trial, [index], target_canvas):
-                response["elements"] = trial["elements"]
-                break
-
-
-def _serialize_variant_response(response: Mapping[str, Any]) -> dict[str, Any]:
-    result = deepcopy(dict(response))
-    for element in result.get("elements", []):
-        for field in ("x", "y", "width", "height"):
-            if field in element:
-                element[field] = quantize_to_int(element[field])
-        if element.get("type") == "text" and "font_size" in element:
             element["font_size"] = quantize_to_int(element["font_size"])
-    return result
+    return response
 
 
 def _derive_variant_response(
@@ -369,7 +210,14 @@ def _derive_variant_response(
     roles: RoleModel,
     spec: CandidateSpec,
 ) -> dict[str, Any]:
-    """Derive role-specific emphasis geometry from a hard-safe base candidate."""
+    """Derive a source-anchored alignment variant without changing semantics.
+
+    The topology solver supplies the macro geometry.  A variant translation is
+    kept exact while it is applied to every eligible foreground record, then
+    the complete response is serialized once before the hard-validation gate.
+    This preserves explicit group transforms until serialization and lets the
+    validator reject any relationship that integer quantization cannot retain.
+    """
 
     response = deepcopy(dict(base))
     if spec.variant_index == 0 or not response.get("elements"):
@@ -416,17 +264,22 @@ def _derive_variant_response(
     anchor_x = (anchor_box[0] + anchor_box[2]) / 2
     anchor_y = (anchor_box[1] + anchor_box[3]) / 2
     if spec.variant_index == 1:
-        desired = quantize_to_int((target_width / 2 - anchor_x) / 2)
-        translation = max(x_interval[0], min(x_interval[1], desired))
+        desired = (target_width / 2 - anchor_x) / 2
+        translation = max(
+            Fraction(x_interval[0]),
+            min(Fraction(x_interval[1]), desired),
+        )
         for index in eligible:
             response["elements"][index]["x"] += translation
     else:
-        desired = quantize_to_int((target_height / 2 - anchor_y) / 2)
-        translation = max(y_interval[0], min(y_interval[1], desired))
+        desired = (target_height / 2 - anchor_y) / 2
+        translation = max(
+            Fraction(y_interval[0]),
+            min(Fraction(y_interval[1]), desired),
+        )
         for index in eligible:
             response["elements"][index]["y"] += translation
-    _apply_variant_emphasis(response, source, roles, target_canvas, spec)
-    return response
+    return _serialize_variant_response(response)
 
 
 def _renderer_classes() -> tuple[type[BaseException], ...]:
@@ -462,14 +315,29 @@ def _render_candidate(
         resolved_fonts = str(fonts_dir or default_fonts)
         with TemporaryDirectory(prefix=".chameleon-search-") as directory:
             png_path = Path(directory) / "candidate.png"
-            warnings = render_design_to_png(
+            raw_warnings = render_design_to_png(
                 deepcopy(dict(response)),
                 resolved_assets,
                 png_path,
                 resolved_fonts,
                 font_manager=font_manager,
-            )
-            return png_path.read_bytes(), tuple(str(warning) for warning in warnings)
+            ) or []
+            warnings = tuple(str(warning) for warning in raw_warnings)
+            with Image.open(png_path) as image:
+                if image.format != "PNG":
+                    raise ValueError("renderer did not produce a PNG artifact")
+                image.verify()
+            with Image.open(png_path) as image:
+                image.load()
+                validate_artifact(
+                    response,
+                    image,
+                    assets_dir=resolved_assets,
+                    fonts_dir=resolved_fonts,
+                    font_manager=font_manager,
+                    warnings=warnings,
+                )
+            return png_path.read_bytes(), warnings
     except _renderer_classes() as error:
         raise error
 
@@ -495,14 +363,12 @@ def _invoke_solver(
     target_canvas: Mapping[str, Any],
     roles: RoleModel,
     *,
-    variant: str,
     font_manager: Any,
     fonts_dir: str | Path | None,
     assets_dir: str | Path | None,
-) -> Mapping[str, Any]:
+) -> RenderedCandidate:
     solver = _TOPOLOGY_SOLVERS[spec.topology_order]
     kwargs: dict[str, Any] = {
-        "variant": variant,
         "font_manager": font_manager,
         "fonts_dir": str(fonts_dir) if fonts_dir is not None else None,
         "assets_dir": str(assets_dir) if assets_dir is not None else None,
@@ -511,10 +377,57 @@ def _invoke_solver(
         kwargs["roles"] = roles
     # Every solver receives private copies: a topology implementation cannot
     # mutate caller-owned source data or leak mutations between variants.
-    response = solver(deepcopy(source), deepcopy(target_canvas), **kwargs)
-    if not isinstance(response, Mapping):
-        raise ValueError("topology solver did not return a design mapping")
-    return response
+    result = solver(deepcopy(source), deepcopy(target_canvas), **kwargs)
+    if not isinstance(result, RenderedCandidate):
+        raise TypeError("topology solver did not return a rendered candidate")
+    return result
+
+
+def _failure_record(
+    spec: CandidateSpec,
+    reason_code: str,
+    reason: str,
+    *,
+    details: Mapping[str, Any] | None = None,
+    search_exhausted: bool = False,
+    status: str | None = None,
+) -> dict[str, Any]:
+    """Return normalized per-work-item diagnostics.
+
+    ``search_exhausted`` is deliberately kept separate from the reason code:
+    a topology may report an incomplete search while still having no candidate
+    for its current work item, and a hard rejection is not a proof that other
+    permitted work was examined.
+    """
+
+    copied_details = deepcopy(dict(details or {}))
+    embedded_exhaustion = copied_details.get("search_exhausted")
+    if isinstance(embedded_exhaustion, bool):
+        search_exhausted = embedded_exhaustion
+    embedded_status = copied_details.get("status")
+    if status is None and isinstance(embedded_status, str):
+        status = embedded_status
+    if status is None:
+        status = (
+            TaskStatus.INCOMPLETE_SEARCH.value
+            if reason_code == InfeasibleReasonCode.INCOMPLETE_SEARCH.value
+            else (
+                TaskStatus.INFEASIBLE_LAYOUT.value
+                if search_exhausted
+                else TaskStatus.INCOMPLETE_SEARCH.value
+            )
+        )
+    return {
+        "topology": spec.topology,
+        "variant": spec.variant,
+        "candidate_index": spec.candidate_index,
+        "reason_code": reason_code,
+        "reason": reason,
+        "status": status,
+        "search_exhausted": search_exhausted,
+        "details": copied_details,
+    }
+
 
 
 def search(
@@ -543,42 +456,70 @@ def search(
     specs = enumerate_candidate_specs(source, target_canvas, roles=roles)
     limit = min(max_candidates, len(specs), MAX_CANDIDATES)
     cutoff = limit < len(specs)
+    work_set_topologies = tuple(dict.fromkeys(spec.topology for spec in specs))
     admitted: list[Candidate] = []
     failures: list[dict[str, Any]] = []
-    saw_incomplete = False
+    base_candidates: dict[str, RenderedCandidate] = {}
+    # These state variables describe finite work independently of any
+    # candidate's reason code.  A reason alone cannot prove exhaustion.
+    finite_work_exhausted = not cutoff
+    unexamined_work = cutoff
 
     for spec in specs[:limit]:
+        candidate_generated = False
         try:
-            response = _invoke_solver(
-                spec,
-                source,
-                target_canvas,
-                roles,
-                variant=spec.variant,
-                font_manager=font_manager,
-                fonts_dir=fonts_dir,
-                assets_dir=assets_dir,
-            )
-            if spec.variant_index != 0:
+            rendered_png: bytes
+            warnings: tuple[str, ...]
+            if spec.variant_index == 0:
+                solver_candidate = _invoke_solver(
+                    spec,
+                    source,
+                    target_canvas,
+                    roles,
+                    font_manager=font_manager,
+                    fonts_dir=fonts_dir,
+                    assets_dir=assets_dir,
+                )
+                candidate_generated = True
+                base_candidates[spec.topology] = solver_candidate
+                response = solver_candidate.response
+                rendered_png = solver_candidate.rendered_png
+                warnings = solver_candidate.warnings
+            else:
+                base = base_candidates.get(spec.topology)
+                if base is None:
+                    unexamined_work = True
+                    finite_work_exhausted = False
+                    failures.append(
+                        _failure_record(
+                            spec,
+                            InfeasibleReasonCode.INCOMPLETE_SEARCH.value,
+                            "base topology candidate was not available",
+                        )
+                    )
+                    continue
+                candidate_generated = True
                 response = _derive_variant_response(
-                    response,
+                    base.response,
                     source,
                     target_canvas,
                     roles,
                     spec,
                 )
-            response = _serialize_variant_response(response)
-            # Reject serialized structural failures before spending renderer
-            # work.  The renderer then supplies the actual text/glyph gate.
+            # The centralized semantic gate remains authoritative and runs
+            # before rendering every derived response.
             validate_response(source, target_canvas, response)
-            rendered_png, warnings = _render_candidate(
-                response,
-                assets_dir=assets_dir,
-                fonts_dir=fonts_dir,
-                font_manager=font_manager,
-            )
-            # Re-read the candidate at the renderer boundary as an explicit
-            # post-serialization hard gate before fixed-point scoring.
+            if spec.variant_index != 0:
+                rendered_png, warnings = _render_candidate(
+                    response,
+                    assets_dir=assets_dir,
+                    fonts_dir=fonts_dir,
+                    font_manager=font_manager,
+                )
+            # Re-read the serialized response after the solver or derived
+            # render boundary before fixed-point scoring.  The bytes for the
+            # base variant came from the solver; derived bytes were rendered
+            # exactly once above.
             validate_response(source, target_canvas, response)
             quality = score_candidate(source, response, rendered_png, roles=roles)
             admitted.append(
@@ -598,42 +539,56 @@ def search(
         except InfeasibleLayoutError as error:
             if error.reason_code is InfeasibleReasonCode.RUNTIME_IO_FAILURE:
                 raise _runtime_error(error, spec) from error
-            saw_incomplete = saw_incomplete or (
-                error.reason_code is InfeasibleReasonCode.INCOMPLETE_SEARCH
+            details = deepcopy(error.details)
+            explicit_exhaustion = details.get("search_exhausted")
+            attempt_exhausted = (
+                explicit_exhaustion
+                if isinstance(explicit_exhaustion, bool)
+                else candidate_generated
             )
+            if not attempt_exhausted:
+                finite_work_exhausted = False
+                unexamined_work = True
             failures.append(
-                {
-                    "topology": spec.topology,
-                    "variant": spec.variant,
-                    "candidate_index": spec.candidate_index,
-                    "reason_code": error.reason_code.value,
-                    "reason": error.message,
-                    "details": deepcopy(error.details),
-                }
+                _failure_record(
+                    spec,
+                    error.reason_code.value,
+                    error.message,
+                    details=details,
+                    search_exhausted=attempt_exhausted,
+                )
             )
         except _renderer_classes() as error:
+            # A renderer failure raised while a topology is generating its
+            # base candidate has no finite-exhaustion proof.  A renderer
+            # rejection of an already materialized derived variant is a
+            # complete work-item attempt, represented by candidate_generated.
+            attempt_exhausted = candidate_generated
+            if not attempt_exhausted:
+                finite_work_exhausted = False
+                unexamined_work = True
             failures.append(
-                {
-                    "topology": spec.topology,
-                    "variant": spec.variant,
-                    "candidate_index": spec.candidate_index,
-                    "reason_code": InfeasibleReasonCode.TEXT_OVERFLOW.value,
-                    "reason": str(error),
-                }
+                _failure_record(
+                    spec,
+                    InfeasibleReasonCode.TEXT_OVERFLOW.value,
+                    str(error),
+                    search_exhausted=attempt_exhausted,
+                )
             )
         except Exception as error:
             raise _runtime_error(error, spec) from error
 
+    search_exhausted = finite_work_exhausted and not unexamined_work
     if not admitted:
         status = (
-            TaskStatus.INCOMPLETE_SEARCH
-            if cutoff or saw_incomplete
-            else TaskStatus.INFEASIBLE_LAYOUT
+            TaskStatus.INFEASIBLE_LAYOUT
+            if search_exhausted
+            else TaskStatus.INCOMPLETE_SEARCH
         )
         reason = (
-            InfeasibleReasonCode.INCOMPLETE_SEARCH
-            if cutoff or saw_incomplete
-            else InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE
+            InfeasibleReasonCode.NO_HARD_VALID_CANDIDATE
+            if search_exhausted
+            else InfeasibleReasonCode.INCOMPLETE_SEARCH
         )
         raise InfeasibleLayoutError(
             reason,
@@ -642,18 +597,38 @@ def search(
                 "status": status.value,
                 "evaluated_candidates": limit,
                 "candidate_count": len(specs),
+                "work_set_topologies": work_set_topologies,
+                "rejected_topologies": tuple(
+                    dict.fromkeys(failure["topology"] for failure in failures)
+                ),
                 "cutoff": cutoff,
+                "finite_work_exhausted": search_exhausted,
+                "unexamined_work": unexamined_work,
+                "search_exhausted": search_exhausted,
                 "failures": failures,
             },
         )
-
     selected = select_best(admitted)
+    selected_quality = {
+        "readability": selected.quality.readability,
+        "balance": selected.quality.balance,
+        "alignment": selected.quality.alignment,
+        "hierarchy": selected.quality.hierarchy,
+    }
     result_diagnostics = {
         "status": TaskStatus.SUCCESS.value,
         "candidate_count": len(specs),
         "evaluated_candidates": limit,
+        "work_set_topologies": work_set_topologies,
+        "rejected_topologies": tuple(
+            dict.fromkeys(failure["topology"] for failure in failures)
+        ),
         "hard_valid_candidates": len(admitted),
         "cutoff": cutoff,
+        "finite_work_exhausted": search_exhausted,
+        "unexamined_work": unexamined_work,
+        "search_exhausted": search_exhausted,
+        "selected_quality": selected_quality,
         "failures": tuple(failures),
     }
     return SearchResult(

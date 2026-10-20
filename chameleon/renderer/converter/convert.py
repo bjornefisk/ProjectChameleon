@@ -24,7 +24,7 @@ from PIL import Image
 from cr_renderer import CrelloV5Renderer
 from cr_renderer.fonts import FONT_WEIGHTS
 
-from .assets import asset_path, load_asset_image
+from .assets import asset_path, load_asset_image, missing_asset_warning
 from .brand_fonts import load_brand_font_manager, lookup_exact_font
 from .features_stub import make_stub_features
 from .shapes import render_shape
@@ -113,9 +113,7 @@ def convert_chameleon_to_crello(
             _append_blank_text(out)
             asset_id = element.get("asset_id")
             if asset_path(assets_dir, asset_id) is None:
-                warnings.append(
-                    f"Missing asset '{asset_id}' for element '{eid}' - rendered a placeholder."
-                )
+                warnings.append(missing_asset_warning(eid, asset_id))
             out["image"].append(
                 load_asset_image(
                     assets_dir,

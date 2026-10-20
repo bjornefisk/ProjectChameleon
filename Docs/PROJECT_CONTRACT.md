@@ -1,6 +1,6 @@
 # Project Chameleon Project Contract
 
-**Status:** Accepted pre-implementation Stage 1 contract; implementation and qualification pending
+**Status:** Accepted Stage 1 contract; current implementation evidence and qualification boundaries are tracked in `Docs/STATUS.md`
 
 **Contract version:** 1.0
 
@@ -8,7 +8,7 @@
 
 **Ratified:** 2026-10-06
 
-This document is the normative behavioral contract for the autonomous Stage 1 retargeting engine. It resolves conflicts in the earlier design notes and starter comments. It does not describe an implementation and does not make the current `engine/resize.py` baseline conforming.
+This document is the normative behavioral contract for the autonomous Stage 1 retargeting engine. It resolves conflicts in the earlier design notes and starter comments. It defines the required behavior, not a claim that every environment is qualified; implementation and platform evidence are tracked separately in `Docs/STATUS.md`.
 
 ## 1. Scope
 
@@ -213,17 +213,17 @@ The finale may wrap the engine in an Adobe Express add-on and may explore user-a
 | Requirement | Contract/ADR | Structural or semantic rule | Conformance evidence | Implementation status |
 | --- | --- | --- | --- | --- |
 | Authority hierarchy | ADR-001 | This document's precedence list | `PROJECT_CONTRACT.md` §2 | Ratified |
-| Exact mutable fields and identity | ADR-002 | §5 plus schema required fields | Planned identity-mutation validator cases | Baseline intentionally nonconformant |
-| Empty designs and source degenerates | ADR-003 | Schema `elements.minItems=0`; no new zero-size records | `empty_design.json`, planned empty/degenerate cases | Ratified; solver pending |
-| Rotated containment and bleed | ADR-003 | §7 AABB and source-bleed predicate | `offcanvas_decoration.json`, planned rotation cases | Validator/solver pending |
-| Foreground image ratios | ADR-003 | Cross-product equality after rounding | `image_ratio.json`, planned ratio cases | Validator/solver pending |
-| Renderer/text semantics | ADR-002 | §6 and pinned source revision | `style_run_boundary.json`, renderer conformance matrix | Adapter gaps open |
-| Infeasible target behavior | ADR-003 | Typed failure, no misleading output | `infeasible_target.json`, runner integration evidence | Runner fail-closed path implemented; solver search pending |
-| Offline runtime and platform | ADR-004 | Docker/request pins and network rule | Docker/buildx smoke plan in `STATUS.md` | Buildx smoke completed; native-amd64 qualification pending |
+| Exact mutable fields and identity | ADR-002 | §5 plus schema required fields | `tests/contract/test_contract.py`, `tests/geometry/`, runner publication cases | Structural validator and bounded solvers implemented; platform qualification remains separate |
+| Empty designs and source degenerates | ADR-003 | Schema `elements.minItems=0`; no new zero-size records | `tests/contract/`, `tests/layout/`, runner cases | Implemented locally; broader catalogue evidence remains pending |
+| Rotated containment and bleed | ADR-003 | §7 AABB and source-bleed predicate | `tests/geometry/`, `tests/layout/` | Implemented locally; renderer/platform qualification remains separate |
+| Foreground image ratios | ADR-003 | Cross-product equality after rounding | `tests/geometry/`, `tests/layout/` | Implemented locally with post-serialization validation |
+| Renderer/text semantics | ADR-002 | §6 and pinned source revision | `tests/renderer/`, renderer preflight and artifact seams | Local adapter evidence implemented; native/platform goldens remain unverified |
+| Infeasible target behavior | ADR-003 | Typed failure, no misleading output | `tests/layout/`, `tests/runner/test_runner.py` | Bounded exhaustion/cutoff mapping and fail-closed publication implemented |
+| Offline runtime and platform | ADR-004 | Docker/request pins and network rule | Docker/buildx smoke plan in `STATUS.md` | Local/CI evidence is recorded; native-amd64 and clean-cache qualification remain unverified |
 | Stage split | ADR-005 | §10 | Stage boundary review | Ratified |
-| Failure protocol and search status | ADR-006 | Typed internal statuses; no failure envelope; no failed-task artifacts; logical JSON/PNG pair publication; conservative cutoff semantics; nonzero aggregate failure | `tests/runner/test_runner.py` publication/failure cases; `tests/layout/test_search_status.py` exhaustion aggregation cases | Runner staging, cleanup, status, and exhaustion-aware resize aggregation implemented; full candidate-search cutoff semantics pending |
-| Numeric and geometry semantics | ADR-007 | Exact rational ingress; one half-even serialization; reduced image-ratio lattice; rigid group transform; AABB and positive-area overlap rules | Runner exact-ingress/serialization cases; geometry fixtures | Runner ingress and serialization implemented; geometry/search pending |
-| Typography and renderer edge semantics | ADR-008 | Grapheme-safe UAX #14/UAX #29 wrapping; style-run semantics; effective span metrics; overflow rejection; in-box strokes; no public line map | Planned renderer conformance matrix | Adapter gaps open |
-| Initial deterministic search | ADR-009 | Four topology families, bounded source-derived variants, renderer-in-loop validation, fixed-point ranking, no model/CP-SAT initially | Planned held-out search evaluation | Search not started |
+| Failure protocol and search status | ADR-006 | Typed internal statuses; no failure envelope; no failed-task artifacts; logical JSON/PNG pair publication; conservative cutoff semantics; nonzero aggregate failure | `tests/runner/test_runner.py`, `tests/layout/test_search_ranking.py` | Runner staging, cleanup, aggregate exit, and bounded cutoff/exhaustion semantics implemented |
+| Numeric and geometry semantics | ADR-007 | Exact rational ingress; one half-even serialization; reduced image-ratio lattice; rigid group transform; AABB and positive-area overlap rules | `tests/geometry/`, `tests/layout/`, runner exact-ingress cases | Implemented locally with final serialized validation |
+| Typography and renderer edge semantics | ADR-008 | Grapheme-safe UAX #14/UAX #29 wrapping; style-run semantics; effective span metrics; overflow rejection; in-box strokes; no public line map | `tests/renderer/`, renderer preflight, artifact corpus | Bounded adapter and local evidence implemented; final fonts/native parity remain unverified |
+| Initial deterministic search | ADR-009 | Four topology families, bounded source-derived variants, renderer-in-loop validation, fixed-point ranking, no model/CP-SAT initially | `chameleon/tests/layout/test_issue23_search_evidence.py`, `test_search_ranking.py`, `test_heldout_evaluation.py`, `Docs/IMPLEMENTATION/tickets/08-heldout-evaluation.md` | Bounded search and local held-out-style evidence implemented; official/native qualification pending |
 
 The source-driven verification record and external URLs are in [DEPENDENCY_EVIDENCE.md](DEPENDENCY_EVIDENCE.md). Current implementation gaps are tracked in [STATUS.md](STATUS.md).
