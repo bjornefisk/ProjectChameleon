@@ -1,0 +1,94 @@
+# Ticket 08 qualification evidence
+
+This record belongs to Ticket 08 and is intentionally separate from the parallel Ticket 07 implementation. The post-issue-32 integration evidence below was measured on the local Darwin arm64 workstation unless stated otherwise.
+The issue #23/F-07 normative evidence expansion is recorded separately in [`08-issue-23-evidence.md`](08-issue-23-evidence.md).
+
+## Historical Ticket 08 implementation checks
+The measurements below are the earlier local Ticket 08 record. Current Issue #16 verification supersedes its counts for the integrated tree and is recorded in [`../../STATUS.md`](../../STATUS.md); no native-amd64 or official held-out qualification is inferred.
+| Check | Command | Observed result |
+| --- | --- | --- |
+| Focused integration | `cd chameleon && ../.venv/bin/python -m unittest tests.layout.test_level1 tests.layout.test_level2 tests.layout.test_search_ranking -v` | 22 tests, all passed. |
+| Repository wiring | `make verify` | Passed: repository governance and implementation wiring are consistent. |
+| Syntax smoke | `cd chameleon && ../.venv/bin/python -m py_compile engine/layout/candidate.py engine/layout/search.py engine/layout/ranking.py engine/layout/near_isomorphic.py engine/layout/column_pivot.py engine/layout/horizontal_ribbon.py engine/layout/vertical_restack.py engine/layout/__init__.py engine/resize.py tests/layout/test_search_ranking.py tests/layout/test_near_isomorphic.py tests/layout/test_level2.py tests/layout/test_level3.py` | Passed. |
+| Full suite | `make test` | 180 project tests and 47 review-capsule tests, all passed. |
+| PR review capsule | `.venv/bin/python -m unittest scripts.test_review_pr -v` | 47 tests, all passed. |
+
+## Local public samples
+
+Command: `cd chameleon && ../.venv/bin/python -m engine.main`
+
+- The repository's exact `python -m engine.main` command was also attempted first and failed before application startup because the system interpreter lacks `jsonschema`. The project `.venv` command above is the successful local run.
+- `chameleon_sample_level1_warmup.json`: `SUCCESS`; JSON/PNG pair published; `0.45s` in the post-integration batch run.
+- `chameleon_sample_level2_core.json`: `SUCCESS`; JSON/PNG pair published; `0.70s` in the post-integration batch run; the existing non-authoritative self-check reported the known off-canvas `deco_circle_1` source-bleed warning.
+- The public run therefore is not a 100% pass and is not reported as one.
+
+A separate in-process measurement around `resize()` reported:
+
+| Sample | Status | Runtime | Process peak RSS |
+| --- | --- | ---: | ---: |
+| Level 1 warmup | `SUCCESS` | 0.918s | 212.5 MiB |
+| Level 2 core | `SUCCESS` | 0.622s | 286.3 MiB |
+| Level 3 advanced | `INCOMPLETE_SEARCH` | 0.414s | 287.3 MiB |
+
+The RSS measurement uses macOS `ru_maxrss` bytes converted to MiB. It is host-process evidence, not native-amd64 container evidence.
+
+The successful local artifact hashes from the batch run were:
+
+```text
+237a8a9eeeeae02ab954bf820fc0294b2501890097c390b3bb6c0c148d2744ba  output/chameleon_sample_level1_warmup_output.json
+df2a08c7c87f66837726bb98bf9ac896739d91766da12dbd3d35233a2a2bc8ec  output/chameleon_sample_level2_core_output.json
+71e0be9ea2ae55ab860100fed77ce870e1f531da8f74df05adb67414cf27cea0  output/chameleon_sample_level1_warmup_output.png
+c75148701283de9f81663489ea09e76b7b757f36d0fefe110940b15644bc867f  output/chameleon_sample_level2_core_output.png
+```
+
+## Contract fixtures
+
+The source-only fixtures were exercised with their own canvas as the target; `infeasible_target.json` and `image_ratio.json` supplied explicit task envelopes.
+
+| Fixture | Observed status |
+| --- | --- |
+| `empty_design.json` | `SUCCESS` |
+| `image_ratio.json` | `SUCCESS` |
+| `infeasible_target.json` | typed `INCOMPLETE_SEARCH`; no output artifact |
+| `minimal_design.json` | `SUCCESS` |
+| `offcanvas_decoration.json` | `SUCCESS` |
+| `style_run_boundary.json` | typed `INCOMPLETE_SEARCH`; no output artifact |
+
+## Historical offline Docker smoke
+
+Command:
+
+```bash
+docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .
+```
+
+Observed: build passed. Buildx emitted the existing `FromPlatformFlagConstDisallowed` warning for the pinned `FROM --platform=linux/amd64` line. The loaded image reports `amd64/linux`, image ID `sha256:f6b7ad0326b6791b57ca0d4327f912df270dec0cb57d9f5daae8b5df43ff248a`, and Docker's reported image size is `303848897` bytes (about 290 MiB), below the 8 GB ceiling.
+
+Command:
+
+```bash
+docker run --rm --network none \
+  -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" \
+  chameleon-stage1
+```
+
+Observed on this arm64 workstation under Docker amd64 emulation:
+
+- `chameleon_sample_level1_warmup.json`: `SUCCESS`, JSON/PNG pair, `6.03s`.
+- `chameleon_sample_level2_core.json`: `SUCCESS`, JSON/PNG pair, `9.47s`.
+- `chameleon_sample_level3_advanced.json`: typed `INCOMPLETE_SEARCH`, no pair.
+- The container exited `1` because the batch includes the typed Level 3 failure.
+- Docker reported the expected `linux/amd64` versus host `linux/arm64/v8` emulation warning, plus a fontconfig warning from the base image.
+
+The post-integration emulated container runtimes still exceed the `<2.0s` target. This remains an explicit qualification blocker: native-amd64 runtime and peak-memory qualification are **unverified** on this arm64 host, and the arm64-host emulation measurements do not complete the ratified latency target. The local host RSS measurements above remain below the 500 MiB target, but they are not a substitute for container memory measurement.
+
+## Issue #32 resolution
+
+The shared topology hand-off now returns a `RenderedCandidate` containing the serialized response and the verified PNG bytes. The centralized search gate still calls `validate_response()` before admission and again at the render boundary:
+
+- the unchanged source-proportional/base variant reuses the solver's PNG;
+- every translated or emphasis-derived variant is rendered once by centralized search before scoring;
+- the selected candidate's stored PNG remains available to ranking; and
+- the batch staging path still renders the selected serialized response for the final published artifact pair, which is a separate publication boundary.
+
+`tests.layout.test_search_ranking.SearchRankingTests.test_solver_render_is_reused_and_derived_variants_render_once` proves one solver render is reused while each derived variant receives exactly one centralized render. The duplicate solver/search base render recorded in the prior evidence is removed. The `<2.0s` runtime target remains blocked by the explicit qualification exception above, not marked complete.

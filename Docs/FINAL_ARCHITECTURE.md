@@ -1,6 +1,6 @@
 # Project Chameleon final architecture
 
-**Status:** Gate 1 qualification is cleared. PR #14's bounded Ticket 06 source-aware routing and column-pivot implementation is under integration review after refreshed-PR corrections; focused/full/runtime local evidence passes and partner review is pending. Tickets 07-08, full candidate ranking, and held-out evaluation remain later work.
+**Status:** Gate 1 qualification is cleared and Tickets 06-08 have bounded implementation on the integrated review tree. The search enumerates all four topology families with source-derived variants, renderer-gated hard validation, fixed-point ranking, and local held-out-style evidence. The public Level 3 sample remains a typed fail-closed result; native-amd64, broad organizer-held-out, and release qualification remain unverified.
 
 **Scope:** Stage 1 retargeting engine and the separate finale integration boundary.
 
@@ -23,7 +23,7 @@ The architecture must:
 - produce deterministic results in an offline `linux/amd64` container; and
 - keep the autonomous Stage 1 engine separate from the interactive finale.
 
-The current phase is **Ticket 06 integration review after Gate 1 qualification**. The bounded source-aware role inference and column-pivot slice is implemented; refreshed-PR corrections remove arbitrary relationship/resource ceilings and reconcile evidence claims. The existing near-isomorphic path remains a bounded candidate family, and Tickets 07-08, full ranking, and held-out evaluation remain outside this phase.
+The current phase is **bounded four-topology search review after Gate 1 qualification**. Source-aware role inference, column pivot, horizontal ribbon, vertical restack, candidate variants, renderer-in-loop admission, and fixed-point ranking are implemented without changing the public schema or hard contract. The public Level 3 sample-pass criterion remains unresolved and must not be addressed by shedding records, changing copy/font attributes, substituting fonts, or relaxing hard validation. Local held-out-style evidence is recorded separately from official/native qualification.
 
 ### Terminology
 
@@ -201,6 +201,17 @@ The adapter owns task-schema conversion, local font loading, image fit preproces
 - Rectangle and ellipse strokes rasterize inside their declared boxes without expanding public geometry.
 
 Missing assets retain their original element records and `asset_id`. A deterministic diagnostic placeholder may be rendered for inspection, but it is never written into the design response or treated as a replacement asset.
+
+### PNG artifact conformance
+
+Decoded PNGs are hard-validity inputs at both candidate and publication seams,
+not merely readable previews. The artifact gate mirrors the pinned renderer's
+`max_size=2048` dimensions, requires an opaque canvas, checks exact
+missing-asset warning provenance, rejects ink outside adapter-derived paint
+regions, preserves exact opaque one-to-one image/shape raster pixels, and
+compares non-exact layers against a second render from the pinned adapter.
+Contrast and readability remain soft ranking concerns. Artifact failures use
+`RUNTIME_IO_FAILURE`, publish no pair, and never repair or replace pixels.
 
 ## 7. Deterministic search architecture
 

@@ -1,10 +1,12 @@
 # Implementation roadmap and review report
 
-**Status:** Execution plan after contract and decision ratification. This file is non-normative; `PROJECT_CONTRACT.md` and Accepted ADRs are the authority. Gate 1 is cleared; PR #14's Ticket 06 implementation, focused/full tests, and sample evidence are under integration review after refreshed-PR corrections, with local correction and smoke evidence passing and partner review pending.
+**Status:** Execution plan after contract and decision ratification. This file is non-normative; `PROJECT_CONTRACT.md` and Accepted ADRs are the authority. Gate 1 is cleared, Tickets 01-07 are implemented within bounded scopes, and Ticket 08's bounded search/ranking and local offline evidence are recorded on the integrated review tree. The public Level 3 sample remains typed fail-closed `INCOMPLETE_SEARCH`; held-out evaluation and native-amd64/resource qualification remain deferred or unverified.
 
-## Ratified delivery plan
+## Issue #16 reconciliation
 
-Decision ratification is complete and documentation-only. Implementation of Tickets 01-05 is complete. Gate 1 is cleared per `STATUS.md`. Ticket 06 (Issue #13; owner @bjornefisk; partner reviewer @gabegaines24) has implementation evidence on `feat/ticket-06-column-pivot-level2`, based on transition revision `77b3368`; refreshed-PR corrections for contract-valid large sources, readable-floor font search, and accurate evidence are verified locally. Do not claim held-out evaluation, full four-topology ranking, merge/release, or native-amd64 qualification from the local arm64-host Docker run until those later gates have evidence.
+The current implementation is not the pre-implementation plan described by several historical paragraphs below. F-01/F-02/F-03/F-07 have bounded local evidence; F-04/F-05 have local renderer/artifact seam evidence but not complete platform qualification; F-06 and broad held-out evaluation remain open. See the audit matrix and exact paths in [`STATUS.md`](STATUS.md). No warning-only check, soft score, arm64 emulation, or missing artifact is contract or qualification evidence.
+
+Decision ratification is complete and documentation-only. Tickets 01-08 have bounded implementation or evidence records within their stated scopes. Ticket 07's public sample-pass criterion remains unresolved, while Ticket 08 implementation is present rather than blocked; do not claim held-out evaluation, sample-pass completion, merge/release, native-amd64 qualification, or complete runtime qualification until the corresponding evidence exists.
 
 ### Gate 0 — Contract and evidence (complete; documentation only)
 
@@ -32,13 +34,11 @@ Decision ratification is complete and documentation-only. Implementation of Tick
 - Apply one round-half-even serialization step and validate serialized integers, reduced image-ratio lattice, rotated AABB containment, positive-area overlap, deterministic background tie-break, and same-side source bleed.
 - Acceptance: Level 1 plus geometry fixtures pass structural validation. The baseline must never hide or drop an element. **Gate 2 acceptance achieved** - Ticket 05 Level 1 solver complete with 20 layout tests passing.
 
-### Gate 3 — Source-aware routing (Ticket 06 review — partner review pending)
+### Gate 3 — Source-aware routing (Ticket 06 complete; Ticket 07 active review)
 
 - Infer roles from multiple signals without fixed z-index/coverage thresholds.
-- Generate four topology candidates: near-isomorphic, column pivot, horizontal ribbon, and vertical re-stack.
-- For each family, generate at most three source-derived slot/emphasis variants; omit unsupported variants rather than inventing roles.
 - Derive slots from target proportions, source group extents, measured text, and image ratios. Never reserve fixed logo/hero/CTA pixels.
-- Acceptance: Ticket 06 implementation, focused/full tests, and Level 2 sample evidence are recorded; relationship/resource-cap corrections and evidence reconciliation pass local verification, and partner review remains pending. The later horizontal-ribbon, vertical-restack, full-ranking, and held-out-evaluation acceptance remains unverified.
+- Acceptance: Ticket 06 implementation, focused/full tests, and Level 2 sample evidence are recorded and merged. Ticket 07 horizontal-ribbon and vertical-restack candidates are implemented and pass feasible synthetic contract tests, but the public Level 3 sample-pass criterion remains unresolved; do not relax hard constraints to close it.
 
 ### Gate 4 — Typography and candidate generation
 
@@ -54,7 +54,7 @@ Decision ratification is complete and documentation-only. Implementation of Tick
 - Start with the accepted bounded structured search: at most three source-derived variants per each of four topology families, renderer-in-loop hard validation, and fixed-point ranking. Ticket 06 MUST remain deterministic and MUST NOT add CP-SAT, OR-Tools, models, or model weights/runtime; any later solver-dependency proposal requires separate authority and change control.
 - Represent only source-separated pairs in no-overlap constraints. Keep intentional overlaps and rigid groups out of universal separation constraints.
 - Rank only hard-valid candidates using alignment, even spacing, hierarchy, balance, whitespace, readability, and source relationship preservation. A cutoff with no hard-valid candidate is `INCOMPLETE_SEARCH`, never proven infeasibility.
-- Acceptance: every selected output has a hard-validation report and a reproducible candidate score. This evidence is pending.
+- Acceptance: the current bounded tree records hard-validation reports and reproducible fixed-point candidate scores in `Docs/STATUS.md` and the held-out-style evaluator. Official/native-amd64 and organizer-held-out qualification remain pending.
 
 ### Gate 6 — Offline submission qualification
 

@@ -1,0 +1,15 @@
+{
+  "canvas": {"width": 16, "height": 12},
+  "elements": [
+    {
+      "id": "box",
+      "type": "shape",
+      "x": 2,
+      "y": 2,
+      "width": 5,
+      "height": 4,
+      "shape_type": "rectangle",
+      "fill_color": "rgba(12,34,56,1)"
+    }
+  ]
+}

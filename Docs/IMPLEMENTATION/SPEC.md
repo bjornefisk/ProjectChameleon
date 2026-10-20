@@ -1,6 +1,6 @@
 # Project Chameleon implementation specification
 
-**Status:** Ready for Gate 1 implementation; solver and model work remain blocked until Gate 1 evidence.
+**Status:** Bounded implementation and local evidence are present for the ratified Stage 1 engine; public Level 3, held-out/native-amd64, and broader qualification boundaries remain explicit in `Docs/STATUS.md`.
 **Date:** 2026-10-06
 **Normative Authority:** [`../PROJECT_CONTRACT.md`](../PROJECT_CONTRACT.md) and [`../DECISIONS/`](../DECISIONS/) (ADR-001 through ADR-009)
 
@@ -91,17 +91,15 @@ A deterministic, renderer-aware adaptive layout engine that separates macro-topo
    - `ratios.py`: Reduced integer lattice point calculation for foreground images.
    - `groups.py`: Uniform macro-scale and translation vector computation.
 5. **`chameleon/engine/layout/`:**
-   - `roles.py`: Deterministic multi-signal role classifier (background, logo, hero, headline, subhead, cta, badge, decoration).
-   - `topologies.py`: Four archetype generator functions: `generate_near_isomorphic()`, `generate_column_pivot()`, `generate_horizontal_ribbon()`, `generate_vertical_restack()`.
-   - `typography.py`: Binary-search font size optimizer against Skia typeface measurements.
-   - `search.py`: Structured macro-candidate orchestrator generating at most 12 candidates.
-   - `ranking.py`: Fixed-point lexicographic scorer: `(hard_validity, quality_tuple, topology_order, candidate_index, source_order)`.
-6. **`chameleon/engine/staging.py` & `main.py`:**
-   - JSON ingress: `main.py` uses `parse_int=int`, `parse_float=Decimal`, and a rejecting `parse_constant` hook (or an equivalent decoder) before validation and geometry; output serialization emits only contract-approved JSON values.
-   - Task isolation: `run_task(task_path, input_dir, output_dir)`.
-   - Atomic pair publisher: stages `<task>_output.json.tmp` and `<task>_output.png.tmp`, validates both, commits atomically to final names.
-   - Stale artifact cleanup: deletes pre-existing outputs on task failure.
-   - Main runner: loops over input tasks, handles typed exceptions, returns exit code `0` only on total batch success.
+   - `roles.py`: deterministic multi-signal role classifier (background, logo, hero, headline, subhead, cta, badge, decoration).
+   - `near_isomorphic.py`, `column_pivot.py`, `horizontal_ribbon.py`, and `vertical_restack.py`: four bounded topology generators with renderer-gated candidates.
+   - `search.py`: structured macro-candidate orchestrator generating at most 12 source-derived candidates.
+   - `ranking.py`: fixed-point lexicographic scorer: `(hard_validity, quality_tuple, topology_order, candidate_index, source_order)`.
+6. **`chameleon/engine/artifact.py`, `staging.py` & `main.py`:**
+   - Renderer-aware semantic text and PNG artifact gates run before candidate admission or pair publication.
+   - JSON ingress uses exact integer/decimal parse hooks and rejects non-finite constants; output serialization emits only contract-approved JSON values.
+   - Task isolation stages `<task>_output.json.tmp` and `<task>_output.png.tmp`, validates both, and commits the logical pair with a marker.
+   - The runner handles typed exceptions, cleans stale artifacts, and returns exit code `0` only on total batch success.
 
 ### Key data structures
 ```text

@@ -1,5 +1,7 @@
 # Agent run record
 
+**Historical record:** Created before PR #14 merged. Its review, partner-pending, and no-merge statements describe that earlier transition state; current state is in [`Docs/STATUS.md`](../../Docs/STATUS.md).
+
 ```text
 run_id: run-ticket06-docs-20261018
 parent_task_id: task-ticket06-column-pivot-level2

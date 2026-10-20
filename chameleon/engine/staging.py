@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from pathlib import Path
 import re
 import shutil
 import stat
@@ -17,12 +18,13 @@ import tempfile
 import unicodedata
 from dataclasses import dataclass
 from decimal import Decimal
-from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from PIL import Image
 
-from .contract import validate_response
+from .artifact import validate_artifact
+from .contract import validate_renderer_response, validate_response
+from .errors import InfeasibleLayoutError, InfeasibleReasonCode
 from .geometry.math_util import quantize_to_int
 
 
@@ -426,8 +428,100 @@ def _publish_response_json(response: Mapping[str, Any], path: Path) -> Mapping[s
     return _read_serialized_design(path)
 
 
-def validate_png(path: Path) -> None:
-    """Ensure a staged file is a readable, non-empty PNG image."""
+_RENDER_MAX_SIZE = 2048
+
+
+def _expected_render_size(canvas: Mapping[str, Any]) -> tuple[int, int]:
+    """Mirror pinned cr-renderer's ``_get_scale_size(..., max_size=2048)``."""
+
+    width = float(canvas["width"])
+    height = float(canvas["height"])
+    scale = min(1.0, _RENDER_MAX_SIZE / max(width, height))
+    sx = sy = scale
+    if round(width * sx) <= 0:
+        sx = 1.0 / width
+    if round(height * sy) <= 0:
+        sy = 1.0 / height
+    size = (round(width * sx), round(height * sy))
+    if size[0] <= 0 or size[1] <= 0:
+        raise ValueError(f"invalid renderer dimensions: {size!r}")
+    return size
+
+
+def _artifact_failure(message: str, details: Mapping[str, Any] | None = None) -> None:
+    raise InfeasibleLayoutError(
+        InfeasibleReasonCode.RUNTIME_IO_FAILURE,
+        message,
+        details,
+    )
+
+
+def _validate_artifact_semantics(
+    image: Image.Image,
+    design: Mapping[str, Any],
+    assets_dir: Path | None,
+    warnings: list[str],
+) -> None:
+    """Check decoded renderer invariants independent of soft visual scoring."""
+
+    try:
+        expected_size = _expected_render_size(design["canvas"])
+    except (KeyError, TypeError, ValueError, OverflowError) as error:
+        _artifact_failure("cannot determine expected renderer dimensions", {"error": str(error)})
+    if image.size != expected_size:
+        _artifact_failure(
+            "rendered PNG dimensions do not match the pinned renderer",
+            {"expected": expected_size, "actual": image.size},
+        )
+
+    if "A" in image.getbands() and image.getchannel("A").getextrema()[0] != 255:
+        _artifact_failure(
+            "rendered PNG contains transparent pixels",
+            {"alpha_extrema": image.getchannel("A").getextrema()},
+        )
+
+    try:
+        from renderer.converter.assets import asset_path, missing_asset_warning
+    except ModuleNotFoundError:
+        from chameleon.renderer.converter.assets import asset_path, missing_asset_warning
+
+    expected_missing: set[str] = set()
+    for element in design.get("elements", ()):
+        if element.get("type") != "image":
+            continue
+        asset_id = element.get("asset_id")
+        if asset_path(str(assets_dir) if assets_dir is not None else None, asset_id) is None:
+            expected_missing.add(missing_asset_warning(element.get("id"), asset_id))
+    actual_missing = {
+        warning
+        for warning in warnings
+        if isinstance(warning, str) and warning.startswith("Missing asset ")
+    }
+    if expected_missing - actual_missing:
+        _artifact_failure(
+            "renderer omitted a required missing-asset warning",
+            {"missing": sorted(expected_missing - actual_missing)},
+        )
+    if actual_missing - expected_missing:
+        _artifact_failure(
+            "renderer reported an unexpected missing asset",
+            {"unexpected": sorted(actual_missing - expected_missing)},
+        )
+
+
+def validate_png(
+    path: Path,
+    *,
+    design: Mapping[str, Any] | None = None,
+    assets_dir: Path | None = None,
+    warnings: list[str] | None = None,
+    artifact_gate: Callable[
+        [Mapping[str, Any], Image.Image, Path | None, list[str]], None
+    ]
+    | None = None,
+    fonts_dir: Path | None = None,
+) -> None:
+    """Validate syntax and, when a design is supplied, hard artifact semantics."""
 
     with _open_regular_file(path) as stream:
         if os.fstat(stream.fileno()).st_size == 0:
@@ -439,7 +533,20 @@ def validate_png(path: Path) -> None:
     with _open_regular_file(path) as stream:
         with Image.open(stream) as image:
             image.load()
-
+            if design is None:
+                return
+            decoded = image.convert("RGBA")
+            warning_list = list(warnings or ())
+            _validate_artifact_semantics(decoded, design, assets_dir, warning_list)
+            validate_artifact(
+                design,
+                decoded,
+                assets_dir=assets_dir,
+                fonts_dir=fonts_dir,
+                warnings=warning_list,
+            )
+            if artifact_gate is not None:
+                artifact_gate(design, decoded, assets_dir, warning_list)
 
 def _validate_output_directory(output_dir: Path) -> None:
     try:
@@ -463,6 +570,11 @@ def publish_task(
     render_to_png: Callable[
         [Mapping[str, Any], Path, Path], list[str] | None
     ],
+    artifact_gate: Callable[
+        [Mapping[str, Any], Image.Image, Path | None, list[str]], None
+    ]
+    | None = None,
+    fonts_dir: Path | None = None,
 ) -> TaskArtifactPaths:
     """Stage, validate, and marker-publish one JSON/PNG task pair."""
 
@@ -484,9 +596,22 @@ def publish_task(
     staging_dir, paths = _private_staging_paths(output_dir, task_name, public_paths)
     try:
         serialized = _publish_response_json(response, paths.json_tmp)
-        validate_response(source, target_canvas, serialized)
-        render_to_png(serialized, assets_dir, paths.png_tmp)
-        validate_png(paths.png_tmp)
+        validate_renderer_response(
+            source,
+            target_canvas,
+            serialized,
+            assets_dir=assets_dir,
+            fonts_dir=fonts_dir,
+        )
+        render_warnings = render_to_png(serialized, assets_dir, paths.png_tmp) or []
+        validate_png(
+            paths.png_tmp,
+            design=serialized,
+            assets_dir=assets_dir,
+            warnings=list(render_warnings),
+            artifact_gate=artifact_gate,
+            fonts_dir=fonts_dir,
+        )
         _write_commit_marker(paths)
 
         # POSIX cannot rename two root files as one operation. The marker is
