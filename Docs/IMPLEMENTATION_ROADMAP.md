@@ -1,12 +1,12 @@
 # Implementation roadmap and review report
 
-**Status:** Execution plan after contract and decision ratification. This file is non-normative; `PROJECT_CONTRACT.md` and Accepted ADRs are the authority. Gate 1 is cleared, Tickets 01-07 are implemented within bounded scopes, and Ticket 08's bounded search/ranking and local offline evidence are recorded on the integrated review tree. The public Level 3 sample remains typed fail-closed `INCOMPLETE_SEARCH`; held-out evaluation and native-amd64/resource qualification remain deferred or unverified.
+**Status:** Execution plan after contract and decision ratification. This file is non-normative; `PROJECT_CONTRACT.md` and Accepted ADRs are the authority. Gate 1 is cleared, Tickets 01-07 are implemented within bounded scopes, and Ticket 08's bounded search/ranking and local offline evidence are recorded on the integrated review tree. The public Level 3 sample remains typed fail-closed `INCOMPLETE_SEARCH`; native-amd64 runtime/sample-output evidence is recorded for F-06, while held-out evaluation, cross-platform parity, full packaging closure, and organizer-controlled qualification remain deferred or unverified.
 
 ## Issue #16 reconciliation
 
-The current implementation is not the pre-implementation plan described by several historical paragraphs below. F-01/F-02/F-03/F-07 have bounded local evidence; F-04/F-05 have local renderer/artifact seam evidence but not complete platform qualification; F-06 and broad held-out evaluation remain open. See the audit matrix and exact paths in [`STATUS.md`](STATUS.md). No warning-only check, soft score, arm64 emulation, or missing artifact is contract or qualification evidence.
+The current implementation is not the pre-implementation plan described by several historical paragraphs below. F-01/F-02/F-03/F-07 have bounded local evidence; F-04/F-05 have local renderer/artifact seam evidence but not complete platform qualification; F-06 has native-amd64 CI observations, while cross-platform parity, full packaging closure, and broad held-out evaluation remain open. See the audit matrix and exact paths in [`STATUS.md`](STATUS.md). No warning-only check, soft score, arm64 emulation, or missing artifact is contract or qualification evidence.
 
-Decision ratification is complete and documentation-only. Tickets 01-08 have bounded implementation or evidence records within their stated scopes. Ticket 07's public sample-pass criterion remains unresolved, while Ticket 08 implementation is present rather than blocked; do not claim held-out evaluation, sample-pass completion, merge/release, native-amd64 qualification, or complete runtime qualification until the corresponding evidence exists.
+Decision ratification is complete and documentation-only. Tickets 01-08 have bounded implementation or evidence records within their stated scopes. Ticket 07's public sample-pass criterion remains unresolved, while Ticket 08 implementation is present rather than blocked; do not claim held-out evaluation, sample-pass completion, merge/release, or complete organizer runtime qualification until the corresponding gaps are resolved.
 
 ### Gate 0 — Contract and evidence (complete; documentation only)
 
@@ -54,7 +54,7 @@ Decision ratification is complete and documentation-only. Tickets 01-08 have bou
 - Start with the accepted bounded structured search: at most three source-derived variants per each of four topology families, renderer-in-loop hard validation, and fixed-point ranking. Ticket 06 MUST remain deterministic and MUST NOT add CP-SAT, OR-Tools, models, or model weights/runtime; any later solver-dependency proposal requires separate authority and change control.
 - Represent only source-separated pairs in no-overlap constraints. Keep intentional overlaps and rigid groups out of universal separation constraints.
 - Rank only hard-valid candidates using alignment, even spacing, hierarchy, balance, whitespace, readability, and source relationship preservation. A cutoff with no hard-valid candidate is `INCOMPLETE_SEARCH`, never proven infeasibility.
-- Acceptance: the current bounded tree records hard-validation reports and reproducible fixed-point candidate scores in `Docs/STATUS.md` and the held-out-style evaluator. Official/native-amd64 and organizer-held-out qualification remain pending.
+- Acceptance: the current bounded tree records hard-validation reports and reproducible fixed-point candidate scores in `Docs/STATUS.md` and the held-out-style evaluator. Native-amd64 F-06 runtime/sample-output evidence is recorded; official/native cross-platform and organizer-held-out qualification remain pending.
 
 ### Gate 6 — Offline submission qualification
 
