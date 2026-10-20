@@ -49,6 +49,7 @@ def generate_vertical_restack_candidate(
     source: Mapping[str, Any],
     target_canvas: Mapping[str, Any],
     *,
+    variant: str = "source_proportional",
     font_manager=None,
     fonts_dir: str | None = None,
     assets_dir: str | None = None,
@@ -61,6 +62,7 @@ def generate_vertical_restack_candidate(
         source,
         target_canvas,
         axis="vertical",
+        variant=variant,
         font_manager=font_manager,
         fonts_dir=fonts_dir,
     )

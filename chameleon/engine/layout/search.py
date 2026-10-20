@@ -542,12 +542,14 @@ def _invoke_solver(
     target_canvas: Mapping[str, Any],
     roles: RoleModel,
     *,
+    variant: str,
     font_manager: Any,
     fonts_dir: str | Path | None,
     assets_dir: str | Path | None,
 ) -> RenderedCandidate:
     solver = _TOPOLOGY_SOLVERS[spec.topology_order]
     kwargs: dict[str, Any] = {
+        "variant": variant,
         "font_manager": font_manager,
         "fonts_dir": str(fonts_dir) if fonts_dir is not None else None,
         "assets_dir": str(assets_dir) if assets_dir is not None else None,
@@ -638,7 +640,6 @@ def search(
     work_set_topologies = tuple(dict.fromkeys(spec.topology for spec in specs))
     admitted: list[Candidate] = []
     failures: list[dict[str, Any]] = []
-    base_candidates: dict[str, RenderedCandidate] = {}
     # These state variables describe finite work independently of any
     # candidate's reason code.  A reason alone cannot prove exhaustion.
     finite_work_exhausted = not cutoff
@@ -647,39 +648,23 @@ def search(
     for spec in specs[:limit]:
         candidate_generated = False
         try:
-            rendered_png: bytes
-            warnings: tuple[str, ...]
-            if spec.variant_index == 0:
-                solver_candidate = _invoke_solver(
-                    spec,
-                    source,
-                    target_canvas,
-                    roles,
-                    font_manager=font_manager,
-                    fonts_dir=fonts_dir,
-                    assets_dir=assets_dir,
-                )
-                candidate_generated = True
-                base_candidates[spec.topology] = solver_candidate
-                response = solver_candidate.response
-                rendered_png = solver_candidate.rendered_png
-                warnings = solver_candidate.warnings
-            else:
-                base = base_candidates.get(spec.topology)
-                if base is None:
-                    unexamined_work = True
-                    finite_work_exhausted = False
-                    failures.append(
-                        _failure_record(
-                            spec,
-                            InfeasibleReasonCode.INCOMPLETE_SEARCH.value,
-                            "base topology candidate was not available",
-                        )
-                    )
-                    continue
-                candidate_generated = True
+            solver_candidate = _invoke_solver(
+                spec,
+                source,
+                target_canvas,
+                roles,
+                variant=spec.variant,
+                font_manager=font_manager,
+                fonts_dir=fonts_dir,
+                assets_dir=assets_dir,
+            )
+            candidate_generated = True
+            response = solver_candidate.response
+            rendered_png = solver_candidate.rendered_png
+            warnings = solver_candidate.warnings
+            if spec.variant_index != 0:
                 response = _derive_variant_response(
-                    base.response,
+                    response,
                     source,
                     target_canvas,
                     roles,
@@ -696,9 +681,7 @@ def search(
                     font_manager=font_manager,
                 )
             # Re-read the serialized response after the solver or derived
-            # render boundary before fixed-point scoring.  The bytes for the
-            # base variant came from the solver; derived bytes were rendered
-            # exactly once above.
+            # render boundary before fixed-point scoring.
             validate_response(source, target_canvas, response)
             quality = score_candidate(source, response, rendered_png, roles=roles)
             admitted.append(
