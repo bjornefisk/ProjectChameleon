@@ -4,7 +4,7 @@ This directory houses the complete engineering specification, module architectur
 
 It is structured using the industry-standard **`to-spec`**, **`to-tickets`**, and **`writing-for-agents`** methodologies so autonomous AI agents have explicit implementation boundaries and dependency-sequenced work.
 Use `../FINAL_ARCHITECTURE.md` as the consolidated implementation summary. This directory decomposes that architecture into the executable specification and dependency-sequenced tickets.
-Current frontier is PR #14 integration review for bounded Ticket 06 source-aware routing and column-pivot work after Gate 1 clearance. Tickets 01-05 are complete; Ticket 06 implementation, focused/full tests, and sample evidence are recorded, and refreshed-PR corrections for contract-valid large sources, readable-floor font search, and accurate path/status evidence are verified locally. Partner review remains pending on `feat/ticket-06-column-pivot-level2`; Tickets 07-08, full candidate ranking, and held-out evaluation remain later. No merge or release is claimed.
+Current frontier is Ticket 06 complete on `main` at commit `58b697a` after PR #14 merged. Tickets 01-06 are complete within their bounded scopes; exact column-pivot serialization and renderer-aware response text validation are current hard-validation paths. Ticket 07 is next, while Ticket 08, full candidate ranking, held-out evaluation, and complete runtime qualification remain pending or unverified.
 
 ---
 

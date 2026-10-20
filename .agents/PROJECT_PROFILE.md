@@ -19,7 +19,7 @@ The contract plus Accepted ADRs win conflicts. Starter comments, warning-only ch
 
 ## Current phase
 
-PR #14's bounded Ticket 06 source-aware routing and column-pivot implementation is under integration review after refreshed-PR corrections. Focused/full local evidence and supplemental container evidence pass with the documented expected Level 3 failure; partner review remains pending (Issue #13). Tickets 07-08, full candidate ranking, and held-out evaluation remain later work.
+PR #14's bounded Ticket 06 source-aware routing and column-pivot implementation is merged into `main` at commit `58b697a`. The current tree includes exact column-pivot serialization and renderer-aware response text validation. Focused/full local evidence and supplemental arm64-host container evidence pass with the documented expected Level 3 failure; native amd64, cross-platform parity, apt locks, and wheelhouse closure remain unverified. Tickets 07-08, full candidate ranking, and held-out evaluation remain later work.
 
 Stage 1 MUST preserve source identity, IDs, counts, order, types, immutable fields, content, assets, and source relationships. Only target canvas dimensions, element geometry, and text `font_size` may change; serialized mutable values must be finite integers. Hard validation is authoritative for rotated bounds, exact foreground-image ratios, groups and source-separated overlap, text/render bounds, and missing assets. Invalid candidates fail closed without misleading output files.
 
