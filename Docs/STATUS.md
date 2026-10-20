@@ -2,9 +2,9 @@
 
 **Date:** 2026-10-19
 
-**Phase:** Gate 1 cleared. Tickets 01-05 complete. PR #14's Ticket 06 implementation is under integration review after a refreshed-PR correction pass; local focused/full/runtime corrections pass, and partner review is pending.
-**Decision status:** Gate 1 renderer/validator qualification and native runtime remain recorded on the transition branch. Ticket 06 focused/full implementation/sample evidence and correction verification are recorded. Tickets 07-08, full candidate ranking, and held-out evaluation remain later work.
-**Ticket 06 authority:** User-requested GitHub issue #13; owner @bjornefisk; partner reviewer @gabegaines24. Implementation branch `feat/ticket-06-column-pivot-level2`, refreshed PR #14 source revision `2166392` reviewed locally, based on transition revision `77b3368` (`origin/work/pr-12-ready`).
+**Phase:** Gate 1 cleared. Tickets 01-06 complete. PR #14's Ticket 06 implementation is merged into `main`; Ticket 07 horizontal-ribbon work is now active.
+**Decision status:** Gate 1 renderer/validator qualification and native runtime remain recorded on the transition branch. Ticket 06 focused/full implementation/sample evidence and correction verification are complete and merged. Ticket 07 is the active bounded topology slice; Ticket 08, full candidate ranking, and held-out evaluation remain later work.
+**Ticket 06 authority:** User-requested GitHub issue #13; owner @bjornefisk; partner reviewer @gabegaines24. Implementation branch `feat/ticket-06-column-pivot-level2`, merged PR #14, source revision `2b09dbd`, now included in `main` at `58b697a`.
 
 ## PR12 merge gate — CLEARED
 
@@ -58,22 +58,47 @@ The bounded deterministic search with `INCOMPLETE_SEARCH` status satisfies Gate 
 - Confirm any future renderer-golden/native-parity qualification claim against evidence, and preserve the successful native-amd64 CI run; the current PR12 merge gate is already cleared.
 - Keep arm64-host Buildx output labeled supplemental evidence.
 
-## Ticket 06 implementation evidence and review state
+## Ticket 06 implementation evidence — complete
 
-Ticket 06 implementation evidence is recorded and the slice is in integration review. The refreshed PR review found an unauthorized relationship/resource cap and stale evidence claims; the relationship view, readable-floor font search, resource-guard removal, and documentation corrections are applied and verified locally. No merge, release, or native-amd64 qualification is claimed from the local arm64-host Docker run.
+Ticket 06 implementation evidence is complete and PR #14 is merged into `main`. The refreshed-PR corrections removed the unauthorized relationship/resource cap and stale evidence claims; the relationship view, readable-floor font search, resource-guard removal, and documentation corrections passed local verification before merge. No native-amd64 qualification is claimed from the local arm64-host Docker run.
 
 - **Changed Ticket 06 product paths:** `chameleon/engine/layout/roles.py` (new lazy relationship view), `chameleon/engine/layout/column_pivot.py` (new), `chameleon/engine/layout/__init__.py`, `chameleon/engine/layout/near_isomorphic.py` (bounded renderer/font-search hardening), `chameleon/engine/resize.py`, and `chameleon/tests/layout/test_level2.py` (new/updated).
-- **Inherited Gate 1 paths present in the PR tree:** renderer converter and renderer tests remain from the prior transition; the refreshed PR's temporary `resources.py` policy and its imports/call sites were removed. No new renderer resource ceiling is part of Ticket 06.
+- **Inherited Gate 1 paths present in the merged tree:** renderer converter and renderer tests remain from the prior transition; the temporary `resources.py` policy and its imports/call sites were removed. No new renderer resource ceiling is part of Ticket 06.
 - **Changed documentation paths:** `AGENTS.md`, `.agents/README.md`, `.agents/PROJECT_PROFILE.md`, `.agents/PRODUCTION_STANDARD.md`, `.agents/roles/implementer.md`, `.agents/workflows/02-plan.md`, `.agents/tasks/ticket-06-column-pivot-level2.md`, `.agents/runs/ticket-06-column-pivot-level2.md`, `Docs/STATUS.md`, `Docs/FINAL_ARCHITECTURE.md`, `Docs/IMPLEMENTATION/README.md`, `Docs/IMPLEMENTATION_ROADMAP.md`, `Docs/IMPLEMENTATION/tickets/06-column-pivot-and-level-2-solver.md`, and `Docs/IMPLEMENTATION/tickets/07-horizontal-ribbon-and-level-3-solver.md`.
 - **Focused tests:** `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 35 passed after the refreshed-PR correction pass.
 - **Full tests:** `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 170 passed.
 - **Repository/syntax checks:** `python3 scripts/verify_repository.py`, `make verify`, changed-file `py_compile`, and final `git diff --check` passed.
 - **Engine smoke:** `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1 expected; Levels 1-2 `SUCCESS` with pairs, Level 3 `INCOMPLETE_SEARCH` with no pair; warning-only off-canvas self-check remains non-authoritative.
 - **Docker supplemental smoke:** `docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` passed with `FromPlatformFlagConstDisallowed`; offline `docker run --rm --network none ... chameleon-stage1` exited 1 as expected with Levels 1-2 pairs and Level 3 `INCOMPLETE_SEARCH`. This is arm64-host supplemental evidence, not native-amd64 qualification.
-- **Review:** Independent correctness/security review found contract-visible rejection through the relationship/resource caps and stale path/status claims. The relationship view and readable-floor font search address the product findings; the arbitrary renderer resource guard is removed. Pre-existing exact-ingress/style-run and unbounded schema/render resource risks remain outside this bounded fix. Partner review by @gabegaines24 remains pending.
-- **Next gate:** Partner review and disposition by @gabegaines24. Do not mark the ticket merged/released or claim native-amd64 qualification from the local arm64 run.
+- **Review:** Independent correctness/security review found and resolved the contract-visible relationship/resource-cap and stale-path/status findings. Pre-existing exact-ingress/style-run and unbounded schema/render resource risks remain outside this bounded fix. Partner review and merge disposition are complete.
+- **Next gate:** Resolve the Ticket 07 Level 3 sample acceptance gap through bounded implementation review or an accepted contract/fixture decision; Ticket 08 remains blocked behind Ticket 07.
 
 
+
+## Ticket 07 implementation evidence — active review
+
+Ticket 07 product work is implemented on `feat/ticket-07-horizontal-ribbon-level3`, but the Level 3 fixture acceptance remains open. The implementation is intentionally contract-first: it keeps exact group transforms, rotated AABB checks, source-separated placement, image-ratio lattices, renderer-gated integer font search, missing-asset records, and typed fail-closed behavior. It does not claim a hard-valid output for the adversarial `1080 x 1350 -> 728 x 90` sample.
+
+- **Changed product paths:** `chameleon/engine/layout/horizontal_ribbon.py`, `chameleon/engine/layout/vertical_restack.py`, `chameleon/engine/layout/__init__.py`, `chameleon/engine/resize.py`, and `chameleon/tests/layout/test_level3.py`.
+- **Focused evidence:** `cd chameleon && ../.venv/bin/python -m unittest tests.layout.test_level3 -v` — 4 passed. Feasible synthetic horizontal and vertical candidates validate; repeated synthetic rendering produces identical PNG hashes; the public Level 3 fixture fails closed after the bounded ribbon candidates are exhausted.
+- **Level 2 regression:** `cd chameleon && ../.venv/bin/python -m unittest tests.layout.test_level2 -v` — 15 passed.
+- **Full evidence:** `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 174 passed.
+- **Repository checks:** `python3 scripts/verify_repository.py`, `make verify`, and changed-file `py_compile` passed; `git diff --check` passed for tracked edits.
+- **Engine smoke:** required system `python -m engine.main` could not start because that interpreter lacks `jsonschema`; the project environment `../.venv/bin/python -m engine.main` ran Levels 1-2 successfully and Level 3 as typed `INCOMPLETE_SEARCH` with no pair.
+- **Docker supplemental smoke:** `docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` passed with the existing `FromPlatformFlagConstDisallowed` warning. Offline `docker run --rm --network none ... chameleon-stage1` ran under arm64-host amd64 emulation, produced Level 1-2 pairs, and returned the expected nonzero status for the Level 3 typed failure. This is supplemental, not native-amd64 qualification.
+- **Observed public Level 3 result:** typed `INCOMPLETE_SEARCH`; no design/PNG pair. The horizontal family exhausts its finite geometry/order variants at renderer-gated text placement; column-pivot and near-isomorphic remain bounded fallbacks and also fail on the fixture's rigid groups. This is evidence of an unresolved acceptance gap, not proof that the fixture is contract-infeasible.
+- **Known review risk:** the ticket requires a valid $728 x 90$ sample output, but the current hard-valid search has not produced one. Do not mark Ticket 07 complete, claim sample-pass evidence, or promote this arm64-host work to native-amd64 qualification until the gap is resolved or superseded by an accepted contract decision.
+- **Next review question:** independently enumerate the legal integer group/image lattices and renderer-valid text boxes for the fixture before changing hard constraints. A solver change MUST remain bounded and MUST NOT shed records, rewrite copy/font attributes, substitute fonts, or relax overlap/containment rules.
+
+## Issue #19 / F-03 exhaustion-aware status evidence — complete
+
+The resize failure seam aggregates all attempted family outcomes and emits `NO_HARD_VALID_CANDIDATE` only when every attempted family has top-level `details["search_exhausted"] is True`. Missing, non-boolean, false, cutoff, and outer serialized-validation metadata cannot establish exhaustion and remain `INCOMPLETE_SEARCH`. Failed tasks remain fail-closed and publish no JSON/PNG pair.
+
+- **Focused evidence:** `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/layout -t . -p 'test_*.py' -v` — 43 passed; `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 72 passed.
+- **Repository/full evidence:** `python3 scripts/verify_repository.py`, `make verify`, and `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 179 passed; changed-file `py_compile` and whitespace checks passed.
+- **Engine smoke:** the documented `cd chameleon && python -m engine.main` command is unavailable in the system interpreter because `jsonschema` is not installed. The project environment `../.venv/bin/python -m engine.main` ran Levels 1–2 as `SUCCESS` with committed pairs and Level 3 as typed `INCOMPLETE_SEARCH` with no pair.
+- **Docker supplemental smoke:** `docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` passed with the existing `FromPlatformFlagConstDisallowed` warning. The offline `docker run --rm --network none ... chameleon-stage1` run exited nonzero as expected under arm64-host amd64 emulation: Levels 1–2 committed pairs and Level 3 reported `INCOMPLETE_SEARCH` without a pair. This is supplemental, not native-amd64 qualification.
+- **Review:** independent contract-focused correctness review found no issues. No security-sensitive paths changed; no separate security review was required for this status-only change. Ticket 07's public Level 3 sample-pass gap and Ticket 08 search/ranking work remain open.
 
 ## Ground truth now recorded
 
@@ -118,15 +143,15 @@ These are contract artifacts, not solver or renderer implementation:
 - `chameleon/chameleon_design_schema_v0.9.json` is no longer provisional, accepts empty designs, and records structural ranges/defaults.
 - Contract fixtures live under `chameleon/tests/fixtures/contract/`.
 - The Level 2 public sample's style range is corrected to valid end-exclusive `[6, 15)` semantics; this is fixture/source-data correction, not solver implementation.
-- Ticket 01's semantic validator and contract tests, ticket 02's renderer adapter/tests, ticket 03's fail-closed runner, ticket 04's exact geometry package/tests, and ticket 05's bounded Level 1 solver/tests are implemented. Gate 1 qualification is complete in the current transition record; the earlier verification notes below preserve their observed evidence gaps, while later solver work remains pending.
+- Ticket 01's semantic validator and contract tests, ticket 02's renderer adapter/tests, ticket 03's fail-closed runner, ticket 04's exact geometry package/tests, and ticket 05's bounded Level 1 solver/tests are implemented. Gate 1 qualification is complete in the current transition record; Ticket 06 is merged; Ticket 07 is active review with the public Level 3 sample acceptance gap recorded above.
 
 ## Solver work after Gate 1
 
 Gate 1 qualification is complete. The following solver capabilities are active or planned next:
 
-1. **Ticket 06 (integration review):** Bounded deterministic multi-signal role inference and source-aware column-pivot topology for Level 2 wide targets ($1080 \times 1080 \to 1600 \times 400$); implementation, focused/full tests, and sample evidence are recorded, refreshed-PR corrections are verified locally, and partner review remains pending.
-2. **Ticket 07 (blocked by 06):** Horizontal-ribbon topology for extreme-wide targets.
-3. **Ticket 08 (blocked by 06-07):** Vertical-restack topology, multi-candidate ranking, and held-out evaluation.
+1. **Ticket 06:** Complete and merged in PR #14; the bounded role-inference and column-pivot evidence is recorded above.
+2. **Ticket 07 (active review):** Horizontal-ribbon and vertical-restack topology candidates are implemented, but the public Level 3 sample remains a typed fail-closed result and its pass criterion is unresolved.
+3. **Ticket 08 (blocked by Ticket 07):** Candidate search/ranking, offline Docker qualification, and held-out evaluation remain later work.
 4. **Future hardening (if needed):** Project-owned hash-locked wheelhouse and apt-version locks (current direct pins are baseline).
 
 **Note:** `engine/main.py` warning-only self-check is not the contract validator - `engine/contract.validate_response()` is authoritative.
