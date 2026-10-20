@@ -1,11 +1,16 @@
 import math
+import sys
 import unittest
 from pathlib import Path
 
-from engine.contract import validate_response
-from engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
-from renderer.converter.brand_fonts import load_brand_font_manager
-from renderer.converter.wrap import char_widths
+PROJECT_ROOT = Path(__file__).parents[3]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from chameleon.engine.contract import validate_response
+from chameleon.engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
+from chameleon.renderer.converter.brand_fonts import load_brand_font_manager
+from chameleon.renderer.converter.wrap import char_widths
 
 
 FONTS = Path(__file__).parents[2] / "brand_kit" / "fonts"
