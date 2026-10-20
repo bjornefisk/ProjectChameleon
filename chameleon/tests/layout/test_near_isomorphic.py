@@ -6,8 +6,9 @@ import tempfile
 import unittest
 from decimal import Decimal
 from pathlib import Path
+from unittest.mock import patch
 
-from PIL import UnidentifiedImageError
+from PIL import Image, UnidentifiedImageError
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 if str(PROJECT_ROOT) not in sys.path:
@@ -269,6 +270,21 @@ class NearIsomorphicTests(unittest.TestCase):
         ).response
 
         self.assertLessEqual(response["elements"][0]["font_size"], 5)
+
+    def test_candidate_rejects_non_png_renderer_output(self):
+        source = {"canvas": {"width": 100, "height": 100}, "elements": []}
+
+        def write_jpeg(_design, _assets_dir, png_path, **_kwargs):
+            Image.new("RGB", (100, 100), "white").save(png_path, format="JPEG")
+            return []
+
+        with patch(
+            "engine.layout.near_isomorphic._renderer_components",
+            return_value=(None, None, write_jpeg, None),
+        ):
+            with self.assertRaises(ValueError) as raised:
+                solve_near_isomorphic(source, source["canvas"])
+        self.assertIn("PNG", str(raised.exception))
 
     def test_renderer_failure_is_checked_before_candidate_return(self):
         source = {

@@ -324,6 +324,10 @@ def _render_candidate(
             ) or []
             warnings = tuple(str(warning) for warning in raw_warnings)
             with Image.open(png_path) as image:
+                if image.format != "PNG":
+                    raise ValueError("renderer did not produce a PNG artifact")
+                image.verify()
+            with Image.open(png_path) as image:
                 image.load()
                 validate_artifact(
                     response,

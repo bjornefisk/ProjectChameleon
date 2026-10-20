@@ -630,6 +630,8 @@ def _render_candidate(
         for warning in warnings:
             logger.warning("renderer warning: %r", warning)
         with Image.open(png_path) as image:
+            if image.format != "PNG":
+                raise ValueError("renderer did not produce a PNG artifact")
             image.verify()
         with Image.open(png_path) as image:
             image.load()
