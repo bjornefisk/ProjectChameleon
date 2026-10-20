@@ -86,9 +86,10 @@ The post-integration emulated container runtimes still exceed the `<2.0s` target
 
 The shared topology hand-off now returns a `RenderedCandidate` containing the serialized response and the verified PNG bytes. The centralized search gate still calls `validate_response()` before admission and again at the render boundary:
 
-- the unchanged source-proportional/base variant reuses the solver's PNG;
-- every translated or emphasis-derived variant is rendered once by centralized search before scoring;
+- each topology/variant work item invokes its solver independently from source data;
+- the source-proportional variant reuses its own solver PNG;
+- every translated or emphasis-derived variant is rendered once by centralized search after independent generation;
 - the selected candidate's stored PNG remains available to ranking; and
 - the batch staging path still renders the selected serialized response for the final published artifact pair, which is a separate publication boundary.
 
-`tests.layout.test_search_ranking.SearchRankingTests.test_solver_render_is_reused_and_derived_variants_render_once` proves one solver render is reused while each derived variant receives exactly one centralized render. The duplicate solver/search base render recorded in the prior evidence is removed. The `<2.0s` runtime target remains blocked by the explicit qualification exception above, not marked complete.
+`tests.layout.test_search_ranking.SearchRankingTests.test_each_variant_invokes_solver_and_derived_variants_render_once` proves independent variant dispatch and one centralized render for each derived variant. The `<2.0s` runtime target remains blocked by the explicit qualification exception above, not marked complete.

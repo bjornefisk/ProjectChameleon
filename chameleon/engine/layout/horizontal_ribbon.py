@@ -446,6 +446,7 @@ def _build_extreme_candidate(
     if wide_text:
         text_variants.append(wide_text)
 
+    attempts: list[dict[str, Any]] = []
     art_scales = (
         (Fraction(1), Fraction(1, 2))
         if variant != "dominant_copy"
