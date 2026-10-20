@@ -664,6 +664,7 @@ def solve_near_isomorphic(
     source: Mapping[str, Any],
     target_canvas: Mapping[str, Any],
     *,
+    variant: str = "source_proportional",
     font_manager=None,
     fonts_dir: str | None = None,
     assets_dir: str | None = None,
