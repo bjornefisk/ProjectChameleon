@@ -19,6 +19,7 @@ from ..contract import validate_response, validate_source, validate_target_canva
 from ..errors import InfeasibleLayoutError, InfeasibleReasonCode, TaskStatus
 from ..geometry.bounds import rotated_aabb, source_bleed_sides
 from ..geometry.math_util import quantize_to_int, to_fraction
+from ..geometry.ratios import reduced_ratio
 from .column_pivot import is_column_pivot_suitable, solve_column_pivot
 from .horizontal_ribbon import is_horizontal_ribbon_suitable, solve_horizontal_ribbon
 from .near_isomorphic import solve_near_isomorphic
@@ -192,6 +193,175 @@ def _integer_bounds(low: Fraction, high: Fraction) -> tuple[int, int] | None:
     return (lower, upper) if lower <= upper else None
 
 
+_MEDIA_ROLES = frozenset({RoleKind.HERO_MEDIA, RoleKind.LOGO, RoleKind.IMAGE})
+_COPY_ROLES = frozenset(
+    {RoleKind.HEADLINE, RoleKind.SUPPORTING_TEXT, RoleKind.CTA, RoleKind.BADGE, RoleKind.TEXT}
+)
+
+
+def _variant_focus_indices(
+    source: Mapping[str, Any], roles: RoleModel, variant_index: int
+) -> frozenset[int]:
+    role_set = _MEDIA_ROLES if variant_index == 1 else _COPY_ROLES
+    return frozenset(
+        assignment.index
+        for assignment in roles.assignments
+        if assignment.role in role_set
+        and assignment.index != roles.background_index
+    )
+
+
+def _variant_lattice_dimensions(
+    source_element: Mapping[str, Any],
+    response_element: Mapping[str, Any],
+    factor: Fraction,
+) -> tuple[int, int]:
+    ratio = reduced_ratio(source_element["width"], source_element["height"])
+    if ratio is None:
+        return (
+            quantize_to_int(to_fraction(response_element["width"]) * factor),
+            quantize_to_int(to_fraction(response_element["height"]) * factor),
+        )
+    numerator, denominator = ratio
+    current_width = to_fraction(response_element["width"])
+    current_height = to_fraction(response_element["height"])
+    current_multiplier = min(
+        current_width.numerator // (current_width.denominator * numerator),
+        current_height.numerator // (current_height.denominator * denominator),
+    )
+    desired_multiplier = min(
+        (current_width * factor).numerator
+        // ((current_width * factor).denominator * numerator),
+        (current_height * factor).numerator
+        // ((current_height * factor).denominator * denominator),
+    )
+    multiplier = max(current_multiplier, desired_multiplier, 1)
+    return multiplier * numerator, multiplier * denominator
+
+
+def _scaled_variant_records(
+    response: dict[str, Any],
+    source: Mapping[str, Any],
+    indices: Sequence[int],
+    *,
+    origin: tuple[Fraction, Fraction],
+    factor: Fraction,
+    lattice_images: bool,
+) -> None:
+    origin_x, origin_y = origin
+    for index in indices:
+        source_element = source["elements"][index]
+        element = response["elements"][index]
+        center_x = to_fraction(element["x"]) + to_fraction(element["width"]) / 2
+        center_y = to_fraction(element["y"]) + to_fraction(element["height"]) / 2
+        next_center_x = origin_x + (center_x - origin_x) * factor
+        next_center_y = origin_y + (center_y - origin_y) * factor
+        if lattice_images and element.get("type") == "image":
+            next_width, next_height = _variant_lattice_dimensions(
+                source_element, element, factor
+            )
+        else:
+            next_width = to_fraction(element["width"]) * factor
+            next_height = to_fraction(element["height"]) * factor
+        element["x"] = next_center_x - to_fraction(next_width) / 2
+        element["y"] = next_center_y - to_fraction(next_height) / 2
+        element["width"] = next_width
+        element["height"] = next_height
+        if element.get("type") == "text":
+            element["font_size"] = to_fraction(element["font_size"]) * factor
+
+
+def _variant_fits(
+    response: Mapping[str, Any],
+    indices: Sequence[int],
+    target_canvas: Mapping[str, Any],
+) -> bool:
+    target_width = to_fraction(target_canvas["width"])
+    target_height = to_fraction(target_canvas["height"])
+    for index in indices:
+        box = rotated_aabb(response["elements"][index])
+        if box[0] < 0 or box[1] < 0 or box[2] > target_width or box[3] > target_height:
+            return False
+    return True
+
+
+def _apply_variant_emphasis(
+    response: dict[str, Any],
+    source: Mapping[str, Any],
+    roles: RoleModel,
+    target_canvas: Mapping[str, Any],
+    spec: CandidateSpec,
+) -> None:
+    focus = _variant_focus_indices(source, roles, spec.variant_index)
+    if not focus:
+        return
+    groups: dict[Any, list[int]] = {}
+    individual: list[int] = []
+    for index in sorted(focus):
+        group_id = source["elements"][index].get("group_id")
+        if group_id is None:
+            individual.append(index)
+            continue
+        groups.setdefault(group_id, [])
+    for group_id in groups:
+        groups[group_id] = [
+            index
+            for index, element in enumerate(source["elements"])
+            if element.get("group_id") == group_id
+        ]
+    for indices in groups.values():
+        if roles.background_index in indices:
+            continue
+        aabbs = [rotated_aabb(response["elements"][index]) for index in indices]
+        origin = (
+            (min(box[0] for box in aabbs) + max(box[2] for box in aabbs)) / 2,
+            (min(box[1] for box in aabbs) + max(box[3] for box in aabbs)) / 2,
+        )
+        for factor in (Fraction(2), Fraction(3, 2), Fraction(1)):
+            trial = deepcopy(response)
+            _scaled_variant_records(
+                trial,
+                source,
+                indices,
+                origin=origin,
+                factor=factor,
+                lattice_images=False,
+            )
+            if _variant_fits(trial, indices, target_canvas):
+                response["elements"] = trial["elements"]
+                break
+    for index in individual:
+        element = response["elements"][index]
+        origin = (
+            to_fraction(element["x"]) + to_fraction(element["width"]) / 2,
+            to_fraction(element["y"]) + to_fraction(element["height"]) / 2,
+        )
+        for factor in (Fraction(5, 4), Fraction(9, 8), Fraction(1)):
+            trial = deepcopy(response)
+            _scaled_variant_records(
+                trial,
+                source,
+                [index],
+                origin=origin,
+                factor=factor,
+                lattice_images=True,
+            )
+            if _variant_fits(trial, [index], target_canvas):
+                response["elements"] = trial["elements"]
+                break
+
+
+def _serialize_variant_response(response: Mapping[str, Any]) -> dict[str, Any]:
+    result = deepcopy(dict(response))
+    for element in result.get("elements", []):
+        for field in ("x", "y", "width", "height"):
+            if field in element:
+                element[field] = quantize_to_int(element[field])
+        if element.get("type") == "text" and "font_size" in element:
+            element["font_size"] = quantize_to_int(element["font_size"])
+    return result
+
+
 def _derive_variant_response(
     base: Mapping[str, Any],
     source: Mapping[str, Any],
@@ -199,15 +369,7 @@ def _derive_variant_response(
     roles: RoleModel,
     spec: CandidateSpec,
 ) -> dict[str, Any]:
-    """Derive a source-anchored alignment variant without changing semantics.
-
-    The topology solver supplies the macro geometry.  Ticket 08 variants only
-    apply one common integer translation to eligible foreground records.  A
-    common translation preserves explicit group transforms, image ratios, and
-    all pairwise relationships; the independent hard validator still gates the
-    result because a source-bleed record or another boundary can make a
-    translated variant invalid.
-    """
+    """Derive role-specific emphasis geometry from a hard-safe base candidate."""
 
     response = deepcopy(dict(base))
     if spec.variant_index == 0 or not response.get("elements"):
@@ -263,6 +425,7 @@ def _derive_variant_response(
         translation = max(y_interval[0], min(y_interval[1], desired))
         for index in eligible:
             response["elements"][index]["y"] += translation
+    _apply_variant_emphasis(response, source, roles, target_canvas, spec)
     return response
 
 
@@ -417,6 +580,7 @@ def search(
                     roles,
                     spec,
                 )
+            response = _serialize_variant_response(response)
             # Reject serialized structural failures before spending renderer
             # work.  The renderer then supplies the actual text/glyph gate.
             validate_response(source, target_canvas, response)
