@@ -56,13 +56,24 @@ jobs:
       - name: Verify Docker image architecture
         run: test "$(docker inspect chameleon-stage1 --format '{{.Os}}/{{.Architecture}}')" = "linux/amd64"
 
-      - name: Record Docker image provenance and SBOM
+      - name: Record Docker image provenance
         run: |
           docker inspect chameleon-stage1 \
             --format 'image_id={{.Id}} architecture={{.Os}}/{{.Architecture}} repo_digests={{json .RepoDigests}}'
-          docker sbom chameleon-stage1 \
-            > "$RUNNER_TEMP/chameleon-stage1.sbom.txt"
-          cat "$RUNNER_TEMP/chameleon-stage1.sbom.txt"
+      - name: Generate Docker image SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          image: chameleon-stage1
+          format: spdx-json
+          output-file: ${{ runner.temp }}/chameleon-stage1.sbom.spdx.json
+          syft-version: v1.42.3
+          upload-artifact: false
+          upload-release-assets: false
+          dependency-snapshot: false
+      - name: Record Docker image SBOM
+        run: |
+          cat "${{ runner.temp }}/chameleon-stage1.sbom.spdx.json"
+          sha256sum "${{ runner.temp }}/chameleon-stage1.sbom.spdx.json"
       - name: Record packaged asset and font hashes
         run: |
           docker run --rm --network none --entrypoint sh chameleon-stage1 -c '
