@@ -1,10 +1,10 @@
 # Implementation roadmap and review report
 
-**Status:** Execution plan after contract and decision ratification. This file is non-normative; `PROJECT_CONTRACT.md` and Accepted ADRs are the authority. Gate 1 is cleared and PR #14's Ticket 06 implementation is merged. Ticket 07 is the active bounded topology slice; feasible synthetic candidates and the full local suite pass, while the adversarial Level 3 sample remains a typed fail-closed result under review.
+**Status:** Execution plan after contract and decision ratification. This file is non-normative; `PROJECT_CONTRACT.md` and Accepted ADRs are the authority. Gate 1 is cleared and PR #14's Ticket 06 implementation is merged. Ticket 07 and Ticket 08 are under stacked review; local integrated search evidence passes, while the adversarial Level 3 sample remains typed fail-closed.
 
 ## Ratified delivery plan
 
-Decision ratification is complete and documentation-only. Implementation of Tickets 01-05 is complete, Ticket 06 is merged, and Ticket 07 is active review. Do not claim held-out evaluation, full four-topology ranking, sample-pass completion, merge/release, or native-amd64 qualification from the local arm64-host Docker run until those later gates have evidence.
+Decision ratification is complete and documentation-only. Implementation of Tickets 01-06 is complete; Ticket 07 and Ticket 08 review branches are not merged. Do not claim held-out evaluation, public Level 3 sample-pass completion, release, or native-amd64 qualification from arm64-host Docker output.
 
 ### Gate 0 — Contract and evidence (complete; documentation only)
 
@@ -52,7 +52,7 @@ Decision ratification is complete and documentation-only. Implementation of Tick
 - Start with the accepted bounded structured search: at most three source-derived variants per each of four topology families, renderer-in-loop hard validation, and fixed-point ranking. Ticket 06 MUST remain deterministic and MUST NOT add CP-SAT, OR-Tools, models, or model weights/runtime; any later solver-dependency proposal requires separate authority and change control.
 - Represent only source-separated pairs in no-overlap constraints. Keep intentional overlaps and rigid groups out of universal separation constraints.
 - Rank only hard-valid candidates using alignment, even spacing, hierarchy, balance, whitespace, readability, and source relationship preservation. A cutoff with no hard-valid candidate is `INCOMPLETE_SEARCH`, never proven infeasibility.
-- Acceptance: every selected output has a hard-validation report and a reproducible candidate score. This evidence is pending.
+- Acceptance: local integrated review evidence now covers hard-validation reports, reproducible candidate scores, deterministic variants, and solver PNG reuse. Held-out evaluation remains unverified.
 
 ### Gate 6 — Offline submission qualification
 
@@ -60,7 +60,8 @@ Decision ratification is complete and documentation-only. Implementation of Tick
 - Exercise all three sample levels, the fixture matrix, and catalogue-sized synthetic targets. Test on native amd64 and Apple Silicon Buildx output.
 - Use the accepted failure statuses and pair-publication rule: stage JSON and PNG together, publish neither on failure, continue independent tasks where possible, and return a nonzero aggregate status if any task fails or does not commit both artifacts.
 - Confirm `INFEASIBLE_LAYOUT` and `INCOMPLETE_SEARCH` tasks fail closed with the documented reason rather than emitting dishonest JSON/PNG or a failure envelope.
-- Acceptance: a clean rebuild reproduces the same contract artifacts and no runtime download occurs.
+- Local integrated review evidence covers samples, offline emulation, hashes, and failure behavior. Native-amd64 runtime/RSS, fixture-matrix rerun, held-out evaluation, and native renderer parity remain unverified.
+- Acceptance: pending native-amd64 and held-out evidence.
 
 ### Gate 7 — Finale product layer
 

@@ -3,23 +3,31 @@
 **What to build:**  
 A bounded macro-candidate search coordinating all four layout topologies, paired with offline `linux/amd64` qualification. For any task, the engine generates at most 12 candidates across the four families, validates each through the actual renderer, ranks only hard-valid survivors, selects deterministically, and records qualification evidence rather than assuming every task is feasible.
 
-**Blocked by:**  
-`07: Horizontal Ribbon Topology and Level 3 Extreme Leaderboard Solver`
+**Integrated dependency:**
+Ticket 07 revision `b11d7c3` supplies horizontal-ribbon and vertical-restack exports.
 
 **Status:**  
-implemented; offline evidence recorded; native-amd64 qualification remains unverified on the arm64 workstation
+Bounded search implementation and local qualification are complete on the integrated PR #15 review stack.
+Native-amd64, peak-RSS, held-out, and public Level 3 pass qualification remain incomplete or unverified.
+
 ## Integration ownership
 
-Ticket 08 owns `chameleon/engine/resize.py` integration through `layout.search.search()`. Ticket 07 supplies the horizontal-ribbon and vertical-restack solver exports consumed by that orchestrator. The integrated review revision includes Ticket 07 at `b11d7c3`; a clean checkout must include both revisions before importing `layout.search`. Roll back by reverting the Ticket 07 dependency merge, then restore the previous bounded topology owner.
+Ticket 08 owns `chameleon/engine/resize.py` integration through `layout.search.search()`.
+Ticket 07 owns horizontal-ribbon and vertical-restack modules and tests.
+Topology exports use:
+`solve_<topology>(source, target_canvas, *, font_manager=None, fonts_dir=None, assets_dir=None, variant=None, rendered_output=None) -> dict[str, Any]`.
+The private `rendered_output` collector lets search reuse source-proportional solver PNG bytes.
+Derived variants render after geometry changes; central serialized hard validation remains before and after rendering.
+Revert the Ticket 07 dependency merge to roll back integrated topology ownership.
 
-- [x] Create `chameleon/engine/layout/search.py` orchestrating candidate generation across the four topology families (near-isomorphic, column-pivot, horizontal-ribbon, vertical-restack) with at most 3 source-derived variants each (maximum 12 macro-candidates).
-- [x] Connect renderer-in-the-loop hard validation: pass every candidate through Skia rendering and `validate_response()`, immediately discarding any candidate that violates containment, ratios, groups, or text bounds.
-- [x] Create `chameleon/engine/layout/ranking.py` implementing fixed-point quality scoring: score readability ($\text{Rea}$), visual balance ($\text{Bal}$), alignment ($\text{Ali}$), and hierarchy preservation.
-- [x] Implement deterministic lexicographic tie-breaking: `(hard_validity, quality_tuple, topology_order, candidate_index, source_order)` with zero random seeds.
-- [x] Wire the full search and ranking pipeline into `resize()` in `chameleon/engine/resize.py`.
-- [x] Execute `python -m engine.main` locally across all three public samples and contract fixtures, recording hard-validation results, typed failures, and deterministic artifacts. Do not claim a 100% pass rate until the implementation and fixture evidence establish it.
-- [x] Build the Docker container using `docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` so the image is available to the local `docker run` smoke step regardless of the selected Buildx driver.
-- [x] Run the container with `--network none` mounting input and output volumes: record whether each level produces a valid JSON/PNG pair, any typed failure status, and measured per-design runtime against the <$2.0$ second performance target.
-- [x] Measure peak memory against the <$500\text{ MB}$ solver target and image size against the <$8\text{ GB}$ container ceiling; record evidence rather than treating targets as completed qualification.
+- [x] Create `chameleon/engine/layout/search.py` across four topology families with at most 12 macro-candidates.
+- [x] Connect renderer-in-the-loop hard validation and serialized validation.
+- [x] Create fixed-point quality scoring and deterministic lexicographic tie-breaking.
+- [x] Wire search and ranking through `resize()`.
+- [x] Run local public samples and record typed failure and artifact behavior.
+- [x] Build and run the offline `linux/amd64` image under `--network none`.
+- [ ] Establish native-amd64 runtime and peak-memory qualification.
+- [ ] Run held-out evaluation and repeated held-out determinism.
+- [ ] Produce a hard-valid public Level 3 sample output.
 
 Evidence: [08-qualification-evidence.md](08-qualification-evidence.md)

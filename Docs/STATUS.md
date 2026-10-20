@@ -2,9 +2,11 @@
 
 **Date:** 2026-10-19
 
-**Phase:** Gate 1 cleared. Tickets 01-06 complete. PR #14's Ticket 06 implementation is merged into `main`; Ticket 07 horizontal-ribbon work is now active.
-**Decision status:** Gate 1 renderer/validator qualification and native runtime remain recorded on the transition branch. Ticket 06 focused/full implementation/sample evidence and correction verification are complete and merged. Ticket 07 is the active bounded topology slice; Ticket 08, full candidate ranking, and held-out evaluation remain later work.
-**Ticket 06 authority:** User-requested GitHub issue #13; owner @bjornefisk; partner reviewer @gabegaines24. Implementation branch `feat/ticket-06-column-pivot-level2`, merged PR #14, source revision `2b09dbd`, now included in `main` at `58b697a`.
+**Phase:** Gate 1 cleared. Tickets 01-06 complete. Ticket 07 and Ticket 08 are under stacked review; PR #15 is not merged.
+The integrated review stack contains Ticket 07 revision `b11d7c3` and PR #15 base revision `9ca4802`.
+
+**Decision status:** Local bounded search, ranking, renderer gating, integration ownership, and offline smoke evidence pass on the review stack.
+The public Level 3 sample remains typed `INCOMPLETE_SEARCH`; native-amd64, peak-RSS, held-out, and native renderer-parity qualification remain unverified.
 
 ## PR12 merge gate — CLEARED
 
@@ -99,6 +101,20 @@ The resize failure seam aggregates all attempted family outcomes and emits `NO_H
 - **Engine smoke:** the documented `cd chameleon && python -m engine.main` command is unavailable in the system interpreter because `jsonschema` is not installed. The project environment `../.venv/bin/python -m engine.main` ran Levels 1–2 as `SUCCESS` with committed pairs and Level 3 as typed `INCOMPLETE_SEARCH` with no pair.
 - **Docker supplemental smoke:** `docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` passed with the existing `FromPlatformFlagConstDisallowed` warning. The offline `docker run --rm --network none ... chameleon-stage1` run exited nonzero as expected under arm64-host amd64 emulation: Levels 1–2 committed pairs and Level 3 reported `INCOMPLETE_SEARCH` without a pair. This is supplemental, not native-amd64 qualification.
 - **Review:** independent contract-focused correctness review found no issues. No security-sensitive paths changed; no separate security review was required for this status-only change. Ticket 07's public Level 3 sample-pass gap and Ticket 08 search/ranking work remain open.
+
+## PR #15 / Ticket 08 integrated review evidence — current
+
+This section records the stacked review branch, not merged `main`.
+The branch includes PR #15 base `9ca4802`, Ticket 07 `b11d7c3`, and current evidence revision `c254cd6`.
+
+- **Complete:** 33 focused layout/search-status tests, `make verify`, changed-file `py_compile`, 187 project tests, and 47 review tests.
+- **Complete:** local Level 1-2 sample pairs and typed Level 3 fail-closed behavior.
+- **Complete:** offline `linux/amd64` image build and `--network none` smoke under arm64-host emulation.
+- **Complete:** role-specific variants, independent variant dispatch, one final variant serialization, solver PNG reuse, and centralized hard validation.
+- **Incomplete:** public Level 3 still returns typed `INCOMPLETE_SEARCH` without output artifacts.
+- **Unverified:** native-amd64 runtime/RSS, held-out evaluation, repeated held-out determinism, and native renderer/library parity.
+
+Detailed commands, revisions, Docker identifiers, timings, and artifact hashes live in [Ticket 08 qualification evidence](IMPLEMENTATION/tickets/08-qualification-evidence.md).
 
 ## Ground truth now recorded
 
