@@ -1,6 +1,7 @@
 # Ticket 08 qualification evidence
 
 This record belongs to Ticket 08 and is intentionally separate from the parallel Ticket 07 implementation. The post-issue-32 integration evidence below was measured on the local Darwin arm64 workstation unless stated otherwise.
+The issue #23/F-07 normative evidence expansion is recorded separately in [`08-issue-23-evidence.md`](08-issue-23-evidence.md).
 
 ## Implementation checks
 
