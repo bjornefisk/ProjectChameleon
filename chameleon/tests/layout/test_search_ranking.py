@@ -262,6 +262,42 @@ class SearchRankingTests(unittest.TestCase):
             [(topology, 0) for topology in TOPOLOGY_ORDER],
         )
 
+    def test_badge_role_produces_copy_variant(self):
+        source = {
+            "canvas": {"width": 400, "height": 200},
+            "elements": [
+                {
+                    "id": "background",
+                    "type": "image",
+                    "x": 0,
+                    "y": 0,
+                    "width": 400,
+                    "height": 200,
+                    "asset_id": "background.png",
+                    "fit": "cover",
+                },
+                {
+                    "id": "badge",
+                    "type": "text",
+                    "x": 20,
+                    "y": 20,
+                    "width": 100,
+                    "height": 30,
+                    "content": "SALE",
+                    "font_family": "Solstice Sans",
+                    "font_size": 16,
+                    "color": "rgba(255,255,255,1)",
+                    "group_id": "badge",
+                },
+            ],
+        }
+
+        specs = enumerate_candidate_specs(source, {"width": 800, "height": 200})
+
+        copy_specs = [spec for spec in specs if spec.variant == "dominant_copy"]
+        self.assertTrue(copy_specs)
+        self.assertEqual(copy_specs[0].source_order, 1)
+
     def test_ranker_uses_fixed_point_quality_and_stable_ties(self):
         quality = QualityScore(readability=900, balance=800, alignment=700, hierarchy=600)
         self.assertTrue(all(type(value) is int for value in quality.as_tuple()))

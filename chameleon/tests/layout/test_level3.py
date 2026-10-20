@@ -4,6 +4,7 @@ import json
 import sys
 import tempfile
 import unittest
+from decimal import Decimal
 from pathlib import Path
 
 from PIL import Image
@@ -17,6 +18,7 @@ try:
     from engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
     from engine.geometry.bounds import positive_aabb_intersection, rotated_aabb
     from engine.geometry.ratios import preserves_source_ratio
+    from engine.layout.horizontal_ribbon import generate_horizontal_ribbon_candidate
     from engine.resize import resize
     from renderer.converter.convert import render_design_to_png
 except ModuleNotFoundError:
@@ -24,6 +26,7 @@ except ModuleNotFoundError:
     from chameleon.engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
     from chameleon.engine.geometry.bounds import positive_aabb_intersection, rotated_aabb
     from chameleon.engine.geometry.ratios import preserves_source_ratio
+    from chameleon.engine.layout.horizontal_ribbon import generate_horizontal_ribbon_candidate
     from chameleon.engine.resize import resize
     from chameleon.renderer.converter.convert import render_design_to_png
 
@@ -164,6 +167,183 @@ class Level3IntegrationTests(unittest.TestCase):
                 hashlib.sha256(first.read_bytes()).digest(),
                 hashlib.sha256(second.read_bytes()).digest(),
             )
+
+    def test_zero_span_group_does_not_raise_runtime_error(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                {
+                    "id": "bg",
+                    "type": "image",
+                    "x": 0,
+                    "y": 0,
+                    "width": 100,
+                    "height": 100,
+                    "asset_id": "missing-bg.png",
+                    "fit": "cover",
+                },
+                {
+                    "id": "zero-a",
+                    "type": "shape",
+                    "x": 10,
+                    "y": 10,
+                    "width": 0,
+                    "height": 0,
+                    "group_id": "zero",
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(255,0,0,1)",
+                },
+                {
+                    "id": "zero-b",
+                    "type": "shape",
+                    "x": 10,
+                    "y": 10,
+                    "width": 0,
+                    "height": 0,
+                    "group_id": "zero",
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(0,255,0,1)",
+                },
+                {
+                    "id": "later",
+                    "type": "shape",
+                    "x": 50,
+                    "y": 10,
+                    "width": 10,
+                    "height": 20,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(0,0,255,1)",
+                },
+            ],
+        }
+        target = {"width": 80, "height": 20}
+
+        response = generate_horizontal_ribbon_candidate(source, target).response
+
+        validate_response(source, target, response)
+
+    def test_singleton_group_keeps_uniform_transform(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                {
+                    "id": "bg",
+                    "type": "image",
+                    "x": 0,
+                    "y": 0,
+                    "width": 100,
+                    "height": 100,
+                    "asset_id": "missing-bg.png",
+                    "fit": "cover",
+                },
+                {
+                    "id": "copy",
+                    "type": "text",
+                    "x": 20,
+                    "y": 20,
+                    "width": 30,
+                    "height": 10,
+                    "content": "A",
+                    "font_family": "Solstice Sans",
+                    "font_size": 12,
+                    "color": "rgba(255,255,255,1)",
+                    "text_align": "center",
+                    "group_id": "copy",
+                },
+            ],
+        }
+        target = {"width": 80, "height": 10}
+
+        response = generate_horizontal_ribbon_candidate(source, target).response
+
+        validate_response(source, target, response)
+        copy_element = response["elements"][1]
+        self.assertEqual(copy_element["width"] * 10, copy_element["height"] * 30)
+
+    def test_bleeding_singleton_keeps_positive_canvas_intersection(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                {
+                    "id": "bleed",
+                    "type": "shape",
+                    "x": -1,
+                    "y": 20,
+                    "width": 3,
+                    "height": 20,
+                    "opacity": Decimal("0.5"),
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(255,0,0,1)",
+                },
+                {
+                    "id": "later",
+                    "type": "shape",
+                    "x": 50,
+                    "y": 20,
+                    "width": 10,
+                    "height": 20,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(0,255,0,1)",
+                },
+            ],
+        }
+        target = {"width": 80, "height": 20}
+
+        response = generate_horizontal_ribbon_candidate(source, target).response
+
+        validate_response(source, target, response)
+        bleed = response["elements"][0]
+        self.assertGreaterEqual(bleed["width"], 2)
+
+    def test_ribbon_packing_preserves_source_order(self):
+        source = {
+            "canvas": {"width": 100, "height": 100},
+            "elements": [
+                {
+                    "id": "bg",
+                    "type": "image",
+                    "x": 0,
+                    "y": 0,
+                    "width": 100,
+                    "height": 100,
+                    "asset_id": "missing-bg.png",
+                    "fit": "cover",
+                },
+                {
+                    "id": "copy",
+                    "type": "text",
+                    "x": 10,
+                    "y": 10,
+                    "width": 30,
+                    "height": 20,
+                    "content": "SALE",
+                    "font_family": "Solstice Sans",
+                    "font_size": 12,
+                    "color": "rgba(255,255,255,1)",
+                    "text_align": "center",
+                },
+                {
+                    "id": "later-shape",
+                    "type": "shape",
+                    "x": 60,
+                    "y": 10,
+                    "width": 20,
+                    "height": 20,
+                    "shape_type": "rectangle",
+                    "fill_color": "rgba(255,0,0,1)",
+                },
+            ],
+        }
+        target = {"width": 80, "height": 20}
+
+        response = generate_horizontal_ribbon_candidate(source, target).response
+
+        validate_response(source, target, response)
+        self.assertEqual(
+            [element["id"] for element in response["elements"]],
+            [element["id"] for element in source["elements"]],
+        )
+        self.assertLess(response["elements"][1]["x"], response["elements"][2]["x"])
 
     def test_vertical_restack_with_synthetic_source(self):
         source = {
