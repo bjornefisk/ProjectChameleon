@@ -417,8 +417,16 @@ def _finalize_column_candidate(
 ) -> RenderedCandidate:
     serialized = _serialize_column_candidate(response)
     try:
-        validate_response(source, target_canvas, serialized)
+        validate_response(
+            source,
+            target_canvas,
+            serialized,
+            font_manager=font_manager,
+            fonts_dir=fonts_dir,
+        )
     except InfeasibleLayoutError as error:
+        if error.reason_code is InfeasibleReasonCode.RUNTIME_IO_FAILURE:
+            raise
         _fail(
             "column-pivot candidate failed serialized hard validation",
             reason_code=error.reason_code.value,
@@ -431,7 +439,6 @@ def _finalize_column_candidate(
         fonts_dir,
         font_manager,
     )
-    validate_response(source, target_canvas, serialized)
     return RenderedCandidate(
         response=serialized,
         rendered_png=rendered_png,

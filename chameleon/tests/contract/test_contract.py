@@ -45,6 +45,7 @@ def grouped_source():
                 "font_family": "Solstice Sans",
                 "font_size": 10,
                 "color": "rgba(255,255,255,1)",
+                "text_align": "center",
                 "group_id": "unit",
             },
         ]

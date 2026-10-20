@@ -28,14 +28,15 @@ class Issue23RoundingRegressionTests(unittest.TestCase):
                 {
                     "id": "label",
                     "type": "text",
-                    "x": 5,
+                    "x": 4,
                     "y": 0,
-                    "width": 4,
+                    "width": 6,
                     "height": 10,
                     "content": "T",
                     "font_family": "Solstice Sans",
                     "font_size": Decimal("3.5"),
                     "color": "rgba(0,0,0,1)",
+                    "text_align": "center",
                 },
             ],
         }

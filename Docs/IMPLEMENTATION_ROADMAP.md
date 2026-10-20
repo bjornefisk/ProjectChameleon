@@ -4,7 +4,7 @@
 
 ## Issue #16 reconciliation
 
-The current implementation is not the pre-implementation plan described by several historical paragraphs below. F-01/F-02/F-03/F-07 have bounded local evidence; F-04/F-05 have local renderer/artifact seam evidence but not complete platform qualification; F-06 has native-amd64 CI observations, while cross-platform parity, full packaging closure, and broad held-out evaluation remain open. See the audit matrix and exact paths in [`STATUS.md`](STATUS.md). No warning-only check, soft score, arm64 emulation, or missing artifact is contract or qualification evidence.
+The current implementation is not the pre-implementation plan described by several historical paragraphs below. F-01/F-02/F-03/F-04/F-07 have bounded local evidence at their authoritative seams; F-05 has local renderer/artifact seam evidence but not complete platform qualification; F-06 has native-amd64 CI observations, while cross-platform parity, full packaging closure, and broad held-out evaluation remain open. See the audit matrix and exact paths in [`STATUS.md`](STATUS.md). No warning-only check, soft score, arm64 emulation, or missing artifact is contract or qualification evidence.
 
 Decision ratification is complete and documentation-only. Tickets 01-08 have bounded implementation or evidence records within their stated scopes. Ticket 07's public sample-pass criterion remains unresolved, while Ticket 08 implementation is present rather than blocked; do not claim held-out evaluation, sample-pass completion, merge/release, or complete organizer runtime qualification until the corresponding gaps are resolved.
 
