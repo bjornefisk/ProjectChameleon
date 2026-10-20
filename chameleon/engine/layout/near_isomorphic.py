@@ -643,6 +643,7 @@ def solve_near_isomorphic(
     font_manager=None,
     fonts_dir: str | None = None,
     assets_dir: str | None = None,
+    rendered_output: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return one hard-safe, centered near-isomorphic candidate.
 
@@ -776,7 +777,9 @@ def solve_near_isomorphic(
             reason=error.message,
             details=error.details,
         )
-    _render_candidate(response, assets_dir, fonts_dir, font_manager)
+    rendered_png = _render_candidate(response, assets_dir, fonts_dir, font_manager)
+    if rendered_output is not None:
+        rendered_output["png"] = rendered_png
     return response
 
 

@@ -258,6 +258,26 @@ class SearchRankingTests(unittest.TestCase):
 
         self.assertEqual(calls, ["source_proportional", "dominant_media"])
         self.assertEqual(result.selected.variant, "dominant_media")
+    def test_source_variant_reuses_solver_render(self):
+        source = {"canvas": {"width": 100, "height": 100}, "elements": []}
+        target = {"width": 200, "height": 100}
+        specs = (CandidateSpec("near_isomorphic", "source_proportional", 0, 0, 0, 0),)
+
+        def solver(_source, _target, **kwargs):
+            kwargs["rendered_output"]["png"] = b"solver-png"
+            return {"canvas": dict(target), "elements": []}
+
+        with patch.object(search_module, "enumerate_candidate_specs", return_value=specs):
+            with patch.object(search_module, "_TOPOLOGY_SOLVERS", (solver,)):
+                with patch.object(
+                    search_module,
+                    "_render_candidate",
+                    side_effect=AssertionError("central render duplicated solver render"),
+                ):
+                    result = search_module.search(source, target)
+
+        self.assertEqual(result.selected.rendered_png, b"solver-png")
+
     def test_variant_translation_serializes_once_with_half_even_rounding(self):
         source = {
             "canvas": {"width": 100, "height": 100},

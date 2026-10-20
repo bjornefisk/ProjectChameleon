@@ -52,6 +52,7 @@ def generate_vertical_restack_candidate(
     font_manager=None,
     fonts_dir: str | None = None,
     assets_dir: str | None = None,
+    rendered_output: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     validate_source(source)
     validate_target_canvas(target_canvas)
@@ -65,7 +66,9 @@ def generate_vertical_restack_candidate(
         variant=variant,
         fonts_dir=fonts_dir,
     )
-    _render_candidate(response, assets_dir, fonts_dir, font_manager)
+    rendered_png = _render_candidate(response, assets_dir, fonts_dir, font_manager)
+    if rendered_output is not None:
+        rendered_output["png"] = rendered_png
     return response
 
 

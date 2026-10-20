@@ -406,6 +406,7 @@ def generate_column_pivot_candidate(
     font_manager=None,
     fonts_dir: str | None = None,
     assets_dir: str | None = None,
+    rendered_output: dict[str, Any] | None = None,
     roles: RoleModel | None = None,
 ) -> dict[str, Any]:
     """Generate and serialize one source-aware column-pivot candidate."""
@@ -423,7 +424,9 @@ def generate_column_pivot_candidate(
         fonts_dir=fonts_dir,
         variant=variant,
     )
-    _render_candidate(response, assets_dir, fonts_dir, font_manager)
+    rendered_png = _render_candidate(response, assets_dir, fonts_dir, font_manager)
+    if rendered_output is not None:
+        rendered_output["png"] = rendered_png
     validate_response(source, target_canvas, response)
     return response
 
@@ -436,6 +439,7 @@ def solve_column_pivot(
     font_manager=None,
     fonts_dir: str | None = None,
     assets_dir: str | None = None,
+    rendered_output: dict[str, Any] | None = None,
     roles: RoleModel | None = None,
 ) -> dict[str, Any]:
     validate_source(source)
@@ -451,7 +455,9 @@ def solve_column_pivot(
         variant=variant,
         fonts_dir=fonts_dir,
     )
-    _render_candidate(response, assets_dir, fonts_dir, font_manager)
+    rendered_png = _render_candidate(response, assets_dir, fonts_dir, font_manager)
+    if rendered_output is not None:
+        rendered_output["png"] = rendered_png
     validate_response(source, target_canvas, response)
     return response
 

@@ -499,6 +499,7 @@ def _invoke_solver(
     font_manager: Any,
     fonts_dir: str | Path | None,
     assets_dir: str | Path | None,
+    rendered_output: dict[str, Any] | None,
 ) -> Mapping[str, Any]:
     solver = _TOPOLOGY_SOLVERS[spec.topology_order]
     kwargs: dict[str, Any] = {
@@ -506,6 +507,7 @@ def _invoke_solver(
         "font_manager": font_manager,
         "fonts_dir": str(fonts_dir) if fonts_dir is not None else None,
         "assets_dir": str(assets_dir) if assets_dir is not None else None,
+        "rendered_output": rendered_output,
     }
     if spec.topology == "column_pivot":
         kwargs["roles"] = roles
@@ -549,6 +551,7 @@ def search(
 
     for spec in specs[:limit]:
         try:
+            rendered_output: dict[str, Any] = {}
             response = _invoke_solver(
                 spec,
                 source,
@@ -558,6 +561,7 @@ def search(
                 font_manager=font_manager,
                 fonts_dir=fonts_dir,
                 assets_dir=assets_dir,
+                rendered_output=rendered_output,
             )
             if spec.variant_index != 0:
                 response = _derive_variant_response(
@@ -571,12 +575,16 @@ def search(
             # Reject serialized structural failures before spending renderer
             # work.  The renderer then supplies the actual text/glyph gate.
             validate_response(source, target_canvas, response)
-            rendered_png, warnings = _render_candidate(
-                response,
-                assets_dir=assets_dir,
-                fonts_dir=fonts_dir,
-                font_manager=font_manager,
-            )
+            if spec.variant_index == 0 and rendered_output.get("png") is not None:
+                rendered_png = bytes(rendered_output["png"])
+                warnings = tuple(rendered_output.get("warnings", ()))
+            else:
+                rendered_png, warnings = _render_candidate(
+                    response,
+                    assets_dir=assets_dir,
+                    fonts_dir=fonts_dir,
+                    font_manager=font_manager,
+                )
             # Re-read the candidate at the renderer boundary as an explicit
             # post-serialization hard gate before fixed-point scoring.
             validate_response(source, target_canvas, response)
