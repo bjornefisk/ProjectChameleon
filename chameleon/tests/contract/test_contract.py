@@ -45,6 +45,7 @@ def grouped_source():
                 "font_family": "Solstice Sans",
                 "font_size": 10,
                 "color": "rgba(255,255,255,1)",
+                "text_align": "center",
                 "group_id": "unit",
             },
         ]
@@ -375,6 +376,149 @@ class ContractValidatorTests(unittest.TestCase):
             copy.deepcopy(source),
             InfeasibleReasonCode.TEXT_OVERFLOW,
         )
+    def test_wrapped_text_is_checked_at_authoritative_response_boundary(self):
+        source = design_with_elements(
+            [
+                {
+                    "id": "copy",
+                    "type": "text",
+                    "x": 10,
+                    "y": 10,
+                    "width": 1,
+                    "height": 80,
+                    "content": "A A",
+                    "font_family": "Solstice Sans",
+                    "font_size": 20,
+                    "color": "rgba(255,255,255,1)",
+                }
+            ]
+        )
+        self.assert_reason(
+            source,
+            source["canvas"],
+            copy.deepcopy(source),
+            InfeasibleReasonCode.TEXT_OVERFLOW,
+        )
+    def test_authoritative_text_validation_uses_effective_style_face_metrics(self):
+        from renderer.converter.brand_fonts import load_brand_font_manager
+        from renderer.converter.wrap import char_widths
+
+        fonts = Path(__file__).parents[2] / "brand_kit" / "fonts"
+        manager = load_brand_font_manager(str(fonts))
+        content = "WW WW"
+        regular_width = sum(
+            char_widths(manager, "Solstice Sans", "regular", "regular", 24, content)
+        )
+        bold_width = sum(
+            char_widths(manager, "Solstice Sans", "bold", "bold", 24, content)
+        )
+        width = math.floor((regular_width + bold_width) / 2)
+        self.assertLess(regular_width, width)
+        self.assertGreater(bold_width, width)
+
+        source = design_with_elements(
+            [
+                {
+                    "id": "copy",
+                    "type": "text",
+                    "x": 0,
+                    "y": 0,
+                    "width": width,
+                    "height": 80,
+                    "content": content,
+                    "font_family": "Solstice Sans",
+                    "font_size": 24,
+                    "color": "rgba(255,255,255,1)",
+                    "style_runs": [{"start": 0, "end": len(content), "font_weight": "bold"}],
+                    "max_lines": 1,
+                    "text_align": "center",
+                }
+            ],
+        )
+        self.assert_reason(
+            source,
+            source["canvas"],
+            copy.deepcopy(source),
+            InfeasibleReasonCode.TEXT_OVERFLOW,
+        )
+
+    def test_authoritative_text_validation_maps_missing_font_to_runtime_failure(self):
+        source = design_with_elements(
+            [
+                {
+                    "id": "copy",
+                    "type": "text",
+                    "x": 0,
+                    "y": 0,
+                    "width": 100,
+                    "height": 80,
+                    "content": "copy",
+                    "font_family": "Not Installed",
+                    "font_size": 20,
+                    "color": "rgba(255,255,255,1)",
+                }
+            ]
+        )
+        self.assert_reason(
+            source,
+            source["canvas"],
+            copy.deepcopy(source),
+            InfeasibleReasonCode.RUNTIME_IO_FAILURE,
+        )
+
+    def test_authoritative_text_validation_maps_numeric_overflow_to_runtime_failure(self):
+        huge = 10**400
+        source = design_with_elements(
+            [
+                {
+                    "id": "copy",
+                    "type": "text",
+                    "x": 0,
+                    "y": 0,
+                    "width": huge,
+                    "height": huge,
+                    "content": "copy",
+                    "font_family": "Solstice Sans",
+                    "font_size": 20,
+                    "color": "rgba(255,255,255,1)",
+                }
+            ],
+            width=huge,
+            height=huge,
+        )
+        self.assert_reason(
+            source,
+            source["canvas"],
+            copy.deepcopy(source),
+            InfeasibleReasonCode.RUNTIME_IO_FAILURE,
+        )
+
+
+    def test_positioned_glyph_bounds_are_checked_at_authoritative_response_boundary(self):
+        source = design_with_elements(
+            [
+                {
+                    "id": "copy",
+                    "type": "text",
+                    "x": 10,
+                    "y": 10,
+                    "width": 6,
+                    "height": 80,
+                    "content": "j",
+                    "font_family": "Solstice Sans",
+                    "font_size": 24,
+                    "font_style": "italic",
+                    "color": "rgba(255,255,255,1)",
+                }
+            ]
+        )
+        self.assert_reason(
+            source,
+            source["canvas"],
+            copy.deepcopy(source),
+            InfeasibleReasonCode.TEXT_OVERFLOW,
+        )
+
 
     def test_foreground_image_ratio_is_exact_and_background_is_exempt(self):
         task = load_fixture("image_ratio.json")
