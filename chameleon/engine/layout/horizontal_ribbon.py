@@ -418,6 +418,7 @@ def _build_extreme_candidate(
     source: Mapping[str, Any],
     target_canvas: Mapping[str, Any],
     *,
+    variant: str = "source_proportional",
     axis: str = "horizontal",
     font_manager=None,
     fonts_dir: str | None = None,
@@ -464,8 +465,18 @@ def _build_extreme_candidate(
         text_variants.append(wide_text)
 
     attempts: list[dict[str, Any]] = []
-    for art_scale in (Fraction(1), Fraction(1, 2)):
-        for text_dimensions in text_variants:
+    art_scales = (
+        (Fraction(1), Fraction(1, 2))
+        if variant != "dominant_copy"
+        else (Fraction(1, 2), Fraction(1))
+    )
+    ordered_text_variants = (
+        tuple(reversed(text_variants))
+        if variant == "dominant_copy"
+        else tuple(text_variants)
+    )
+    for art_scale in art_scales:
+        for text_dimensions in ordered_text_variants:
             plans: list[dict[str, Any]] = []
             for first, indices in units:
                 plan = _make_plan(
@@ -649,6 +660,7 @@ def generate_horizontal_ribbon_candidate(
     source: Mapping[str, Any],
     target_canvas: Mapping[str, Any],
     *,
+    variant: str = "source_proportional",
     font_manager=None,
     fonts_dir: str | None = None,
     assets_dir: str | None = None,
@@ -657,7 +669,13 @@ def generate_horizontal_ribbon_candidate(
     validate_target_canvas(target_canvas)
     if not is_horizontal_ribbon_suitable(source, target_canvas):
         _fail("source and target proportions do not support a horizontal ribbon")
-    response = _build_extreme_candidate(source, target_canvas, font_manager=font_manager, fonts_dir=fonts_dir)
+    response = _build_extreme_candidate(
+        source,
+        target_canvas,
+        font_manager=font_manager,
+        fonts_dir=fonts_dir,
+        variant=variant
+    )
     rendered_png, warnings = _render_candidate(response, assets_dir, fonts_dir, font_manager)
     return RenderedCandidate(
         response=response,

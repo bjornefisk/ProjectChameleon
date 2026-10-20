@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch
 
 try:
+    import engine.layout.search as search_module
     from engine.contract import validate_response
     from engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
     from engine.layout.ranking import QualityScore, select_best
@@ -18,6 +19,7 @@ try:
         search,
     )
 except ModuleNotFoundError:
+    import chameleon.engine.layout.search as search_module
     from chameleon.engine.contract import validate_response
     from chameleon.engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
     from chameleon.engine.layout.ranking import QualityScore, select_best
@@ -36,7 +38,7 @@ except ModuleNotFoundError:
 
 
 class SearchRankingTests(unittest.TestCase):
-    def test_solver_render_is_reused_and_derived_variants_render_once(self):
+    def test_each_variant_invokes_solver_and_derived_variants_render_once(self):
         source = {
             "canvas": {"width": 100, "height": 100},
             "elements": [],
@@ -54,8 +56,10 @@ class SearchRankingTests(unittest.TestCase):
             warnings=("solver-warning",),
         )
         render_calls = []
+        solver_calls = []
 
         def fake_solver(*args, **kwargs):
+            solver_calls.append(kwargs["variant"])
             return solver_result
 
         def fake_render(response, **kwargs):
@@ -71,11 +75,48 @@ class SearchRankingTests(unittest.TestCase):
 
         self.assertEqual(len(render_calls), 2)
         self.assertEqual(
+            solver_calls,
+            ["source_proportional", "dominant_media", "dominant_copy"],
+        )
+        self.assertEqual(
             [candidate.rendered_png for candidate in result.candidates],
             [b"solver-render", b"derived-render-1", b"derived-render-2"],
         )
-
         self.assertEqual(result.candidates[0].warnings, ("solver-warning",))
+
+    def test_variant_dispatch_continues_after_failed_base_generation(self):
+        source = {"canvas": {"width": 100, "height": 100}, "elements": []}
+        target = {"width": 200, "height": 100}
+        specs = (
+            CandidateSpec("near_isomorphic", "source_proportional", 0, 0, 0, 0),
+            CandidateSpec("near_isomorphic", "dominant_media", 0, 1, 0, 1),
+        )
+        calls = []
+        solver_result = RenderedCandidate(
+            response={"canvas": target, "elements": []},
+            rendered_png=b"solver-render",
+        )
+
+        def solver(_source, _target, **kwargs):
+            calls.append(kwargs["variant"])
+            if kwargs["variant"] == "source_proportional":
+                raise InfeasibleLayoutError(
+                    InfeasibleReasonCode.INCOMPLETE_SEARCH,
+                    "base candidate unavailable",
+                )
+            return solver_result
+
+        with (
+            patch("engine.layout.search.enumerate_candidate_specs", return_value=specs),
+            patch("engine.layout.search._TOPOLOGY_SOLVERS", (solver,)),
+            patch("engine.layout.search._render_candidate", return_value=(b"png", ())),
+        ):
+            result = search(source, target)
+
+        self.assertEqual(calls, ["source_proportional", "dominant_media"])
+        self.assertEqual(result.selected.variant, "dominant_media")
+
+
 
     def test_selected_fixed_point_components_are_diagnostic_only(self):
         source = {

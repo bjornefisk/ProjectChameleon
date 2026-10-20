@@ -186,6 +186,7 @@ def _build_column_candidate(
     target_canvas: Mapping[str, Any],
     model: RoleModel,
     *,
+    variant: str = "source_proportional",
     font_manager=None,
     fonts_dir: str | None = None,
 ) -> dict[str, Any]:
@@ -217,7 +218,14 @@ def _build_column_candidate(
     if hero_index is None:
         _fail("column pivot requires a source media role")
     hero = source_elements[hero_index]
-    media_fraction = min(Fraction(1), max(Fraction(1, 4), to_fraction(hero["width"]) / source_width))
+    media_fraction = min(
+        Fraction(1),
+        max(Fraction(1, 4), to_fraction(hero["width"]) / source_width),
+    )
+    if variant == "dominant_media":
+        media_fraction = min(Fraction(1), media_fraction * Fraction(5, 4))
+    elif variant == "dominant_copy":
+        media_fraction = max(Fraction(1, 4), media_fraction * Fraction(3, 4))
     gutter = max(Fraction(1), target_width * Fraction(1, 40))
     left_slot = target_width * media_fraction
     right_x = left_slot + gutter
@@ -450,6 +458,7 @@ def generate_column_pivot_candidate(
     source: Mapping[str, Any],
     target_canvas: Mapping[str, Any],
     *,
+    variant: str = "source_proportional",
     font_manager=None,
     fonts_dir: str | None = None,
     assets_dir: str | None = None,
@@ -468,6 +477,7 @@ def generate_column_pivot_candidate(
         model,
         font_manager=font_manager,
         fonts_dir=fonts_dir,
+        variant=variant,
     )
     return _finalize_column_candidate(
         source,
@@ -483,6 +493,7 @@ def solve_column_pivot(
     source: Mapping[str, Any],
     target_canvas: Mapping[str, Any],
     *,
+    variant: str = "source_proportional",
     font_manager=None,
     fonts_dir: str | None = None,
     assets_dir: str | None = None,
@@ -498,6 +509,7 @@ def solve_column_pivot(
         target_canvas,
         model,
         font_manager=font_manager,
+        variant=variant,
         fonts_dir=fonts_dir,
     )
     return _finalize_column_candidate(
