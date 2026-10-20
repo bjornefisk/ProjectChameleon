@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import platform
 import sys
 import tempfile
 import unittest
@@ -197,7 +198,9 @@ class RendererArtifactCorpusTests(unittest.TestCase):
             document = self.documents[name]
             self.assertEqual(expected["document_sha256"], _canonical_digest(document), name)
             payload, warnings, size = _render(document, self.font_manager)
-            self.assertEqual(expected["png_sha256"], hashlib.sha256(payload).hexdigest(), name)
+            expected_hashes = expected.get("png_sha256_by_platform", {})
+            expected_hash = expected_hashes.get(platform.machine(), expected["png_sha256"])
+            self.assertEqual(expected_hash, hashlib.sha256(payload).hexdigest(), name)
             self.assertEqual(tuple(expected["size"]), size, name)
             self.assertEqual(expected["warnings"], warnings, name)
 
