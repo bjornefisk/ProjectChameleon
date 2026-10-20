@@ -7,7 +7,7 @@ request/source: User-authorized implementation of GitHub issue #21 (audit findin
 owner/role: implementer, with independent reviewer, false-accept hunter, and false-reject hunter subagents
 workflow/gate: Implement -> Verify -> Review; PR and merge only after the evidence below exists
 created/updated: 2026-10-20
-status: implementation complete; PR/merge pending
+status: implementation complete; PR #51 open; merge pending
 
 Goal / observable outcome:
 A readable PNG that is not a conformant render of its design is never published and never accepted as a candidate render. The renderer seam checks expected dimensions, an opaque canvas, the missing-asset warning policy, rendered bounds, and source-pixel provenance. Fully opaque, integral, unrotated, one-to-one image/shape draws are replayed from adapter rasters; non-exact layers are compared with a second render from the pinned adapter after bounds validation. No output pixel is generated, repaired, or replaced. Soft contrast scoring stays out of hard validity.

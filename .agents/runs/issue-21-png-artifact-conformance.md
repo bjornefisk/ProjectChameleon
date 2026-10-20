@@ -3,7 +3,7 @@
 - **Run ID:** `run-issue21-png-artifact-conformance-20261020`
 - **Branch:** `feat/issue-21-png-artifact-conformance`
 - **Base:** `58b697a` (`origin/main` at implementation start)
-- **Status:** Implementation complete locally; PR creation/merge remains pending.
+- **Status:** Implementation complete; PR #51 is open and CI passed; partner review, merge, and issue closure remain pending.
 - **Issue:** [#21](https://github.com/bjornefisk/ProjectChameleon/issues/21)
 
 ## Goal
@@ -91,4 +91,4 @@ All commands below were run in the Issue-21 worktree with `/Users/charliefurlow/
 - Native `linux/amd64` Docker build and offline container smoke: blocked by unavailable local Docker daemon; no native qualification claim.
 - Mutation testing: not run; no mutation tool is configured in the repository.
 - Resource-limit hardening: intentionally not run/implemented; outside Issue #21 and requires a future contract/ADR decision.
-- GitHub PR creation, CI, partner review, merge, and issue closure: pending after maintainer review.
+- PR #51 was created and its `Verify and test` CI check passed; partner review, merge, and issue closure remain pending.
