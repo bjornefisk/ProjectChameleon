@@ -648,7 +648,7 @@ def generate_horizontal_ribbon_candidate(
         target_canvas,
         font_manager=font_manager,
         fonts_dir=fonts_dir,
-        variant=variant,
+        variant=variant
     )
     rendered_png, warnings = _render_candidate(response, assets_dir, fonts_dir, font_manager)
     return RenderedCandidate(

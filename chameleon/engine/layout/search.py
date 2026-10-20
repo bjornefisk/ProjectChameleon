@@ -666,9 +666,7 @@ def search(
                     font_manager=font_manager,
                 )
             # Re-read the serialized response after the solver or derived
-            # render boundary before fixed-point scoring.  The bytes for the
-            # base variant came from the solver; derived bytes were rendered
-            # exactly once above.
+            # render boundary before fixed-point scoring.
             validate_response(source, target_canvas, response)
             quality = score_candidate(source, response, rendered_png, roles=roles)
             admitted.append(

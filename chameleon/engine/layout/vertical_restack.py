@@ -62,6 +62,7 @@ def generate_vertical_restack_candidate(
         source,
         target_canvas,
         axis="vertical",
+        variant=variant,
         font_manager=font_manager,
         variant=variant,
         fonts_dir=fonts_dir,
