@@ -49,7 +49,6 @@ Reject readable but semantically wrong PNGs at both candidate-render and task-pu
 
 - `.agents/tasks/issue-21-png-artifact-conformance.md`
 - `Docs/PROJECT_CONTRACT.md` §11 traceability row
-- `Docs/FINAL_ARCHITECTURE.md` PNG artifact-conformance subsection
 - `Docs/STATUS.md` Issue #21 evidence section
 - `chameleon/README.md` renderer/publication description
 - This run record.
