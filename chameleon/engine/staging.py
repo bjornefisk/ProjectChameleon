@@ -523,15 +523,34 @@ def validate_png(
 ) -> None:
     """Validate syntax and, when a design is supplied, hard artifact semantics."""
 
+    expected_size: tuple[int, int] | None = None
+    if design is not None:
+        try:
+            expected_size = _expected_render_size(design["canvas"])
+        except (KeyError, TypeError, ValueError, OverflowError, ZeroDivisionError) as error:
+            _artifact_failure(
+                "cannot determine expected renderer dimensions",
+                {"error": str(error)},
+            )
     with _open_regular_file(path) as stream:
         if os.fstat(stream.fileno()).st_size == 0:
             raise ValueError(f"renderer did not produce a PNG: {path}")
         with Image.open(stream) as image:
             if image.format != "PNG":
                 raise ValueError(f"renderer produced {image.format!r}, not PNG")
+            if expected_size is not None and image.size != expected_size:
+                _artifact_failure(
+                    "rendered PNG dimensions do not match the pinned renderer",
+                    {"expected": expected_size, "actual": image.size},
+                )
             image.verify()
     with _open_regular_file(path) as stream:
         with Image.open(stream) as image:
+            if expected_size is not None and image.size != expected_size:
+                _artifact_failure(
+                    "rendered PNG dimensions do not match the pinned renderer",
+                    {"expected": expected_size, "actual": image.size},
+                )
             image.load()
             if design is None:
                 return
@@ -547,6 +566,7 @@ def validate_png(
             )
             if artifact_gate is not None:
                 artifact_gate(design, decoded, assets_dir, warning_list)
+
 
 def _validate_output_directory(output_dir: Path) -> None:
     try:
