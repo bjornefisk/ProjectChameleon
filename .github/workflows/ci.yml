@@ -52,7 +52,21 @@ jobs:
         run: make docker-build
 
       - name: Verify Docker image architecture
-        run: test "$(docker image inspect chameleon-stage1 --format '{{.Os}}/{{.Architecture}}')" = "linux/amd64"
+        run: test "$(docker inspect chameleon-stage1 --format '{{.Os}}/{{.Architecture}}')" = "linux/amd64"
+
+      - name: Record Docker image provenance and SBOM
+        run: |
+          docker inspect chameleon-stage1 \
+            --format 'image_id={{.Id}} architecture={{.Os}}/{{.Architecture}} repo_digests={{json .RepoDigests}}'
+          docker sbom chameleon-stage1 \
+            --format syft-json --output "$RUNNER_TEMP/chameleon-stage1.sbom.json"
+          cat "$RUNNER_TEMP/chameleon-stage1.sbom.json"
+      - name: Verify clean-cache amd64 rebuild
+        run: |
+          docker buildx build --no-cache --platform linux/amd64 --load \
+            -t chameleon-stage1-clean chameleon/
+          test "$(docker inspect chameleon-stage1-clean --format '{{.Os}}/{{.Architecture}}')" = "linux/amd64"
+
       - name: Run native amd64 offline smoke
         shell: bash
         run: |
@@ -73,6 +87,82 @@ jobs:
           test -f chameleon/output/chameleon_sample_level2_core_output.png
           test ! -e chameleon/output/chameleon_sample_level3_advanced_output.json
           test ! -e chameleon/output/chameleon_sample_level3_advanced_output.png
+      - name: Record native runtime measurements
+        shell: bash
+        run: |
+          set -o pipefail
+          set +e
+          docker run --rm --network none \
+            -v "$GITHUB_WORKSPACE/chameleon/input:/app/input" \
+            -v "$GITHUB_WORKSPACE/chameleon/output:/app/output" \
+            -v "$GITHUB_WORKSPACE/scripts:/qualification-bin:ro" \
+            -v "$RUNNER_TEMP:/qualification-out" \
+            --entrypoint python chameleon-stage1 \
+            /qualification-bin/qualify_runtime.py \
+            --report /qualification-out/runtime.json -- python -m engine.main \
+            2>&1 | tee "$RUNNER_TEMP/runtime.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          test "$status" -ne 0
+          grep -F "[chameleon_sample_level1_warmup.json] status=SUCCESS" "$RUNNER_TEMP/runtime.log"
+          grep -F "[chameleon_sample_level2_core.json] status=SUCCESS" "$RUNNER_TEMP/runtime.log"
+          grep -F "[chameleon_sample_level3_advanced.json] status=INCOMPLETE_SEARCH" "$RUNNER_TEMP/runtime.log"
+          cat "$RUNNER_TEMP/runtime.json"
+          docker inspect chameleon-stage1 --format 'image_size_bytes={{.Size}}'
+
+      - name: Verify repeated native artifact hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifacts=(
+            chameleon/output/chameleon_sample_level1_warmup_output.json
+            chameleon/output/chameleon_sample_level1_warmup_output.png
+            chameleon/output/chameleon_sample_level2_core_output.json
+            chameleon/output/chameleon_sample_level2_core_output.png
+            chameleon/output/.chameleon_sample_level1_warmup_output.commit
+            chameleon/output/.chameleon_sample_level2_core_output.commit
+          )
+          sha256sum "${artifacts[@]}" | cut -d' ' -f1 > "$RUNNER_TEMP/first-artifacts.sha256"
+          make clean
+          set +e
+          make docker-test 2>&1 | tee "$RUNNER_TEMP/docker-test-repeat.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          test "$status" -ne 0
+          grep -F "[chameleon_sample_level1_warmup.json] status=SUCCESS" "$RUNNER_TEMP/docker-test-repeat.log"
+          grep -F "[chameleon_sample_level2_core.json] status=SUCCESS" "$RUNNER_TEMP/docker-test-repeat.log"
+          grep -F "[chameleon_sample_level3_advanced.json] status=INCOMPLETE_SEARCH" "$RUNNER_TEMP/docker-test-repeat.log"
+          sha256sum "${artifacts[@]}" | cut -d' ' -f1 > "$RUNNER_TEMP/repeat-artifacts.sha256"
+          diff -u "$RUNNER_TEMP/first-artifacts.sha256" "$RUNNER_TEMP/repeat-artifacts.sha256"
+
+      - name: Verify clean-cache artifact hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          clean_output="$RUNNER_TEMP/clean-output"
+          mkdir -p "$clean_output"
+          set +e
+          docker run --rm --network none \
+            -v "$GITHUB_WORKSPACE/chameleon/input:/app/input" \
+            -v "$clean_output:/app/output" \
+            chameleon-stage1-clean 2>&1 | tee "$RUNNER_TEMP/docker-test-clean.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          test "$status" -ne 0
+          grep -F "[chameleon_sample_level1_warmup.json] status=SUCCESS" "$RUNNER_TEMP/docker-test-clean.log"
+          grep -F "[chameleon_sample_level2_core.json] status=SUCCESS" "$RUNNER_TEMP/docker-test-clean.log"
+          grep -F "[chameleon_sample_level3_advanced.json] status=INCOMPLETE_SEARCH" "$RUNNER_TEMP/docker-test-clean.log"
+          clean_artifacts=(
+            "$clean_output/chameleon_sample_level1_warmup_output.json"
+            "$clean_output/chameleon_sample_level1_warmup_output.png"
+            "$clean_output/chameleon_sample_level2_core_output.json"
+            "$clean_output/chameleon_sample_level2_core_output.png"
+            "$clean_output/.chameleon_sample_level1_warmup_output.commit"
+            "$clean_output/.chameleon_sample_level2_core_output.commit"
+          )
+          sha256sum "${clean_artifacts[@]}" | cut -d' ' -f1 > "$RUNNER_TEMP/clean-artifacts.sha256"
+          diff -u "$RUNNER_TEMP/first-artifacts.sha256" "$RUNNER_TEMP/clean-artifacts.sha256"
+
       - name: Record native sample artifact hashes
         run: |
           sha256sum \
@@ -85,3 +175,18 @@ jobs:
 
       - name: Verify offline native renderer imports
         run: docker run --rm --network none --entrypoint python chameleon-stage1 -c "import cr_renderer; import skia"
+      - name: Record native library closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          closure_log="$RUNNER_TEMP/native-library-closure.log"
+          docker run --rm --network none --entrypoint sh chameleon-stage1 -c '
+            set -eu
+            skia_path="$(python -c "import skia; print(skia.__file__)")"
+            pillow_path="$(python -c "import PIL._imaging; print(PIL._imaging.__file__)")"
+            printf "skia=%s\n" "$skia_path"
+            ldd "$skia_path"
+            printf "pillow=%s\n" "$pillow_path"
+            ldd "$pillow_path"
+          ' 2>&1 | tee "$closure_log"
+          ! grep -F "not found" "$closure_log"
