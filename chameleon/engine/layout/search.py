@@ -672,7 +672,13 @@ def search(
                 )
             # The centralized semantic gate remains authoritative and runs
             # before rendering every derived response.
-            validate_response(source, target_canvas, response)
+            validate_response(
+                source,
+                target_canvas,
+                response,
+                font_manager=font_manager,
+                fonts_dir=fonts_dir,
+            )
             if spec.variant_index != 0:
                 rendered_png, warnings = _render_candidate(
                     response,
@@ -682,7 +688,13 @@ def search(
                 )
             # Re-read the serialized response after the solver or derived
             # render boundary before fixed-point scoring.
-            validate_response(source, target_canvas, response)
+            validate_response(
+                source,
+                target_canvas,
+                response,
+                font_manager=font_manager,
+                fonts_dir=fonts_dir,
+            )
             quality = score_candidate(source, response, rendered_png, roles=roles)
             admitted.append(
                 Candidate(

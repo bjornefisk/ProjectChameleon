@@ -636,8 +636,16 @@ def _build_extreme_candidate(
                 }
                 result = _serialize_extreme_candidate(raw_result)
                 try:
-                    validate_response(source, target_canvas, result)
-                except InfeasibleLayoutError:
+                    validate_response(
+                        source,
+                        target_canvas,
+                        result,
+                        font_manager=font_manager,
+                        fonts_dir=fonts_dir,
+                    )
+                except InfeasibleLayoutError as error:
+                    if error.reason_code is InfeasibleReasonCode.RUNTIME_IO_FAILURE:
+                        raise
                     continue
                 return result
 

@@ -90,15 +90,36 @@ def validate_response(
     source: Mapping[str, Any],
     target_canvas: Mapping[str, Any],
     response: Mapping[str, Any],
+    *,
+    font_manager: Any = None,
+    fonts_dir: str | Path | None = None,
 ) -> None:
-    """Validate a serialized candidate against ``source`` and ``target_canvas``.
+    """Validate a serialized candidate at the authoritative hard-validation seam.
 
-    All mutable geometry is checked from the response's serialized integer
-    values.  The source is validated first, then the response is checked in a
-    deterministic order so callers receive one stable reason code for the
-    first hard failure.
+    Structural, geometry, and renderer-aware text checks all run against the
+    serialized response.  Callers may pass the already-loaded local renderer
+    font context to keep validation and rendering on the same font registry.
     """
 
+    _validate_response(
+        source,
+        target_canvas,
+        response,
+        font_manager=font_manager,
+        fonts_dir=fonts_dir,
+        run_renderer_text=True,
+    )
+
+
+def _validate_response(
+    source: Mapping[str, Any],
+    target_canvas: Mapping[str, Any],
+    response: Mapping[str, Any],
+    *,
+    font_manager: Any = None,
+    fonts_dir: str | Path | None = None,
+    run_renderer_text: bool,
+) -> None:
     validate_source(source)
     validate_target_canvas(target_canvas)
 
@@ -293,6 +314,13 @@ def validate_response(
         source_elements, response_elements, source_aabbs, response_aabbs
     )
     _validate_text_overflow(response_elements)
+    if run_renderer_text:
+        _validate_renderer_text(
+            response_elements,
+            response["canvas"],
+            font_manager=font_manager,
+            fonts_dir=fonts_dir,
+        )
 
 def validate_renderer_response(
     source: Mapping[str, Any],
@@ -305,14 +333,20 @@ def validate_renderer_response(
 ) -> list[str]:
     """Run the pinned local renderer preflight after structural validation.
 
-    ``validate_response`` remains the independent structural and geometry
-    oracle.  This seam deliberately invokes the same converter and local font
-    registry used by rendering, so effective style faces, wrapping, forced
-    lines, line boxes, and positioned glyph bounds are checked from the
-    serialized response without changing the public response shape.
+    ``validate_response`` already enforces renderer-aware text semantics.  This
+    seam reuses the same local font context while converting the complete
+    response so asset warnings and full-document renderer behavior are checked
+    before publication, without changing the public response shape.
     """
 
-    validate_response(source, target_canvas, response)
+    _validate_response(
+        source,
+        target_canvas,
+        response,
+        font_manager=font_manager,
+        fonts_dir=fonts_dir,
+        run_renderer_text=False,
+    )
     resolved_assets = (
         Path(assets_dir)
         if assets_dir is not None
@@ -645,7 +679,9 @@ def _validate_source_separation(
             )
 
 
-def _validate_text_overflow(response_elements: Sequence[Mapping[str, Any]]) -> None:
+def _validate_text_overflow(
+    response_elements: Sequence[Mapping[str, Any]],
+) -> None:
     for index, element in enumerate(response_elements):
         if element["type"] != "text":
             continue
@@ -678,6 +714,117 @@ def _validate_text_overflow(response_elements: Sequence[Mapping[str, Any]]) -> N
                     "required_height": str(required_height),
                     "height": element["height"],
                 },
+            )
+
+
+@lru_cache(maxsize=4)
+def _contract_font_manager(fonts_dir: str):
+    try:
+        from renderer.converter.brand_fonts import load_brand_font_manager
+    except ModuleNotFoundError:
+        from chameleon.renderer.converter.brand_fonts import load_brand_font_manager
+
+    return load_brand_font_manager(fonts_dir)
+
+
+def _validate_renderer_text(
+    response_elements: Sequence[Mapping[str, Any]],
+    canvas: Mapping[str, Any],
+    *,
+    font_manager: Any = None,
+    fonts_dir: str | Path | None = None,
+) -> None:
+    """Run the pinned renderer's text checks for every serialized text box."""
+
+    text_elements = [
+        (index, element)
+        for index, element in enumerate(response_elements)
+        if element["type"] == "text"
+    ]
+    if not text_elements:
+        return
+
+    try:
+        try:
+            from renderer.converter.brand_fonts import MissingFontError
+            from renderer.converter.convert import convert_chameleon_to_crello
+            from renderer.converter.wrap import MalformedTextError, TextLayoutError
+        except ModuleNotFoundError:
+            from chameleon.renderer.converter.brand_fonts import MissingFontError
+            from chameleon.renderer.converter.convert import convert_chameleon_to_crello
+            from chameleon.renderer.converter.wrap import MalformedTextError, TextLayoutError
+    except (
+        ImportError,
+        OSError,
+        OverflowError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ) as error:
+        _fail(
+            InfeasibleReasonCode.RUNTIME_IO_FAILURE,
+            "renderer text preflight setup failed",
+            {"error": str(error)},
+        )
+
+    resolved_font_manager = font_manager
+    if resolved_font_manager is None:
+        resolved_fonts_dir = (
+            fonts_dir
+            or Path(__file__).resolve().parents[1] / "brand_kit" / "fonts"
+        )
+        try:
+            resolved_font_manager = _contract_font_manager(str(resolved_fonts_dir))
+        except (
+            ImportError,
+            OSError,
+            OverflowError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ) as error:
+            _fail(
+                InfeasibleReasonCode.RUNTIME_IO_FAILURE,
+                "renderer text preflight setup failed",
+                {"error": str(error)},
+            )
+
+    for index, element in text_elements:
+        try:
+            convert_chameleon_to_crello(
+                {"canvas": dict(canvas), "elements": [dict(element)]},
+                resolved_font_manager,
+            )
+        except MalformedTextError as error:
+            _fail(
+                InfeasibleReasonCode.MALFORMED_INPUT,
+                "renderer rejected serialized text metadata",
+                {"index": index, "id": element["id"], "error": str(error)},
+            )
+        except TextLayoutError as error:
+            _fail(
+                InfeasibleReasonCode.TEXT_OVERFLOW,
+                "renderer rejected serialized text layout",
+                {"index": index, "id": element["id"], "error": str(error)},
+            )
+        except MissingFontError as error:
+            _fail(
+                InfeasibleReasonCode.RUNTIME_IO_FAILURE,
+                "renderer could not load a required local font face",
+                {"index": index, "id": element["id"], "error": str(error)},
+            )
+        except (
+            ImportError,
+            OSError,
+            OverflowError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ) as error:
+            _fail(
+                InfeasibleReasonCode.RUNTIME_IO_FAILURE,
+                "renderer text preflight failed",
+                {"index": index, "id": element["id"], "error": str(error)},
             )
 
 
