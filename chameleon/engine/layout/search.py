@@ -36,6 +36,7 @@ TOPOLOGY_ORDER: tuple[str, ...] = (
 )
 MAX_VARIANTS_PER_FAMILY = 3
 MAX_CANDIDATES = len(TOPOLOGY_ORDER) * MAX_VARIANTS_PER_FAMILY
+_VARIANT_MUTABLE_FIELDS = ("x", "y", "width", "height")
 _VARIANT_NAMES: tuple[str, ...] = (
     "source_proportional",
     "dominant_media",
@@ -193,6 +194,17 @@ def _integer_bounds(low: Fraction, high: Fraction) -> tuple[int, int] | None:
     return (lower, upper) if lower <= upper else None
 
 
+def _serialize_variant_response(response: dict[str, Any]) -> dict[str, Any]:
+    """Apply one half-even serialization to a complete derived candidate."""
+
+    for element in response["elements"]:
+        for field in _VARIANT_MUTABLE_FIELDS:
+            element[field] = quantize_to_int(element[field])
+        if element.get("type") == "text":
+            element["font_size"] = quantize_to_int(element["font_size"])
+    return response
+
+
 def _derive_variant_response(
     base: Mapping[str, Any],
     source: Mapping[str, Any],
@@ -202,12 +214,11 @@ def _derive_variant_response(
 ) -> dict[str, Any]:
     """Derive a source-anchored alignment variant without changing semantics.
 
-    The topology solver supplies the macro geometry.  Ticket 08 variants only
-    apply one common integer translation to eligible foreground records.  A
-    common translation preserves explicit group transforms, image ratios, and
-    all pairwise relationships; the independent hard validator still gates the
-    result because a source-bleed record or another boundary can make a
-    translated variant invalid.
+    The topology solver supplies the macro geometry.  A variant translation is
+    kept exact while it is applied to every eligible foreground record, then
+    the complete response is serialized once before the hard-validation gate.
+    This preserves explicit group transforms until serialization and lets the
+    validator reject any relationship that integer quantization cannot retain.
     """
 
     response = deepcopy(dict(base))
@@ -255,16 +266,22 @@ def _derive_variant_response(
     anchor_x = (anchor_box[0] + anchor_box[2]) / 2
     anchor_y = (anchor_box[1] + anchor_box[3]) / 2
     if spec.variant_index == 1:
-        desired = quantize_to_int((target_width / 2 - anchor_x) / 2)
-        translation = max(x_interval[0], min(x_interval[1], desired))
+        desired = (target_width / 2 - anchor_x) / 2
+        translation = max(
+            Fraction(x_interval[0]),
+            min(Fraction(x_interval[1]), desired),
+        )
         for index in eligible:
             response["elements"][index]["x"] += translation
     else:
-        desired = quantize_to_int((target_height / 2 - anchor_y) / 2)
-        translation = max(y_interval[0], min(y_interval[1], desired))
+        desired = (target_height / 2 - anchor_y) / 2
+        translation = max(
+            Fraction(y_interval[0]),
+            min(Fraction(y_interval[1]), desired),
+        )
         for index in eligible:
             response["elements"][index]["y"] += translation
-    return response
+    return _serialize_variant_response(response)
 
 
 def _renderer_classes() -> tuple[type[BaseException], ...]:

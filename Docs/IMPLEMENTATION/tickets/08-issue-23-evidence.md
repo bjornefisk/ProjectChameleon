@@ -1,6 +1,6 @@
 # Issue 23 / F-07 evidence record
 
-This record expands the normative regression evidence on the integrated Ticket 07/08 review tree. It does not change the Stage 1 wire schema, renderer dependency, search behavior, or runtime policy.
+This record expands the normative regression evidence on the integrated Ticket 07/08 review tree. It does not change the Stage 1 wire schema, renderer dependency, or runtime policy; the focused issue #29 fix only corrects variant candidate serialization.
 
 ## Authority and scope
 
@@ -20,6 +20,7 @@ The current phase explicitly defers a broad held-out evaluation and later native
 | --- | --- | --- |
 | Rounding regressions | `chameleon/tests/geometry/test_issue23_rounding.py` covers signed half-even ties and a ratio candidate that is valid before serialization but rejected after serialized integer geometry is revalidated. | Local contract-seam evidence; native-amd64 parity is not claimed. |
 | Topology and candidate variants | `chameleon/tests/layout/test_issue23_search_evidence.py` exercises source-derived variants, stable topology enumeration across representative targets, bounded candidate counts, and real hard-valid search admission. | Covers the bounded implementation present on this review tree; it does not widen the Ticket 07/08 candidate space. |
+| Variant translation serialization | `chameleon/tests/layout/test_search_ranking.py::test_variant_translations_round_complete_coordinate_once` proves dominant-media and dominant-copy translations are applied exactly before one half-even serialization and then hard-validated. | Focused local evidence; native-amd64 parity and the broader held-out qualification remain unverified. |
 | Ranking | The search evidence keeps hard-validation assertions separate from fixed-point quality/tie-break assertions; existing `test_search_ranking.py` remains the direct ranker regression suite. | Soft quality is never used to rescue a hard-invalid response. |
 | Persisted artifact hashes | `chameleon/tests/fixtures/renderer_artifact_hashes.json` records document, packaged-asset, font-tree, pinned-renderer, PNG hash, dimensions, and warning provenance. `test_issue23_artifact_corpus.py` recomputes every value. | Hashes are tied to the checked-in local corpus and dependency revision, not an external scorer. |
 | Renderer edge cases | `chameleon/tests/renderer/test_issue23_artifact_corpus.py` covers `contain`, `cover`, and `fill`, rotated geometry, negative letter spacing, right alignment, missing-asset diagnostics, and real PNG output. | Pixel behavior is qualified only for the pinned local adapter/runtime used by the test. |
@@ -37,6 +38,19 @@ The integration owner must run the focused evidence tests, the full unit suite, 
 ## Disposition
 
 This closes the reachable F-07 rounding/search/renderer evidence gaps on the current review tree. It does not close the deferred held-out-evaluation or native-amd64 qualification criteria. Those require the later qualification gate and must not be represented as completed by this change.
+
+## Issue #29 focused verification
+
+- `cd chameleon && ../.venv/bin/python -m unittest tests.layout.test_search_ranking tests.geometry.test_issue23_rounding -v` — 9 tests passed, including both exact variant-translation axes.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — 191 tests passed.
+- `python3 scripts/verify_repository.py` — passed.
+- `make verify` — passed.
+- `cd chameleon && ../.venv/bin/python -m py_compile engine/layout/search.py tests/layout/test_search_ranking.py` — passed.
+- `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1 as expected for the mixed sample batch: Levels 1–2 `SUCCESS` with pairs; Level 3 `INCOMPLETE_SEARCH` with no pair.
+- `cd chameleon && python -m engine.main` — exit 1 because the system interpreter lacks `jsonschema`; the project environment result above is the exercised engine evidence.
+- `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — attempted but blocked before build because the Docker daemon was unavailable; no Docker run was performed.
+
+The focused tests exercise hard serialized integer validation and the dominant-media/dominant-copy half-even regression. Docker/native-amd64 evidence remains unverified in this environment.
 
 ## Observed integration commands
 
