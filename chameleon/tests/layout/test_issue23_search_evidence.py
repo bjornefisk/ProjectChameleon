@@ -302,6 +302,38 @@ class Issue23SearchEvidenceTests(unittest.TestCase):
         )
         self.assertNotIn(MEDIA, {spec.variant for spec in specs})
 
+    def test_grouped_badge_copy_signal_generates_dominant_copy(self):
+        badge_shape = _shape(
+            "badge-background",
+            x=100,
+            y=100,
+            width=200,
+            height=80,
+            group_id="badge",
+        )
+        badge_label = _text(
+            "badge-label",
+            x=120,
+            y=120,
+            width=160,
+            height=40,
+            content="NEW",
+            font_size=20,
+            group_id="badge",
+        )
+        source = _source(badge_shape, badge_label)
+        roles = infer_roles(source)
+        self.assertEqual(roles.role_for("badge-background"), RoleKind.BADGE)
+        self.assertEqual(roles.role_for("badge-label"), RoleKind.BADGE)
+
+        specs = enumerate_candidate_specs(source, WIDE)
+        self.assertEqual(
+            _variants_by_family(specs),
+            {family: (BASE, COPY) for family in TOPOLOGY_ORDER},
+        )
+        copy_specs = [spec for spec in specs if spec.variant == COPY]
+        self.assertEqual({spec.source_order for spec in copy_specs}, {0})
+
     def test_foreground_image_only_source_omits_dominant_copy(self):
         source = _source(_image("photo"))
         specs = enumerate_candidate_specs(source, WIDE)
@@ -491,6 +523,29 @@ class Issue23SearchEvidenceTests(unittest.TestCase):
             )
 
         self.assertEqual(run_signatures[0], run_signatures[1])
+        admitted = {
+            (candidate.topology, candidate.variant): candidate
+            for candidate in runs[0].candidates
+        }
+        base = admitted[("near_isomorphic", BASE)]
+        media = admitted[("near_isomorphic", MEDIA)]
+        copy = admitted[("near_isomorphic", COPY)]
+        base_by_id = {element["id"]: element for element in base.response["elements"]}
+        media_by_id = {
+            element["id"]: element for element in media.response["elements"]
+        }
+        copy_by_id = {
+            element["id"]: element for element in copy.response["elements"]
+        }
+        self.assertGreater(media_by_id["media"]["width"], base_by_id["media"]["width"])
+        self.assertEqual(media_by_id["copy"]["width"], base_by_id["copy"]["width"])
+        self.assertEqual(
+            media_by_id["copy"]["font_size"], base_by_id["copy"]["font_size"]
+        )
+        self.assertGreater(copy_by_id["copy"]["width"], base_by_id["copy"]["width"])
+        self.assertGreater(
+            copy_by_id["copy"]["font_size"], base_by_id["copy"]["font_size"]
+        )
 
 
 if __name__ == "__main__":
