@@ -50,17 +50,25 @@ Observed on the local Darwin arm64 workstation:
   (the horizontal case), and `vertical_restack` (the vertical case).
 - 27 of 60 evaluated work items were hard-valid (`hard_valid_rate=0.45`).
   The selected-topology distribution was `near_isomorphic=3` and
-  `column_pivot=2`; fixed-point quality remains separate soft evidence.
+  `column_pivot=2`; fixed-point quality remains separate soft evidence. On a
+  native Linux aarch64 container the `vertical-restack-studio` case selected
+  `vertical_restack` instead (`near_isomorphic=2`, `column_pivot=2`,
+  `vertical_restack=1`) while hard admission (3, 6, 9, 6, and 3 admitted
+  candidates, same families) matched, so selection is platform dependent and
+  hard admission is the portable evidence.
 - The observed failure-reason distribution contains 33
   `INCOMPLETE_SEARCH` rejected family/variant attempts; no admitted candidate
   had a serialized validation error. The missing-asset case emitted the
   authorized deterministic placeholder warning twice, while preserving the
   source asset reference.
-- Per-case runtime ranged from 236.1 ms to 1125.6 ms across the two repeats.
-  Process maximum RSS ranged from about 225 MiB to 277 MiB on this host; this
-  is not container or native-amd64 qualification.
-- Report SHA-256:
-  `4c5f6fa8cb549365307760c2e0e40cae44017349fdbb147c859e29ed1609cfc7`
+- Per-case runtime ranged from 2512.9 ms to 15081.7 ms across the two
+  repeats. Process maximum RSS ranged from about 222 MiB to 225 MiB on this
+  host; this is not container or native-amd64 qualification.
+- The captured report SHA-256 was
+  `68d7e611ef85047998cbf9105a6b71c60084390608a982d4ffe51744589faa47`.
+  This is not a determinism pin: runtime and RSS fields are intentionally
+  observed evidence and vary between runs. Determinism is asserted on the
+  response/PNG signatures and on the persisted engine artifact fixture.
 
 No result is inferred from fixture construction or from soft quality scores.
 
@@ -83,9 +91,16 @@ Hard evidence includes, for every admitted candidate and selected response:
 Soft evidence records the fixed-point `QualityScore` components and selected
 candidate components only after hard validation. Quality values do not rescue a
 hard-invalid candidate, establish topology validity, or establish qualification.
-The permanent regression test asserts required metric shapes, hard validation,
-repeat determinism, the twelve-candidate bound, and all-four-family work-set
-coverage; it intentionally does not assert incidental score values.
+The permanent regression test (`chameleon/tests/layout/test_heldout_evaluation.py`)
+asserts, per case, `SUCCESS`, zero hard-validation errors, repeat stability, no
+cutoff, the twelve-candidate bound, that every non-admitted work item is a typed
+rejection, and that the case's intended family was admitted (hard-valid) rather
+than merely enumerated. Across cases it asserts that the union of admitted
+families is all four, that admission is selective, and that the aggregates equal
+a recomputation from per-case numbers. All-four-family work-set coverage is
+asserted only as enumeration evidence. The test intentionally does not assert
+incidental score values or the selected topology, which is soft-ranked on
+rendered pixels and differs by platform.
 
 ## Limits and disposition
 
