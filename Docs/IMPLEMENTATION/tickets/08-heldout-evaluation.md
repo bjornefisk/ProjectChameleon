@@ -7,28 +7,40 @@ particular ADR-006, ADR-007, and ADR-009), the pinned renderer/dependency
 records, and the `chameleon-contract`, `chameleon-testing`, and
 `chameleon-review` skills remain authoritative.
 
-## Corpus provenance and scope
+## Corpus provenance and coverage matrix
 
-`chameleon/tests/fixtures/heldout_search_cases.json` contains five source/target
-pairs authored specifically for this corpus. They do not reference or derive
-from the public files in `chameleon/input/`:
+`chameleon/tests/fixtures/heldout_search_cases.json` is corpus v2: it preserves
+the original five locally authored source/target pairs and adds two contract
+interaction cases. None references a public file in `chameleon/input/`.
+`expected_status`, optional `expected_reason_code`, and `coverage` are
+evaluator-only metadata; they are not source design fields. The source and
+target documents are validated against the ratified Draft 2020-12 schema, and
+search runs through the pinned local renderer and serialized hard validator.
 
-- `isomorphic-gallery` exercises the near-isomorphic route;
-- `column-pivot-catalog` supplies a wide target for column-pivot routing;
-- `horizontal-ribbon-journal` supplies a compressed wide target for the
-  horizontal-ribbon route;
-- `vertical-restack-studio` supplies a tall narrow target for vertical-restack
-  routing; and
-- `missing-asset-diagnostic` keeps a deliberately unavailable asset in the
-  corpus so renderer diagnostics and the fail-closed boundary remain observable
-  when the local renderer permits a warning-backed result.
+The dimensions below come from the schema and the accepted hard contract.
+Coverage labels are stored per case in the fixture and copied to each report
+entry so the authored scope can be checked alongside observed outcomes.
+
+| Contract dimension | Corpus case and concrete shape | Boundary measured |
+| --- | --- | --- |
+| Canvas aspect ratios (schema `canvas`; contract §8; ADR-009 §3) | `horizontal-ribbon-journal` target 800×200 (4:1), `vertical-restack-studio` target 200×1600 (1:8), and `extreme-ratio-incomplete` target 728×90 | Both successful extreme topologies and one explicit typed `INCOMPLETE_SEARCH`; the latter is not called infeasible and emits no selected candidate signature. |
+| Rigid groups and source-intended overlap (schema `group_id`; contract §7; ADR-007 §§4, 7) | `contract-interactions`: `group_panel` and `group_label` share `quiet-cta` and positively overlap in the source | The selected hard-valid response preserves their common scale/translation; the label-over-panel overlap is intentional, not a new collision. |
+| Rotated bounds (schema `rotation`; contract §7; ADR-007 §3) | `contract-interactions`: foreground `gallery_vessel` has 11° rotation | Renderer-gated admission recomputes the rotated AABB after integer serialization. |
+| Foreground image ratios (schema image `width`/`height`/`fit`; contract §7; ADR-007 §2) | Existing product images plus `contract-interactions` `gallery_vessel` (600×580 source box) | Hard validation checks the exact serialized cross-product ratio; background cover treatment is separate. |
+| Text wrapping, style runs, and glyph edges (schema text/style fields; contract §6; ADR-008 §§1–4) | `contract-interactions` has a long italic title, `max_lines=2`, negative letter spacing, and a color style run; `group_label` is a separate grouped text child | Actual adapter wrapping, effective face/spacing, style-run range, and positioned glyph-bound checks run before candidate admission; text/copy fields stay fixed. |
+| Background and source bleed (schema image `fit` and shape `opacity`; contract §7; ADR-007 §§5–6) | `contract-interactions` has a full-canvas `solstice_bg_gradient.png` `fit=cover` background and a translucent ellipse clipped on the source's left side | Background exemption uses the contract predicate; the ellipse remains visible and clipped on the same side. |
+| Missing-asset preservation (schema image `asset_id`; contract §6) | `missing-asset-diagnostic` references `heldout_asset_not_packaged.png` | Successful diagnostics retain the original element and asset ID; the renderer warning/placeholder is not written into the design response. |
+
+The corpus keeps the four topology-focused cases and the missing-asset case from
+v1. Fixture labels describe the authored shape, not official target catalog
+coverage or organizer-held-out qualification.
 
 The evaluator loads JSON with `parse_int=int`, `parse_float=Decimal`, and
 non-finite-number rejection. It invokes `engine.layout.search.search` directly,
 with the checked-in assets and fonts, and does not call or alter the public
 response returned by `resize()`.
 
-## Exact command and observed result
+## Historical v1 five-case observation
 
 The exact offline command is:
 
@@ -72,35 +84,101 @@ Observed on the local Darwin arm64 workstation:
 
 No result is inferred from fixture construction or from soft quality scores.
 
+## Expanded v2 observation
+
+The v2 corpus and evaluator implement the expanded local evidence requested
+for the search-corpus gap. This run used the offline local renderer on the
+Darwin arm64 workstation; it is not native-amd64, organizer-held-out, or
+official qualification evidence.
+
+Exact command:
+
+```bash
+cd chameleon
+../.venv/bin/python ../scripts/evaluate_heldout_search.py \
+  --corpus tests/fixtures/heldout_search_cases.json \
+  --repeats 2 \
+  --output /tmp/chameleon-heldout-search.json
+```
+
+All seven authored expected task outcomes matched: six `SUCCESS` and one
+`INCOMPLETE_SEARCH`. All seven task outcomes were stable across repeats; all
+six successful cases had stable canonical-response and PNG signatures. The
+failed case has no selected candidate or response/PNG signature. All source
+documents remained unchanged, and no candidate produced a serialized hard
+validation error. The `contract-interactions` title was observed wrapping to
+two lines in the pinned converter output.
+
+| Case | Expected → observed status / task reason | Hard-valid admissions / evaluated | Candidate rejection reason codes | Selected topology | Repeat task / response / PNG |
+| --- | --- | ---: | --- | --- | --- |
+| `isomorphic-gallery` | `SUCCESS` → `SUCCESS` / — | 3 / 12 | `INCOMPLETE_SEARCH` ×9 | `near_isomorphic` | stable / stable / stable |
+| `column-pivot-catalog` | `SUCCESS` → `SUCCESS` / — | 6 / 12 | `INCOMPLETE_SEARCH` ×6 | `near_isomorphic` | stable / stable / stable |
+| `horizontal-ribbon-journal` | `SUCCESS` → `SUCCESS` / — | 7 / 12 | `INCOMPLETE_SEARCH` ×3; `SOURCE_SEPARATION_VIOLATION` ×2 | `column_pivot` | stable / stable / stable |
+| `vertical-restack-studio` | `SUCCESS` → `SUCCESS` / — | 5 / 12 | `INCOMPLETE_SEARCH` ×6; `SOURCE_SEPARATION_VIOLATION` ×1 | `near_isomorphic` | stable / stable / stable |
+| `missing-asset-diagnostic` | `SUCCESS` → `SUCCESS` / — | 2 / 12 | `INCOMPLETE_SEARCH` ×9; `SOURCE_SEPARATION_VIOLATION` ×1 | `near_isomorphic` | stable / stable / stable |
+| `contract-interactions` | `SUCCESS` → `SUCCESS` / — | 1 / 12 | `INCOMPLETE_SEARCH` ×9; `SOURCE_SEPARATION_VIOLATION` ×2 | `near_isomorphic` | stable / stable / stable |
+| `extreme-ratio-incomplete` | `INCOMPLETE_SEARCH` → `INCOMPLETE_SEARCH` / `INCOMPLETE_SEARCH` | 0 / 8 | `INCOMPLETE_SEARCH` ×8 | none | stable / n/a / n/a |
+
+Each case considered the four bounded topology families. Across the seven
+cases, 24 of 80 evaluated candidate work items were admitted as hard-valid
+(`hard_valid_rate=0.30`); candidate rejection reasons were
+`INCOMPLETE_SEARCH` ×50 and `SOURCE_SEPARATION_VIOLATION` ×6. The separate
+task-level reason distribution contains one `INCOMPLETE_SEARCH`. No work-set
+cutoff was reported, but finite search was not exhausted; therefore the
+extreme-ratio result remains `INCOMPLETE_SEARCH`, not infeasibility. The
+selected-topology distribution was `near_isomorphic` ×5 and `column_pivot` ×1;
+no topology is selected for the failed case.
+
+The evaluator JSON captured for this run had SHA-256
+`9bdc5da880c390014cbfdcf6139846ce4274e9e4b6a1332f789169e20a2e71f2`; the
+fixture SHA-256 was
+`1659bdf4f99b226a26285906d7aee2ab36e7cce73b7bb2f5b26c7bc03cd02e75`.
+Response signatures are SHA-256 over the evaluator's sorted canonical response
+mapping (including exact-decimal markers); PNG signatures hash rendered bytes.
+The report also records per-case fixed-point soft-quality components and
+wall-time/process-RSS observations separately. On this host the observed
+per-run wall time ranged from 1.7 to 1280.7 ms and reported process maximum
+RSS from 249,610,240 to 324,452,352 bytes. These are local observations, not
+resource qualification or ranking claims. Runtime and RSS values are
+measurements and are not determinism pins.
+
+No result is inferred from fixture construction or from soft quality scores.
+
 ## Evidence separation
 
-The report has separate `hard_evidence` and `soft_quality` sections.
+The v2 report keeps measured task outcomes in `hard_evidence`, fixed-point
+ranking metrics in `soft_quality`, wall time and process RSS in
+`runtime_observations`, and authored expected-status checks in
+`outcome_expectations`.
 
-Hard evidence includes, for every admitted candidate and selected response:
+Per-case hard evidence includes:
 
-- serialized `validate_response(source, target_canvas, response)` success;
-- response immutability of the caller-owned source;
-- status and reason-code distributions, including typed failures;
-- candidate count, evaluated/admitted counts, cutoff flags, and hard-valid rate;
-- topology work-set coverage, admitted topology coverage, and selected
-  topology distribution;
-- exact response signatures and SHA-256 hashes/lengths of PNG bytes;
-- repeated-run signature and PNG-byte stability;
-- wall runtime and process maximum RSS when the platform exposes it.
+- actual task status and its task-level reason code, separate from the
+  distribution of rejected candidate reason codes;
+- candidate count, evaluated/admitted counts, hard-valid admissions, cutoff,
+  and finite-work-exhaustion state;
+- topology work-set coverage, hard-admitted topology coverage, and the selected
+  topology as a separate field;
+- a canonical response SHA-256 and PNG SHA-256 for the selected candidate,
+  with separate repeated response-signature and PNG-signature stability flags;
+- independent serialized `validate_response(source, target_canvas, response)`
+  results and source immutability; and
+- deterministic repeated task outcome/signature state.
 
-Soft evidence records the fixed-point `QualityScore` components and selected
-candidate components only after hard validation. Quality values do not rescue a
-hard-invalid candidate, establish topology validity, or establish qualification.
-The permanent regression test (`chameleon/tests/layout/test_heldout_evaluation.py`)
-asserts, per case, `SUCCESS`, zero hard-validation errors, repeat stability, no
-cutoff, the twelve-candidate bound, that every non-admitted work item is a typed
-rejection, and that the case's intended family was admitted (hard-valid) rather
-than merely enumerated. Across cases it asserts that the union of admitted
-families is all four, that admission is selective, and that the aggregates equal
-a recomputation from per-case numbers. All-four-family work-set coverage is
-asserted only as enumeration evidence. The test intentionally does not assert
-incidental score values or the selected topology, which is soft-ranked on
-rendered pixels and differs by platform.
+Failed search cases have no selected response/PNG signature and no soft-quality
+candidate. Their reason codes remain typed. An `INCOMPLETE_SEARCH` outcome is
+not promoted to `INFEASIBLE_LAYOUT`; the evaluator itself does not publish task
+artifacts. Runner publication/failure behavior remains covered at its separate
+runner tests.
+
+Soft evidence records fixed-point `QualityScore` components only for admitted
+candidates. Runtime observations are not hard validity or scorer evidence.
+`test_heldout_evaluation.py` checks every source/target against the schema,
+the coverage matrix and expected task class, every admitted success response
+through the hard validator, candidate-level rejection accounting, all four
+admitted topology families, the explicit incomplete-search case, and stable
+response/PNG signatures separately. It does not pin incidental quality scores
+or claim organizer-controlled performance.
 
 ## Limits and disposition
 
