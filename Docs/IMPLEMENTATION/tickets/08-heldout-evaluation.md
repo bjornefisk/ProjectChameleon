@@ -54,8 +54,10 @@ cd chameleon
   --repeats 2 \
   --output /tmp/chameleon-heldout-search-v1.json
 ```
-The command keeps v1 inputs separate from v2 additions. The metrics and report
-hash below are archival observations from the v1 evaluator format.
+
+The command keeps v1 inputs separate from v2 additions. The current evaluator
+emits expanded v2 evidence fields; metrics and report hash below are archival
+observations from the v1 evaluator format.
 
 Observed on the local Darwin arm64 workstation:
 
