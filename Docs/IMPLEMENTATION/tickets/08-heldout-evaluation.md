@@ -129,6 +129,11 @@ extreme-ratio result remains `INCOMPLETE_SEARCH`, not infeasibility. The
 selected-topology distribution was `near_isomorphic` ×5 and `column_pivot` ×1;
 no topology is selected for the failed case.
 
+These v2 counts are separate from the five-case 27/60 versus 24/60 admission
+discrepancy tracked by issue #62; the v2 denominator includes two added cases.
+This report does not reconcile that baseline discrepancy or tune search
+toward 0.45.
+
 The evaluator JSON captured for this run had SHA-256
 `9bdc5da880c390014cbfdcf6139846ce4274e9e4b6a1332f789169e20a2e71f2`; the
 fixture SHA-256 was
