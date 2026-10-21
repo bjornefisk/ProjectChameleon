@@ -76,6 +76,8 @@ class HeldoutEvaluationTests(unittest.TestCase):
         # The real search is slow; run the evaluator exactly once for the class.
         cls.corpus = load_corpus(CORPUS)
         cls.report = evaluate_corpus(cls.corpus, repeats=2)
+        cls.v1_corpus = load_corpus(V1_CORPUS)
+        cls.v1_report = evaluate_corpus(cls.v1_corpus, repeats=2)
         cls.cases = {case["id"]: case for case in cls.report["cases"]}
         cls.source_cases = {case["id"]: case for case in cls.corpus["cases"]}
 
@@ -90,10 +92,33 @@ class HeldoutEvaluationTests(unittest.TestCase):
         for case in self.report["cases"]:
             with self.subTest(case=case["id"]):
                 self.assertIs(case["expected_outcome"]["matched"], True)
+                self.assertEqual(
+                    case["coverage"],
+                    self.source_cases[case["id"]]["coverage"],
+                )
 
     def test_historical_v1_fixture_remains_separate_from_expanded_corpus(self):
-        v1 = load_corpus(V1_CORPUS)
+        v1 = self.v1_corpus
         self.assertEqual(v1["corpus"], "stage1-heldout-search-v1")
+        self.assertTrue(self.v1_report["outcome_expectations"]["all_match"])
+        self.assertEqual(
+            self.v1_report["hard_evidence"]["status_distribution"],
+            {"SUCCESS": 5},
+        )
+        self.assertIs(
+            self.v1_report["hard_evidence"]["all_repeated_task_outcomes_stable"],
+            True,
+        )
+        self.assertIs(
+            self.v1_report["hard_evidence"]["all_repeated_signatures_stable"],
+            True,
+        )
+        for case in self.v1_report["cases"]:
+            with self.subTest(v1_case=case["id"]):
+                self.assertIs(case["hard_evidence"]["source_unchanged"], True)
+                self.assertIs(case["hard_evidence"]["deterministic_repeated"], True)
+                self.assertIs(case["hard_evidence"]["response_signature_stable"], True)
+                self.assertIs(case["hard_evidence"]["png_signature_stable"], True)
         self.assertEqual(len(v1["cases"]), 5)
         self.assertEqual(
             [case["id"] for case in v1["cases"]],
@@ -315,6 +340,13 @@ class HeldoutEvaluationTests(unittest.TestCase):
         source_case = self.source_cases["missing-asset-diagnostic"]
         hard = self.cases["missing-asset-diagnostic"]["hard_evidence"]
         self.assertEqual(hard["status"], "SUCCESS")
+        self.assertEqual(
+            hard["selected_signature"]["warnings"],
+            [
+                "Missing asset 'heldout_asset_not_packaged.png' "
+                "for element 'unpackaged_asset' - rendered a placeholder."
+            ],
+        )
 
         response = hard["selected_signature"]["response"]
         source_elements = source_case["source"]["elements"]

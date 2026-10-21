@@ -117,6 +117,7 @@ def _candidate_signature(candidate: Any) -> dict[str, Any]:
         "topology": candidate.topology,
         "variant": candidate.variant,
         "candidate_index": int(candidate.candidate_index),
+        "warnings": list(candidate.warnings),
         "response": response,
         "response_sha256": response_sha256,
         "png_sha256": hashlib.sha256(png).hexdigest(),
