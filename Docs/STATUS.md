@@ -34,7 +34,7 @@ The focused contract regressions cover width wrapping and unbreakable segments, 
 
 The following evidence was produced on the current integration tree, not copied from the historical records below:
 
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — **254 tests passed** on the post-merge integration tree.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — **266 tests passed** on the current Issue #63 candidate tree (local Darwin arm64).
 - Focused suites after the Issue #20 change: contract **34**, layout **73**, renderer **39**, and runner **78** tests passed.
 - `python3 scripts/verify_repository.py` and `make verify` — **passed**; corrected changed-file `py_compile` and `git diff --check` — **passed**.
 - `cd chameleon && python -m engine.main` — not runnable because the system interpreter lacks `jsonschema`.
