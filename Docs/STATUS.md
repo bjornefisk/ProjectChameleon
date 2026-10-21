@@ -34,7 +34,7 @@ The focused contract regressions cover width wrapping and unbreakable segments, 
 
 The following evidence was produced on the current integration tree, not copied from the historical records below:
 
-- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — **268 tests ran; 265 passed** on local Darwin arm64. Three persisted artifact/pin checks fail because installed `skia-python` is `144.0.post2` while the fixture pins `132.0b11`; the same failures reproduce on `origin/main`. GitHub CI run `39520551894` passed.
+- `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — **268 tests ran; 265 passed** on local Darwin arm64. Three persisted artifact/pin checks fail because installed `skia-python` is `144.0.post2` while the fixture pins `132.0b11`; the same failures reproduce on `origin/main`. GitHub CI runs `39520551894` and current-fix run `39607956989` passed.
 - Focused suites after the Issue #20 change: contract **34**, layout **75**, renderer **39**, and runner **78** tests passed.
 - `python3 scripts/verify_repository.py` and `make verify` — **passed**; corrected changed-file `py_compile` and `git diff --check` — **passed**.
 - `cd chameleon && python -m engine.main` — not runnable because the system interpreter lacks `jsonschema`.
