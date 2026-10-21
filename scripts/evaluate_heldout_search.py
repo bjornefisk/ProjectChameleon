@@ -111,11 +111,15 @@ def _quality_dict(candidate: Any) -> dict[str, int]:
 
 def _candidate_signature(candidate: Any) -> dict[str, Any]:
     png = bytes(candidate.rendered_png)
+    response = copy.deepcopy(dict(candidate.response))
+    response_sha256 = hashlib.sha256(_canonical(response).encode("utf-8")).hexdigest()
     return {
         "topology": candidate.topology,
         "variant": candidate.variant,
         "candidate_index": int(candidate.candidate_index),
-        "response": copy.deepcopy(dict(candidate.response)),
+        "warnings": list(candidate.warnings),
+        "response": response,
+        "response_sha256": response_sha256,
         "png_sha256": hashlib.sha256(png).hexdigest(),
         "png_size": len(png),
         "png_header_valid": png.startswith(b"\x89PNG\r\n\x1a\n"),
@@ -265,11 +269,17 @@ def _stable_signature(run: Mapping[str, Any]) -> str:
     return _canonical(stable)
 
 
+def _repeat_signature_stability(values: Sequence[str | None]) -> bool | None:
+    if all(value is None for value in values):
+        return None
+    return all(value is not None for value in values) and len(set(values)) == 1
+
+
 def _case_report(case: Mapping[str, Any], repeats: int) -> dict[str, Any]:
     runs = [_run_once(case) for _ in range(repeats)]
-    signatures = [_stable_signature(run) for run in runs]
+    stable_signatures = [_stable_signature(run) for run in runs]
     first = runs[0]
-    deterministic = all(signature == signatures[0] for signature in signatures[1:])
+    deterministic = all(signature == stable_signatures[0] for signature in stable_signatures[1:])
     topology_counts = Counter(
         item["topology"]
         for item in first["candidate_signatures"]
@@ -286,42 +296,91 @@ def _case_report(case: Mapping[str, Any], repeats: int) -> dict[str, Any]:
         if isinstance(topology, str)
     }
     topology_coverage = set(topology_counts) | work_set_topologies
-    reason_counts = Counter()
-    if first.get("reason_code"):
-        reason_counts[str(first["reason_code"])] += 1
-    for failure in first.get("failures", []):
-        if isinstance(failure, Mapping) and failure.get("reason_code"):
-            reason_counts[str(failure["reason_code"])] += 1
-    hard_valid = int(first["hard_valid_candidates"])
+    rejection_counts = Counter(
+        str(failure["reason_code"])
+        for failure in first["failures"]
+        if isinstance(failure, Mapping) and failure.get("reason_code")
+    )
+    hard_valid = max(0, int(first["hard_valid_candidates"]))
     evaluated = int(first["evaluated_candidates"])
+    selected_signatures = [run["selected_signature"] for run in runs]
+    selected_response_hashes = [
+        signature.get("response_sha256") if isinstance(signature, Mapping) else None
+        for signature in selected_signatures
+    ]
+    selected_png_hashes = [
+        signature.get("png_sha256") if isinstance(signature, Mapping) else None
+        for signature in selected_signatures
+    ]
+    selected = first["selected_signature"]
+    selected_topology = selected.get("topology") if isinstance(selected, Mapping) else None
+    expected_status = case["expected_status"]
+    expected_reason_code = case.get("expected_reason_code")
+    expectation_met = all(
+        run["status"] == expected_status
+        and (expected_reason_code is None or run["reason_code"] == expected_reason_code)
+        for run in runs
+    )
     return {
         "id": case["id"],
+        "coverage": list(case["coverage"]),
+        "expected_outcome": {
+            "status": expected_status,
+            "reason_code": expected_reason_code,
+            "observed_repeats": [
+                {"status": run["status"], "reason_code": run["reason_code"]}
+                for run in runs
+            ],
+            "matched": expectation_met,
+        },
         "hard_evidence": {
             "status": first["status"],
-            "reason_code_distribution": dict(sorted(reason_counts.items())),
+            "task_reason_code": first["reason_code"],
+            "candidate_rejection_reason_distribution": dict(sorted(rejection_counts.items())),
             "candidate_count": first["candidate_count"],
             "evaluated_candidates": evaluated,
             "admitted_candidates": first["admitted_candidates"],
-            "hard_valid_candidates": max(0, hard_valid),
+            "hard_valid_admissions": hard_valid,
+            "hard_valid_candidates": hard_valid,
             "hard_valid_rate": (hard_valid / evaluated) if evaluated else 0.0,
             "cutoff": first["cutoff"],
+            "finite_work_exhausted": bool(
+                diagnostics.get(
+                    "finite_work_exhausted",
+                    diagnostics.get("search_exhausted", False),
+                )
+            ),
             # Work-set coverage proves every family was considered; admitted
             # coverage remains separate hard-validation evidence.
             "topology_coverage": sorted(topology_coverage),
             "work_set_topology_coverage": sorted(work_set_topologies),
             "admitted_topology_coverage": sorted(topology_counts),
-            "selected_signature": first["selected_signature"],
+            "selected_topology": selected_topology,
+            "selected_response_sha256": selected.get("response_sha256")
+            if isinstance(selected, Mapping)
+            else None,
+            "selected_png_sha256": selected.get("png_sha256")
+            if isinstance(selected, Mapping)
+            else None,
+            "selected_signature": selected,
+            "response_signature_stable": _repeat_signature_stability(
+                selected_response_hashes
+            ),
+            "png_signature_stable": _repeat_signature_stability(selected_png_hashes),
+            "task_outcome_stable": len({run["status"] for run in runs}) == 1
+            and len({run["reason_code"] for run in runs}) == 1,
             "hard_validation_errors": first["hard_validation_errors"],
             "source_unchanged": first["source_unchanged"],
-            "png_bytes_stable": deterministic,
             "deterministic_repeated": deterministic,
             "repeat_count": repeats,
-            "runtime_ms": [run["runtime_ms"] for run in runs],
-            "max_rss_bytes": [run["max_rss_bytes"] for run in runs],
         },
         "soft_quality": {
             "candidate_components": first["quality"],
             "selected_components": first["selected_quality"],
+        },
+        "runtime_observations": {
+            "wall_time_ms": [run["runtime_ms"] for run in runs],
+            "process_max_rss_bytes": [run["max_rss_bytes"] for run in runs],
         },
     }
 
@@ -332,41 +391,85 @@ def evaluate_corpus(corpus: Mapping[str, Any], repeats: int = 2) -> dict[str, An
     cases = corpus.get("cases")
     if not isinstance(cases, list) or not cases:
         raise ValueError("corpus cases must be a non-empty list")
-    case_reports = [_case_report(case, repeats) for case in cases]
+    allowed_statuses = {status.value for status in TaskStatus}
+    case_ids: list[str] = []
+    for case in cases:
+        if not isinstance(case, Mapping):
+            raise ValueError("each corpus case must be an object")
+        case_id = case.get("id")
+        if not isinstance(case_id, str) or not case_id:
+            raise ValueError("each corpus case requires a non-empty id")
+        if case_id in case_ids:
+            raise ValueError(f"duplicate corpus case id: {case_id}")
+        case_ids.append(case_id)
+        if case.get("expected_status") not in allowed_statuses:
+            raise ValueError(f"case {case_id} requires a valid expected_status")
+        coverage = case.get("coverage")
+        if not isinstance(coverage, list) or not coverage or any(
+            not isinstance(item, str) or not item for item in coverage
+        ):
+            raise ValueError(f"case {case_id} requires non-empty string coverage labels")
+        expected_reason_code = case.get("expected_reason_code")
+        if expected_reason_code is not None and not isinstance(expected_reason_code, str):
+            raise ValueError(f"case {case_id} expected_reason_code must be a string")
 
+    case_reports = [_case_report(case, repeats) for case in cases]
     statuses = Counter(report["hard_evidence"]["status"] for report in case_reports)
-    reasons = Counter()
+    task_reasons = Counter(
+        report["hard_evidence"]["task_reason_code"]
+        for report in case_reports
+        if report["hard_evidence"]["task_reason_code"]
+    )
+    rejection_reasons = Counter()
     selected_topologies = Counter()
     topology_coverage: set[str] = set()
-    total_evaluated = total_admitted = total_hard_valid = 0
+    total_evaluated = total_hard_valid = 0
     for report in case_reports:
         hard = report["hard_evidence"]
-        for reason, count in hard["reason_code_distribution"].items():
-            reasons[reason] += count
-        selected = hard.get("selected_signature")
-        if isinstance(selected, Mapping) and selected.get("topology"):
-            selected_topologies[str(selected["topology"])] += 1
+        rejection_reasons.update(hard["candidate_rejection_reason_distribution"])
+        if hard["selected_topology"]:
+            selected_topologies[str(hard["selected_topology"])] += 1
         topology_coverage.update(hard["topology_coverage"])
         total_evaluated += hard["evaluated_candidates"]
-        total_admitted += hard["admitted_candidates"]
-        total_hard_valid += hard["hard_valid_candidates"]
+        total_hard_valid += hard["hard_valid_admissions"]
 
+    mismatches = [
+        {
+            "case_id": report["id"],
+            "expected_status": report["expected_outcome"]["status"],
+            "actual_status": report["hard_evidence"]["status"],
+            "expected_reason_code": report["expected_outcome"]["reason_code"],
+            "actual_reason_code": report["hard_evidence"]["task_reason_code"],
+            "observed_repeats": report["expected_outcome"]["observed_repeats"],
+        }
+        for report in case_reports
+        if not report["expected_outcome"]["matched"]
+    ]
+    successful_cases = [
+        report for report in case_reports if report["hard_evidence"]["selected_topology"]
+    ]
     all_repeated_stable = all(
         report["hard_evidence"]["deterministic_repeated"] for report in case_reports
     )
     return {
-        "evaluator": "stage1-heldout-search-v1",
+        "evaluator": "stage1-heldout-search-v2",
         "corpus": corpus.get("corpus", "unknown"),
         "corpus_provenance": corpus.get("provenance"),
+        "outcome_expectations": {
+            "all_match": not mismatches,
+            "mismatches": mismatches,
+        },
         "hard_evidence": {
             "case_count": len(case_reports),
             "status_distribution": dict(sorted(statuses.items())),
-            "reason_code_distribution": dict(sorted(reasons.items())),
+            "task_reason_code_distribution": dict(sorted(task_reasons.items())),
+            "candidate_rejection_reason_distribution": dict(sorted(rejection_reasons.items())),
             "candidate_counts": {
                 report["id"]: {
                     "candidate_count": report["hard_evidence"]["candidate_count"],
                     "evaluated_candidates": report["hard_evidence"]["evaluated_candidates"],
                     "admitted_candidates": report["hard_evidence"]["admitted_candidates"],
+                    "hard_valid_admissions": report["hard_evidence"]["hard_valid_admissions"],
                     "cutoff": report["hard_evidence"]["cutoff"],
                 }
                 for report in case_reports
@@ -374,12 +477,37 @@ def evaluate_corpus(corpus: Mapping[str, Any], repeats: int = 2) -> dict[str, An
             "hard_valid_rate": (total_hard_valid / total_evaluated) if total_evaluated else 0.0,
             "selected_topology_distribution": dict(sorted(selected_topologies.items())),
             "topology_coverage": sorted(topology_coverage),
+            "all_repeated_task_outcomes_stable": all(
+                report["hard_evidence"]["task_outcome_stable"] for report in case_reports
+            ),
             "all_repeated_signatures_stable": all_repeated_stable,
+            "all_success_response_signatures_stable": all(
+                report["hard_evidence"]["response_signature_stable"] is True
+                for report in successful_cases
+            )
+            if successful_cases
+            else None,
+            "all_success_png_signatures_stable": all(
+                report["hard_evidence"]["png_signature_stable"] is True
+                for report in successful_cases
+            )
+            if successful_cases
+            else None,
             "max_candidates_limit": MAX_CANDIDATES,
         },
         "soft_quality": {
             "fixed_point_quality_components": {
                 report["id"]: report["soft_quality"] for report in case_reports
+            },
+        },
+        "runtime_observations": {
+            "wall_time_ms": {
+                report["id"]: report["runtime_observations"]["wall_time_ms"]
+                for report in case_reports
+            },
+            "process_max_rss_bytes": {
+                report["id"]: report["runtime_observations"]["process_max_rss_bytes"]
+                for report in case_reports
             },
         },
         "cases": case_reports,
@@ -405,7 +533,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(encoded + "\n", encoding="utf-8")
-    return 0
+    return 0 if report["outcome_expectations"]["all_match"] else 1
 
 
 if __name__ == "__main__":  # pragma: no cover

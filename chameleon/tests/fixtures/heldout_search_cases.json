@@ -1,9 +1,11 @@
 {
-  "corpus": "stage1-heldout-search-v1",
-  "provenance": "Four source documents and target canvases authored for this checked-in evaluator; no public input sample is referenced.",
+  "corpus": "stage1-heldout-search-v2",
+  "provenance": "Seven source documents and target canvases authored for this local evaluator; no public input sample is referenced.",
   "cases": [
     {
       "id": "isomorphic-gallery",
+      "expected_status": "SUCCESS",
+      "coverage": ["canvas:near-square", "background:full-canvas-shape", "image:foreground-ratio", "text:single-line"],
       "source": {
         "canvas": {"width": 1000, "height": 1000},
         "elements": [
@@ -50,6 +52,8 @@
     },
     {
       "id": "column-pivot-catalog",
+      "expected_status": "SUCCESS",
+      "coverage": ["canvas:wide-3-to-1", "image:foreground-ratio"],
       "source": {
         "canvas": {"width": 1000, "height": 1000},
         "elements": [
@@ -96,6 +100,8 @@
     },
     {
       "id": "horizontal-ribbon-journal",
+      "expected_status": "SUCCESS",
+      "coverage": ["canvas:extreme-wide-4-to-1", "image:foreground-ratio"],
       "source": {
         "canvas": {"width": 1000, "height": 1000},
         "elements": [
@@ -142,6 +148,8 @@
     },
     {
       "id": "vertical-restack-studio",
+      "expected_status": "SUCCESS",
+      "coverage": ["canvas:extreme-tall-1-to-8", "image:foreground-ratio"],
       "source": {
         "canvas": {"width": 1000, "height": 1000},
         "elements": [
@@ -188,6 +196,8 @@
     },
     {
       "id": "missing-asset-diagnostic",
+      "expected_status": "SUCCESS",
+      "coverage": ["asset:missing-preservation"],
       "source": {
         "canvas": {"width": 640, "height": 640},
         "elements": [
@@ -231,6 +241,137 @@
         ]
       },
       "target_canvas": {"width": 640, "height": 640}
+    },
+    {
+      "id": "contract-interactions",
+      "expected_status": "SUCCESS",
+      "coverage": [
+        "background:full-canvas-cover-image",
+        "group:rigid",
+        "overlap:grouped-source-intent",
+        "rotation:non-right-angle",
+        "image:foreground-ratio",
+        "text:wrapping",
+        "text:style-runs",
+        "text:italic-glyph-bounds",
+        "source-bleed:left"
+      ],
+      "source": {
+        "canvas": {"width": 1000, "height": 1000},
+        "elements": [
+          {
+            "id": "gallery_backdrop",
+            "type": "image",
+            "x": 0,
+            "y": 0,
+            "width": 1000,
+            "height": 1000,
+            "asset_id": "solstice_bg_gradient.png",
+            "fit": "cover",
+            "z_index": 0
+          },
+          {
+            "id": "gallery_vessel",
+            "type": "image",
+            "x": 175,
+            "y": 120,
+            "width": 600,
+            "height": 580,
+            "rotation": 11,
+            "asset_id": "solstice_bottle.png",
+            "fit": "contain",
+            "z_index": 1
+          },
+          {
+            "id": "gallery_title",
+            "type": "text",
+            "x": 120,
+            "y": 780,
+            "width": 760,
+            "height": 100,
+            "content": "A quiet evening collection for carefully gathered moments",
+            "font_family": "Solstice Sans",
+            "font_size": 40,
+            "font_weight": "bold",
+            "font_style": "italic",
+            "color": "rgba(248,242,230,1)",
+            "text_align": "center",
+            "letter_spacing": -0.25,
+            "max_lines": 2,
+            "style_runs": [
+              {"start": 0, "end": 5, "color": "rgba(210,80,90,1)"}
+            ],
+            "z_index": 2
+          },
+          {
+            "id": "group_panel",
+            "type": "shape",
+            "x": 20,
+            "y": 20,
+            "width": 120,
+            "height": 40,
+            "group_id": "quiet-cta",
+            "shape_type": "rectangle",
+            "fill_color": "rgba(40,50,70,1)",
+            "z_index": 3
+          },
+          {
+            "id": "group_label",
+            "type": "text",
+            "x": 30,
+            "y": 28,
+            "width": 100,
+            "height": 24,
+            "group_id": "quiet-cta",
+            "content": "Explore",
+            "font_family": "Solstice Sans",
+            "font_size": 14,
+            "font_weight": "bold",
+            "color": "rgba(255,255,255,1)",
+            "text_align": "center",
+            "z_index": 4
+          },
+          {
+            "id": "bleed_ellipse",
+            "type": "shape",
+            "x": -35,
+            "y": 800,
+            "width": 80,
+            "height": 80,
+            "opacity": 0.55,
+            "shape_type": "ellipse",
+            "fill_color": "rgba(210,80,90,1)",
+            "z_index": 1
+          }
+        ]
+      },
+      "target_canvas": {"width": 900, "height": 900}
+    },
+    {
+      "id": "extreme-ratio-incomplete",
+      "expected_status": "INCOMPLETE_SEARCH",
+      "expected_reason_code": "INCOMPLETE_SEARCH",
+      "coverage": [
+        "canvas:extreme-wide-target-728x90",
+        "image:foreground-ratio-lattice",
+        "failure:typed-incomplete-search"
+      ],
+      "source": {
+        "canvas": {"width": 1024, "height": 1},
+        "elements": [
+          {
+            "id": "wide_foreground",
+            "type": "image",
+            "x": 0,
+            "y": 0,
+            "width": 1024,
+            "height": 1,
+            "asset_id": "solstice_bottle.png",
+            "fit": "contain"
+          }
+        ]
+      },
+      "target_canvas": {"width": 728, "height": 90}
     }
   ]
 }
