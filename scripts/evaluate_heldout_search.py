@@ -315,8 +315,10 @@ def _case_report(case: Mapping[str, Any], repeats: int) -> dict[str, Any]:
     selected_topology = selected.get("topology") if isinstance(selected, Mapping) else None
     expected_status = case["expected_status"]
     expected_reason_code = case.get("expected_reason_code")
-    expectation_met = first["status"] == expected_status and (
-        expected_reason_code is None or first["reason_code"] == expected_reason_code
+    expectation_met = all(
+        run["status"] == expected_status
+        and (expected_reason_code is None or run["reason_code"] == expected_reason_code)
+        for run in runs
     )
     return {
         "id": case["id"],
@@ -324,6 +326,10 @@ def _case_report(case: Mapping[str, Any], repeats: int) -> dict[str, Any]:
         "expected_outcome": {
             "status": expected_status,
             "reason_code": expected_reason_code,
+            "observed_repeats": [
+                {"status": run["status"], "reason_code": run["reason_code"]}
+                for run in runs
+            ],
             "matched": expectation_met,
         },
         "hard_evidence": {
@@ -433,6 +439,7 @@ def evaluate_corpus(corpus: Mapping[str, Any], repeats: int = 2) -> dict[str, An
             "actual_status": report["hard_evidence"]["status"],
             "expected_reason_code": report["expected_outcome"]["reason_code"],
             "actual_reason_code": report["hard_evidence"]["task_reason_code"],
+            "observed_repeats": report["expected_outcome"]["observed_repeats"],
         }
         for report in case_reports
         if not report["expected_outcome"]["matched"]

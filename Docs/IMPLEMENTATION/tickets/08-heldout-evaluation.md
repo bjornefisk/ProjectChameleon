@@ -9,9 +9,12 @@ records, and the `chameleon-contract`, `chameleon-testing`, and
 
 ## Corpus provenance and coverage matrix
 
+`chameleon/tests/fixtures/heldout_search_cases_v1.json` preserves the original
+five locally authored source/target pairs. The evaluator-only metadata added to
+that versioned fixture does not alter source or target documents.
 `chameleon/tests/fixtures/heldout_search_cases.json` is corpus v2: it preserves
-the original five locally authored source/target pairs and adds two contract
-interaction cases. None references a public file in `chameleon/input/`.
+the v1 pairs and adds two contract interaction cases. None references a public
+file in `chameleon/input/`.
 `expected_status`, optional `expected_reason_code`, and `coverage` are
 evaluator-only metadata; they are not source design fields. The source and
 target documents are validated against the ratified Draft 2020-12 schema, and
@@ -47,10 +50,12 @@ The exact offline command is:
 ```bash
 cd chameleon
 ../.venv/bin/python ../scripts/evaluate_heldout_search.py \
-  --corpus tests/fixtures/heldout_search_cases.json \
+  --corpus tests/fixtures/heldout_search_cases_v1.json \
   --repeats 2 \
-  --output /tmp/chameleon-heldout-search.json
+  --output /tmp/chameleon-heldout-search-v1.json
 ```
+The command keeps v1 inputs separate from v2 additions. The metrics and report
+hash below are archival observations from the v1 evaluator format.
 
 Observed on the local Darwin arm64 workstation:
 

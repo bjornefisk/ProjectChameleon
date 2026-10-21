@@ -2,6 +2,7 @@ import hashlib
 import json
 import sys
 import unittest
+from unittest.mock import patch
 from collections import Counter
 from decimal import Decimal
 from pathlib import Path
@@ -11,12 +12,17 @@ from jsonschema import Draft202012Validator
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.evaluate_heldout_search import evaluate_corpus, load_corpus
+from scripts.evaluate_heldout_search import _case_report, evaluate_corpus, load_corpus
 from engine.geometry.groups import has_common_transform
+from renderer.converter.brand_fonts import load_brand_font_manager
+from renderer.converter.convert import convert_chameleon_to_crello
 
 
 CORPUS = PROJECT_ROOT / "chameleon" / "tests" / "fixtures" / "heldout_search_cases.json"
+V1_CORPUS = PROJECT_ROOT / "chameleon" / "tests" / "fixtures" / "heldout_search_cases_v1.json"
 SCHEMA = PROJECT_ROOT / "chameleon" / "chameleon_design_schema_v0.9.json"
+ASSETS = PROJECT_ROOT / "chameleon" / "brand_kit" / "assets"
+FONTS = PROJECT_ROOT / "chameleon" / "brand_kit" / "fonts"
 REQUIRED_FAMILIES = {
     "near_isomorphic",
     "column_pivot",
@@ -84,6 +90,32 @@ class HeldoutEvaluationTests(unittest.TestCase):
         for case in self.report["cases"]:
             with self.subTest(case=case["id"]):
                 self.assertIs(case["expected_outcome"]["matched"], True)
+
+    def test_historical_v1_fixture_remains_separate_from_expanded_corpus(self):
+        v1 = load_corpus(V1_CORPUS)
+        self.assertEqual(v1["corpus"], "stage1-heldout-search-v1")
+        self.assertEqual(len(v1["cases"]), 5)
+        self.assertEqual(
+            [case["id"] for case in v1["cases"]],
+            [
+                "isomorphic-gallery",
+                "column-pivot-catalog",
+                "horizontal-ribbon-journal",
+                "vertical-restack-studio",
+                "missing-asset-diagnostic",
+            ],
+        )
+        self.assertEqual(len(self.corpus["cases"]), 7)
+        self.assertEqual(
+            [
+                (case["id"], case["source"], case["target_canvas"])
+                for case in v1["cases"]
+            ],
+            [
+                (case["id"], case["source"], case["target_canvas"])
+                for case in self.corpus["cases"][:5]
+            ],
+        )
 
     def test_every_source_and_target_is_valid_under_the_ratified_schema(self):
         schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
@@ -175,6 +207,53 @@ class HeldoutEvaluationTests(unittest.TestCase):
             {"INCOMPLETE_SEARCH": 1},
         )
 
+    def test_expected_outcome_requires_every_repeat_to_match(self):
+        def run(status, reason_code):
+            return {
+                "status": status,
+                "reason_code": reason_code,
+                "message": None,
+                "diagnostics": {},
+                "failures": [],
+                "candidate_count": 0,
+                "evaluated_candidates": 0,
+                "admitted_candidates": 0,
+                "hard_valid_candidates": 0,
+                "cutoff": False,
+                "candidate_signatures": [],
+                "selected_signature": None,
+                "quality": [],
+                "selected_quality": None,
+                "hard_validation_errors": [],
+                "source_unchanged": True,
+                "runtime_ms": 0,
+                "max_rss_bytes": 0,
+            }
+
+        case = {
+            "id": "repeat-mismatch",
+            "coverage": ["test:repeat-mismatch"],
+            "expected_status": "SUCCESS",
+        }
+        with patch(
+            "scripts.evaluate_heldout_search._run_once",
+            side_effect=[
+                run("SUCCESS", None),
+                run("INCOMPLETE_SEARCH", "INCOMPLETE_SEARCH"),
+            ],
+        ):
+            report = _case_report(case, repeats=2)
+
+        self.assertIs(report["expected_outcome"]["matched"], False)
+        self.assertIs(report["hard_evidence"]["task_outcome_stable"], False)
+        self.assertEqual(
+            report["expected_outcome"]["observed_repeats"],
+            [
+                {"status": "SUCCESS", "reason_code": None},
+                {"status": "INCOMPLETE_SEARCH", "reason_code": "INCOMPLETE_SEARCH"},
+            ],
+        )
+
     def test_interaction_case_exercises_group_rotation_ratio_text_and_bleed(self):
         case = self.source_cases["contract-interactions"]
         hard = self.cases["contract-interactions"]["hard_evidence"]
@@ -214,6 +293,18 @@ class HeldoutEvaluationTests(unittest.TestCase):
             output_image["width"] * image["height"],
             output_image["height"] * image["width"],
         )
+        title = output_by_id["gallery_title"]
+        converted, warnings = convert_chameleon_to_crello(
+            {"canvas": case["target_canvas"], "elements": [title]},
+            load_brand_font_manager(str(FONTS)),
+            str(ASSETS),
+        )
+        wrapped_text = converted["text"][0]
+        line_map = converted["text_line"][0]
+        self.assertEqual(wrapped_text.count("\n") + 1, 2)
+        self.assertEqual(len(set(line_map)), 2)
+        self.assertTrue(all(converted["font_italic"][0]))
+        self.assertEqual(warnings, [])
         self.assertEqual(source_by_id["gallery_title"]["font_style"], "italic")
         self.assertTrue(source_by_id["gallery_title"]["style_runs"])
         self.assertEqual(source_by_id["gallery_title"]["max_lines"], 2)
@@ -250,6 +341,7 @@ class HeldoutEvaluationTests(unittest.TestCase):
         self.assertIs(case["expected_outcome"]["matched"], True)
         self.assertEqual(hard["status"], "INCOMPLETE_SEARCH")
         self.assertEqual(hard["task_reason_code"], "INCOMPLETE_SEARCH")
+        self.assertIs(hard["source_unchanged"], True)
         self.assertFalse(hard["finite_work_exhausted"])
         self.assertEqual(hard["hard_valid_admissions"], 0)
         self.assertIsNone(hard["selected_topology"])
