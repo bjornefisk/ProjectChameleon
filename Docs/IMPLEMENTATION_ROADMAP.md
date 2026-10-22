@@ -1,16 +1,16 @@
 # Implementation roadmap and review report
 
-**Status:** Execution plan after contract and decision ratification. This file is non-normative; `PROJECT_CONTRACT.md` and Accepted ADRs are the authority. Gate 1 is cleared, Tickets 01-07 are implemented within bounded scopes, and Ticket 08's bounded search/ranking and local offline evidence are recorded on the integrated review tree. The public Level 3 sample remains typed fail-closed `INCOMPLETE_SEARCH`; native-amd64 runtime/sample-output evidence is recorded for F-06, while held-out evaluation, cross-platform parity, full packaging closure, and organizer-controlled qualification remain deferred or unverified.
+**Status:** Execution plan; `PROJECT_CONTRACT.md` and Accepted ADRs remain authoritative. Gate 1 is cleared, Tickets 01–08 have bounded implementation/evidence, and Issue #61 now produces a hard-valid public Level 3 JSON/PNG pair in local integration tests using ADR-010 through ADR-012. The issue-linked PR's maintainer review and native-amd64 CI remain pending; held-out evaluation, cross-platform parity, full packaging closure, and organizer-controlled qualification remain unverified.
 
 ## Issue #16 reconciliation
 
 The current implementation is not the pre-implementation plan described by several historical paragraphs below. F-01/F-02/F-03/F-04/F-07 have bounded local evidence at their authoritative seams; F-05 has local renderer/artifact seam evidence but not complete platform qualification; F-06 has native-amd64 CI observations, while cross-platform parity, full packaging closure, and broad held-out evaluation remain open. See the audit matrix and exact paths in [`STATUS.md`](STATUS.md). No warning-only check, soft score, arm64 emulation, or missing artifact is contract or qualification evidence.
 
-Decision ratification is complete and documentation-only. Tickets 01-08 have bounded implementation or evidence records within their stated scopes. Ticket 07's public sample-pass criterion remains unresolved, while Ticket 08 implementation is present rather than blocked; do not claim held-out evaluation, sample-pass completion, merge/release, or complete organizer runtime qualification until the corresponding gaps are resolved.
+Decision ratification is complete, including the PDF-grounded Issue #61 changes in ADR-010 through ADR-012. The public Level 3 sample-pass behavior is now implemented and locally evidenced; do not claim issue completion until its PR is reviewed/merged, or claim official scoring, broad held-out evaluation, cross-platform parity, or complete organizer runtime qualification without corresponding evidence.
 
 ### Gate 0 — Contract and evidence (complete; documentation only)
 
-- Read `PROJECT_CONTRACT.md`, ADR-001 through ADR-009, the pinned schema, and `DEPENDENCY_EVIDENCE.md`.
+- Read `PROJECT_CONTRACT.md`, ADR-001 through ADR-012, the pinned schema, and `DEPENDENCY_EVIDENCE.md`.
 - Record the accepted failure, numeric/geometry, typography, and initial-search decisions without adding wire fields or weakening hard constraints.
 - Keep every unresolved external fact visible: hidden-task feasibility and missing-output scoring, scorer thresholds, target catalogue, M5 Pro resources, model limits, final fonts/assets/licensing, native amd64 qualification, and Adobe deployment.
 - Treat the three shipped samples plus the contract fixtures as regression inputs, not as the whole hidden-test universe.
@@ -34,11 +34,11 @@ Decision ratification is complete and documentation-only. Tickets 01-08 have bou
 - Apply one round-half-even serialization step and validate serialized integers, reduced image-ratio lattice, rotated AABB containment, positive-area overlap, deterministic background tie-break, and same-side source bleed.
 - Acceptance: Level 1 plus geometry fixtures pass structural validation. The baseline must never hide or drop an element. **Gate 2 acceptance achieved** - Ticket 05 Level 1 solver complete with 20 layout tests passing.
 
-### Gate 3 — Source-aware routing (Ticket 06 complete; Ticket 07 active review)
+### Gate 3 — Source-aware routing (Ticket 06 complete; Ticket 07 public sample implementation ready for review)
 
 - Infer roles from multiple signals without fixed z-index/coverage thresholds.
 - Derive slots from target proportions, source group extents, measured text, and image ratios. Never reserve fixed logo/hero/CTA pixels.
-- Acceptance: Ticket 06 implementation, focused/full tests, and Level 2 sample evidence are recorded and merged. Ticket 07 horizontal-ribbon and vertical-restack candidates are implemented and pass feasible synthetic contract tests, but the public Level 3 sample-pass criterion remains unresolved; do not relax hard constraints to close it.
+- Acceptance: Ticket 06 implementation, focused/full tests, and Level 2 sample evidence are recorded and merged. The Issue #61 implementation now produces the hard-valid Level 3 sample pair locally with source identities, groups, image ratios, overlap, and renderer checks intact; PR review and native-amd64 CI evidence for this change remain pending.
 
 ### Gate 4 — Typography and candidate generation
 
@@ -54,7 +54,7 @@ Decision ratification is complete and documentation-only. Tickets 01-08 have bou
 - Start with the accepted bounded structured search: at most three source-derived variants per each of four topology families, renderer-in-loop hard validation, and fixed-point ranking. Ticket 06 MUST remain deterministic and MUST NOT add CP-SAT, OR-Tools, models, or model weights/runtime; any later solver-dependency proposal requires separate authority and change control.
 - Represent only source-separated pairs in no-overlap constraints. Keep intentional overlaps and rigid groups out of universal separation constraints.
 - Rank only hard-valid candidates using alignment, even spacing, hierarchy, balance, whitespace, readability, and source relationship preservation. A cutoff with no hard-valid candidate is `INCOMPLETE_SEARCH`, never proven infeasibility.
-- Acceptance: the current bounded tree records hard-validation reports and reproducible fixed-point candidate scores in `Docs/STATUS.md` and the held-out-style evaluator. Native-amd64 F-06 runtime/sample-output evidence is recorded; official/native cross-platform and organizer-held-out qualification remain pending.
+- Acceptance: the current bounded tree records hard-validation reports and reproducible fixed-point candidate scores in `Docs/STATUS.md` and the held-out-style evaluator. Native-amd64 F-06 evidence is recorded for its prior revision; issue-branch native-amd64 CI, official/native cross-platform, and organizer-held-out qualification remain pending.
 
 ### Gate 6 — Offline submission qualification
 
@@ -82,7 +82,7 @@ The reliable path to a strong submission is not a large model or a one-sample de
 6. Prefer a smaller deterministic dependency footprint over an unverified model. Keep Ticket 06 role inference deterministic; do not add learned models or model weights/runtime to the Stage 1 engine.
 7. Demonstrate the same engine path in the finale; product controls must not fork the Stage 1 truth.
 
-The design review establishes the intended deterministic Stage 1 engine contract. Implementation must return the source element set unchanged, preserve intentional relationships, and adapt geometry to the target canvas without generating pixels or rewriting content; no such implementation or qualification is claimed here.
+The design review establishes the intended deterministic Stage 1 engine contract. Implementation must return the source element set unchanged, preserve intentional relationships, and adapt geometry to the target canvas without generating pixels or rewriting content. This paragraph's former statement that no implementation was claimed predates Issue #61; the public Level 3 pair is now locally evidenced in `STATUS.md`, while official qualification remains unverified.
 
 The original design review identified five corrections; all are resolved or superseded in the current documents above. The list is retained as historical rationale, not as an outstanding checklist:
 

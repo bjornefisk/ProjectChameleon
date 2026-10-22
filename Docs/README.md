@@ -9,7 +9,7 @@ This directory contains the complete source of truth, architectural blueprints, 
 When reading or implementing this project, follow this strict precedence. A lower-precedence document never silently overrides a higher one:
 
 1. **Normative Behavioral Contract & Accepted ADRs:**  
-   [`PROJECT_CONTRACT.md`](PROJECT_CONTRACT.md) and [`DECISIONS/`](DECISIONS/) (ADR-001 through ADR-009).
+   [`PROJECT_CONTRACT.md`](PROJECT_CONTRACT.md) and [`DECISIONS/`](DECISIONS/) (ADR-001 through ADR-012).
 2. **Ratified Structural Wire Schema:**  
    [`../chameleon/chameleon_design_schema_v0.9.json`](../chameleon/chameleon_design_schema_v0.9.json).
 3. **Pinned Renderer Adapter & Upstream Source:**  
@@ -53,6 +53,9 @@ All accepted ADRs reside in [`DECISIONS/`](DECISIONS/):
 * **[ADR-007: Numeric & Geometry Semantics](DECISIONS/ADR-007-numeric-and-geometry-semantics.md)** — Mandates exact rational calculation ingress, one final round-half-even quantization, exact integer image ratio lattices, uniform group transforms, and positive-area AABB collision.
 * **[ADR-008: Typography & Renderer Edge Semantics](DECISIONS/ADR-008-typography-and-renderer-edge-semantics.md)** — Adopts UAX #29 extended grapheme clusters intersected with UAX #14 line-break opportunities, code-point $[start, end)$ style ranges, effective span metrics, overflow rejection, and in-box shape strokes.
 * **[ADR-009: Initial Search Strategy & Performance Profile](DECISIONS/ADR-009-initial-search-strategy.md)** — Selects bounded structured candidate search across four topology families with a 0 MB neural weight footprint, < 2.0s CPU latency target, < 500 MB solver RAM, and renderer-in-the-loop hard validation.
+* **[ADR-010: Quantized Rigid Groups](DECISIONS/ADR-010-quantized-rigid-groups.md)** — Requires one shared exact group transform whose output is reproduced by the canonical round-half-even geometry quantizer.
+* **[ADR-011: No Numeric Readability Floor](DECISIONS/ADR-011-no-numeric-readable-font-floor.md)** — Makes ~10px a soft preference, not a minimum; renderer hard checks and qualitative legibility remain required.
+* **[ADR-012: Render Text Inside Declared Bounds](DECISIONS/ADR-012-render-text-inside-declared-bounds.md)** — Applies a minimal transient renderer inset based on actual glyph bounds without changing serialized text geometry.
 
 ### Architectural & technical deep-dives (guidance)
 

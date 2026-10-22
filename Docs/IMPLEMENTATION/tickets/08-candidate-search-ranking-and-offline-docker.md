@@ -4,12 +4,12 @@
 A bounded macro-candidate search coordinating all four layout topologies, paired with offline `linux/amd64` qualification. For any task, the engine generates at most 12 candidates across the four families, validates each through the actual renderer, ranks only hard-valid survivors, selects deterministically, and records qualification evidence rather than assuming every task is feasible.
 
 **Dependency:**
-`07: Horizontal Ribbon Topology and Level 3 Extreme Leaderboard Solver` supplies topology interfaces. The bounded Ticket 08 integration is present even though the public Level 3 sample acceptance and official qualification remain open.
+`07: Horizontal Ribbon Topology and Level 3 Extreme Leaderboard Solver` supplies topology interfaces. Bounded Ticket 08 integration is present; Issue #61 now produces the public Level 3 pair in repeated local tests. Issue-branch review/native-amd64 CI, official held-out scoring, and release qualification remain pending.
 
 **Status:**
-implemented; local evidence recorded; native-amd64 and organizer-held-out qualification remain unverified on the arm64 workstation
+implemented; local bounded evidence recorded; issue-branch native-amd64 CI, cross-platform parity, and organizer-held-out qualification remain unverified.
 
-The command checkboxes below preserve the earlier local evidence record. Current Issue #16 verification is recorded in [`../../STATUS.md`](../../STATUS.md), including the current full-suite count and the blocked Docker daemon.
+The checkboxes below preserve the earlier Ticket 08 evidence record. Current Issue #61 behavior and verification are recorded in [`../../STATUS.md`](../../STATUS.md); do not treat the historical Level 3 `INCOMPLETE_SEARCH` result below as current.
 
 - [x] Create `chameleon/engine/layout/search.py` orchestrating candidate generation across the four topology families (near-isomorphic, column-pivot, horizontal-ribbon, vertical-restack) with at most 3 source-derived variants each (maximum 12 macro-candidates).
 - [x] Connect renderer-in-the-loop hard validation: pass every candidate through Skia rendering and `validate_response()`, immediately discarding any candidate that violates containment, ratios, groups, or text bounds.

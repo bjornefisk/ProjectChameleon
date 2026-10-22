@@ -1,10 +1,10 @@
 # Project Chameleon final architecture
 
-**Status:** Gate 1 qualification is cleared and Tickets 06-08 have bounded implementation on the integrated review tree. The search enumerates all four topology families with source-derived variants, renderer-gated hard validation, fixed-point ranking, and local held-out-style evidence. The public Level 3 sample remains a typed fail-closed result; native-amd64 F-06 runtime/sample-output evidence is recorded, while cross-platform, broad organizer-held-out, and release qualification remain unverified.
+**Status:** Gate 1 qualification is cleared and Tickets 06–08 have bounded implementation on the integrated review tree. Issue #61 now has a PDF-grounded implementation path that produces a hard-valid Level 3 pair in local tests; issue-linked PR review, new native-amd64 CI evidence, cross-platform parity, organizer-held-out scoring, and release qualification remain unverified.
 
 **Scope:** Stage 1 retargeting engine and the separate finale integration boundary.
 
-**Authority:** `Docs/PROJECT_CONTRACT.md` and Accepted ADR-001 through ADR-009 remain normative. The ratified schema and pinned renderer evidence follow them. This document consolidates those decisions for implementation; it does not add wire fields, change behavior, or override a contract or ADR.
+**Authority:** `Docs/PROJECT_CONTRACT.md` and Accepted ADR-001 through ADR-012 are normative. The ratified schema and pinned renderer evidence follow them. This document consolidates those decisions for implementation; it does not add wire fields, change behavior, or override a contract or ADR.
 
 ## 1. Architecture goals
 
@@ -23,7 +23,7 @@ The architecture must:
 - produce deterministic results in an offline `linux/amd64` container; and
 - keep the autonomous Stage 1 engine separate from the interactive finale.
 
-The current phase is **bounded four-topology search review after Gate 1 qualification**. Source-aware role inference, column pivot, horizontal ribbon, vertical restack, candidate variants, renderer-in-loop admission, and fixed-point ranking are implemented without changing the public schema or hard contract. The public Level 3 sample-pass criterion remains unresolved and must not be addressed by shedding records, changing copy/font attributes, substituting fonts, or relaxing hard validation. Local held-out-style evidence and native-amd64 F-06 runtime evidence are recorded separately from organizer-held-out and release qualification.
+The current phase is **Issue #61 public Level 3 resolution and bounded four-topology search review**. Source-aware role inference, column pivot, horizontal ribbon, vertical restack, candidate variants, renderer-in-loop admission, and fixed-point ranking remain bounded. The public 1080×1350 to 728×90 fixture now produces a hard-valid pair in local integration tests using the narrow superseding decisions in ADR-010 through ADR-012. Native-amd64 CI on the issue branch, cross-platform parity, broad organizer-held-out scoring, and release qualification remain separate.
 
 ### Terminology
 
@@ -161,7 +161,7 @@ The valid integer dimensions are reduced-ratio lattice points `(k*p, k*q)` for p
 
 ### Groups and overlap
 
-Elements with the same non-null `group_id` are rigid units. Every child receives the same scale `s > 0` and translation `t`:
+Elements with the same non-null `group_id` are rigid units. Before serialization every child receives one common exact scale `s > 0` and translation `t` for position and dimensions. The serialized geometry is valid only if one shared exact transform reproduces every geometry field through the canonical round-half-even quantizer; this is not an independent per-child tolerance. Text font size is separate. See ADR-010.
 
 ```text
 child_center' = s * child_center + t
@@ -196,7 +196,7 @@ The adapter owns task-schema conversion, local font loading, image fit preproces
 - Empty ranges are no-ops.
 - Later overlapping runs win per property supplied.
 - Measurement uses the effective loaded face, serialized integer font size, span-local letter spacing, and the actual transient line map.
-- `max_lines`, line-box height, and actual positioned glyph bounds are enforced after serialization.
+- `max_lines`, line-box height, and actual positioned glyph bounds are enforced after serialization. The adapter may add the minimal measured vertical inset to the transient renderer origin; the inset is unpersisted and does not relax bounds checks (ADR-012).
 - Content is never rewritten, reordered, hyphenated, truncated, or silently clipped.
 - Rectangle and ellipse strokes rasterize inside their declared boxes without expanding public geometry.
 
@@ -240,13 +240,13 @@ The ranking tuple is:
 (hard_validity, quality_tuple, topology_order, candidate_index, source_order)
 ```
 
-The quality tuple may consider readable text size, rendered contrast, hierarchy, alignment, spacing, balance, whitespace, and preservation of source-intended overlap. A soft score never rescues a hard-invalid candidate.
+The quality tuple may consider readable text size (a soft preference without a universal numeric floor; see ADR-011), rendered contrast, hierarchy, alignment, spacing, balance, whitespace, and preservation of source-intended overlap. A soft score never rescues a hard-invalid candidate.
 
 ### Cutoffs and feasibility
 
 A hard-valid candidate found before a deterministic cutoff may be returned after serialized validation. If no candidate has passed before the cutoff, the result is `INCOMPLETE_SEARCH`, not proven infeasibility. Only an exhausted finite search may report `INFEASIBLE_LAYOUT`.
 
-Before reporting infeasibility, candidate generation must use all contract-permitted feasibility levers: readable font-size reduction, isotropic foreground-art scaling, topology pivots, and margin compression. It must not hide, shed, zero-size, or rewrite records.
+Before reporting infeasibility, candidate generation must use all contract-permitted feasibility levers: font-size reduction subject to qualitative legibility (no universal numeric floor), isotropic foreground-art scaling, topology pivots, and margin compression. It must not hide, shed, zero-size, or rewrite records.
 
 ## 8. Runner and failure architecture
 

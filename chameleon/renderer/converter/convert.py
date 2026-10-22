@@ -13,6 +13,8 @@ the conversion above to a brand-kit-backed `CrelloV5Renderer` and writes
 the result straight to a PNG file.
 """
 
+from dataclasses import dataclass
+from math import ceil
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -42,6 +44,20 @@ logger = logging.getLogger(__name__)
 _BLANK_IMAGE = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
 _DEFAULT_LINE_HEIGHT = 1.2
 _BOLD_WEIGHTS = {"bold", "semibold", "extrabold", "black"}
+
+
+@dataclass(frozen=True, slots=True)
+class _PreparedText:
+    wrapped: str
+    line_indices: List[int]
+    line_count: int
+    family: str
+    size: int
+    line_height: float
+    letter_spacing: float
+    colors: List[str]
+    bold_flags: List[bool]
+    italic_flags: List[bool]
 
 
 def convert_chameleon_to_crello(
@@ -102,7 +118,7 @@ def convert_chameleon_to_crello(
 
         if etype == "text":
             out["type"].append("TextElement")
-            _append_text(out, element, font_manager)
+            out["top"][-1] += _append_text(out, element, font_manager)
             out["image"].append(_BLANK_IMAGE)
         elif etype == "shape":
             out["type"].append("ImageElement")
@@ -305,7 +321,7 @@ def _line_ranges(
     return sorted(ranges)
 
 
-def _validate_positioned_glyph_bounds(
+def _positioned_glyph_metrics(
     wrapped: str,
     line_indices: List[int],
     line_count: int,
@@ -318,12 +334,13 @@ def _validate_positioned_glyph_bounds(
     colors: List[str],
     bold_flags: List[bool],
     italic_flags: List[bool],
-) -> None:
-    """Reject actual Skia glyph envelopes outside the declared text box."""
+) -> tuple[float, float, float | None]:
+    """Return the minimal top inset and adjusted glyph bottom for this text."""
     element_width = float(element.get("width", 1.0))
-    element_height = float(element.get("height", 1.0))
     text_align = element.get("text_align", "left")
     capitalize = bool(element.get("capitalize", False))
+    minimum_top = float("inf")
+    maximum_bottom = float("-inf")
 
     for line_index, line_start, line_end in _line_ranges(
         line_indices, line_count, len(wrapped)
@@ -376,17 +393,64 @@ def _validate_positioned_glyph_bounds(
                 right = span_offset + position + glyph_bound.right()
                 top = baseline + glyph_bound.top()
                 bottom = baseline + glyph_bound.bottom()
-                if left < 0 or top < 0 or right > element_width or bottom > element_height:
+                if left < 0 or right > element_width:
                     raise TextOverflowError(
                         "positioned glyph bounds exceed text element "
                         f"(line={line_index}, bounds=({left:g}, {top:g}, "
-                        f"{right:g}, {bottom:g}), box=({element_width:g}, "
-                        f"{element_height:g}))"
+                        f"{right:g}, {bottom:g}), width={element_width:g})"
                     )
+                minimum_top = min(minimum_top, top)
+                maximum_bottom = max(maximum_bottom, bottom)
             span_offset += span_width
 
+    if minimum_top == float("inf"):
+        return 0.0, 0.0, None
+    inset = max(0.0, -minimum_top)
+    return inset, maximum_bottom + inset, minimum_top
 
-def _append_text(out: Dict[str, Any], element: Dict[str, Any], font_manager) -> None:
+
+def _validate_positioned_glyph_bounds(
+    wrapped: str,
+    line_indices: List[int],
+    line_count: int,
+    element: Dict[str, Any],
+    font_manager,
+    family: str,
+    size: float,
+    line_height: float,
+    letter_spacing: float,
+    colors: List[str],
+    bold_flags: List[bool],
+    italic_flags: List[bool],
+) -> float:
+    """Reject glyph envelopes outside the box after the exact vertical inset."""
+    inset, maximum_bottom, minimum_top = _positioned_glyph_metrics(
+        wrapped,
+        line_indices,
+        line_count,
+        element,
+        font_manager,
+        family,
+        size,
+        line_height,
+        letter_spacing,
+        colors,
+        bold_flags,
+        italic_flags,
+    )
+    element_height = float(element.get("height", 1.0))
+    if minimum_top is not None and (
+        minimum_top + inset < 0 or maximum_bottom > element_height
+    ):
+        raise TextOverflowError(
+            "positioned glyph bounds exceed text element "
+            f"(bounds=({minimum_top + inset:g}, {maximum_bottom:g}), "
+            f"box=({float(element.get('width', 1.0)):g}, {element_height:g}))"
+        )
+    return inset
+
+
+def _prepare_text(element: Dict[str, Any], font_manager) -> _PreparedText:
     content = str(element.get("content", ""))
     transient_content, source_indices = _collapse_crlf(content)
     family = element.get("font_family", "Montserrat")
@@ -411,27 +475,16 @@ def _append_text(out: Dict[str, Any], element: Dict[str, Any], font_manager) -> 
         transient_bold_flags,
         transient_italic_flags,
     )
-
     wrapped, line_indices, line_count = wrap_text_with_line_map(
         transient_content,
         (),
         float(element.get("width", 1.0)),
         measure=measure,
     )
-    enforce_text_limits(
-        wrapped,
-        size,
-        line_height,
-        element.get("max_lines"),
-        float(element.get("height", 1.0)),
-        line_count,
-    )
-    _validate_positioned_glyph_bounds(
+    return _PreparedText(
         wrapped,
         line_indices,
         line_count,
-        element,
-        font_manager,
         family,
         size,
         line_height,
@@ -441,17 +494,81 @@ def _append_text(out: Dict[str, Any], element: Dict[str, Any], font_manager) -> 
         transient_italic_flags,
     )
 
-    out["text"].append(wrapped)
-    out["font_size"].append(size)
-    out["font"].append(family)
-    out["line_height"].append(line_height)
+
+def _append_text(out: Dict[str, Any], element: Dict[str, Any], font_manager) -> float:
+    prepared = _prepare_text(element, font_manager)
+    enforce_text_limits(
+        prepared.wrapped,
+        prepared.size,
+        prepared.line_height,
+        element.get("max_lines"),
+        float(element.get("height", 1.0)),
+        prepared.line_count,
+    )
+    inset = _validate_positioned_glyph_bounds(
+        prepared.wrapped,
+        prepared.line_indices,
+        prepared.line_count,
+        element,
+        font_manager,
+        prepared.family,
+        prepared.size,
+        prepared.line_height,
+        prepared.letter_spacing,
+        prepared.colors,
+        prepared.bold_flags,
+        prepared.italic_flags,
+    )
+
+    out["text"].append(prepared.wrapped)
+    out["font_size"].append(prepared.size)
+    out["font"].append(prepared.family)
+    out["line_height"].append(prepared.line_height)
     out["text_align"].append(element.get("text_align", "left"))
     out["capitalize"].append(bool(element.get("capitalize", False)))
-    out["letter_spacing"].append(letter_spacing)
-    out["font_bold"].append(transient_bold_flags)
-    out["font_italic"].append(transient_italic_flags)
-    out["text_color"].append(transient_colors)
-    out["text_line"].append(line_indices)
+    out["letter_spacing"].append(prepared.letter_spacing)
+    out["font_bold"].append(prepared.bold_flags)
+    out["font_italic"].append(prepared.italic_flags)
+    out["text_color"].append(prepared.colors)
+    out["text_line"].append(prepared.line_indices)
+    return inset
+
+
+def minimum_text_box_height(
+    element: Dict[str, Any],
+    width: int,
+    font_size: int,
+    font_manager,
+) -> int:
+    """Measure the smallest integer box height passing the renderer hard checks."""
+    candidate = dict(element)
+    candidate["width"] = width
+    candidate["font_size"] = font_size
+    prepared = _prepare_text(candidate, font_manager)
+    enforce_text_limits(
+        prepared.wrapped,
+        prepared.size,
+        prepared.line_height,
+        candidate.get("max_lines"),
+        float("inf"),
+        prepared.line_count,
+    )
+    _inset, glyph_bottom, _minimum_top = _positioned_glyph_metrics(
+        prepared.wrapped,
+        prepared.line_indices,
+        prepared.line_count,
+        candidate,
+        font_manager,
+        prepared.family,
+        prepared.size,
+        prepared.line_height,
+        prepared.letter_spacing,
+        prepared.colors,
+        prepared.bold_flags,
+        prepared.italic_flags,
+    )
+    line_box_height = prepared.line_count * prepared.size * prepared.line_height
+    return ceil(max(line_box_height, glyph_bottom))
 
 
 def _normalize_weight(weight: Optional[str]) -> str:

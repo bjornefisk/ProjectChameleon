@@ -1,10 +1,10 @@
 # Issue 23 / F-07 evidence record
 
-This record expands the normative regression evidence on the integrated Ticket 07/08 review tree. It does not change the Stage 1 wire schema, renderer dependency, or runtime policy; the focused issue #29 fix only corrects variant candidate serialization.
+This record expands the normative regression evidence on the integrated Ticket 07/08 review tree before Issue #61. Its recorded public-sample failure is historical, not the current result; see `Docs/STATUS.md` for Issue #61 behavior and verification. It does not change the Stage 1 wire schema, renderer dependency, or runtime policy; the focused Issue #29 fix only corrects variant candidate serialization.
 
 ## Authority and scope
 
-`PROJECT_CONTRACT.md` and Accepted ADR-001 through ADR-009 remain authoritative. The tests use the `chameleon-contract`, `chameleon-testing`, and `chameleon-review` skills:
+`PROJECT_CONTRACT.md` and Accepted ADR-001 through ADR-012 remain authoritative. The tests use the `chameleon-contract`, `chameleon-testing`, and `chameleon-review` skills:
 
 - hard validation is exercised before soft quality assertions;
 - mutable geometry/font-size behavior is checked after one half-even serialization step;
@@ -31,9 +31,9 @@ The local checked-in held-out-style evaluator is now implemented and recorded in
 
 Hard evidence consists of serialized `validate_response()` results, renderer conversion failures/warnings, expected PNG dimensions, source/asset/font provenance, and repeated byte hashes. Soft evidence consists of `QualityScore` values and deterministic rank ordering among candidates that already passed hard validation. No test treats a non-empty PNG, a copied response, or a proxy score as proof of contract validity.
 
-## Current integration verification pointer
+## Historical Issue 23 integration verification pointer
 
-The inherited Issue #16 integration record has run the earlier focused suites, repository checks, held-out-style evaluator, and local smoke sequence. Its counts remain historical provenance; current Issue #23 commands and results are recorded in the pull request and final handoff, while the native-amd64 F-06 evidence is recorded separately and organizer-controlled boundaries remain explicitly unverified.
+The Issue #16 integration record below predates Issue #61; its counts and statuses remain evidence for the revision exercised at the time only. Current Issue #61 results and native-amd64 PR CI state are recorded in [`../../STATUS.md`](../../STATUS.md).
 
 ## Hardening pass: assertions that could not fail
 
@@ -120,9 +120,9 @@ Not verified: Windows, macOS x86_64, other Linux distributions or font-library b
 
 ## Disposition
 
-This closes the reachable F-07 rounding/search/renderer evidence gaps on the current review tree and the F-04 authoritative validator gap, adding local held-out-style search evidence and direct contract-seam regressions. It does not close official/native-amd64 qualification criteria or the public Level 3 sample-pass gap. Those require new evidence and must not be represented as completed by this change. `Docs/STATUS.md` is intentionally not edited here; its F-06 row still lists cross-platform hash parity as unverified, which the platform evidence above refines but does not close.
+At the time of this Issue 23/F-07 evidence run, it closed the local rounding/search/renderer evidence gaps and the F-04 validator gap, but did not establish official/native-amd64 qualification or a public Level 3 pair. The then-current `STATUS.md` recorded those limitations; Issue #61 later revised the local public-sample result under ADR-010 through ADR-012. Current results remain in `Docs/STATUS.md`.
 
-## Current verification for this change
+## Historical Issue 23 verification (pre-Issue #61)
 
 | Command | Observed result |
 | --- | --- |

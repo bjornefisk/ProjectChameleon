@@ -16,8 +16,10 @@ from .groups import (
     GroupTransform,
     apply_transform,
     derive_common_transform,
+    derive_quantized_common_transform,
     element_center as group_element_center,
     has_common_transform,
+    has_quantized_common_transform,
 )
 from .math_util import as_fraction, quantize_to_int, to_fraction
 from .ratios import (
@@ -38,8 +40,10 @@ __all__ = [
     "check_source_bleed",
     "clipped_sides",
     "derive_common_transform",
+    "derive_quantized_common_transform",
     "group_element_center",
     "has_common_transform",
+    "has_quantized_common_transform",
     "has_positive_area_intersection",
     "intersects_canvas",
     "is_contained_in_canvas",

@@ -50,16 +50,16 @@ A hard-valid candidate found before an optimization cutoff MUST be returned, sub
 
 This distinction preserves ADR-003's fail-closed rule while avoiding a false proof from a timeout. It also gives the search ADR a stable hand-off for cutoff behavior.
 
-### 3b. Maximize feasibility via graceful spatial compression before claiming infeasibility
+### 3b. Maximize feasibility via contract-permitted geometric levers
 
-In automated hackathon scoring, tasks that fail to publish output files receive zero credit from automated graders. Therefore, the engine must actively prevent avoidable `INFEASIBLE_LAYOUT` rejections on extreme canvas ratios (such as the Level 3 728x90 leaderboard) by exhaustively applying all contract-permitted geometric levers:
+Candidate generation SHOULD prevent avoidable failures on extreme canvas ratios by considering all contract-permitted levers before declaring infeasibility:
 
-1. Font size reduction down to the readable floor (10px–12px);
-2. Isotropic downscaling of foreground artwork and logos down to recognizable compact extents;
-3. Horizontal ribbon or multi-column topology shifts that spread content along the dominant canvas axis;
-4. Proportional margin compression and tight element spacing.
+1. Reduce text font sizes while preserving unchanged copy, fixed typography properties, renderer bounds, and qualitative readability. The roughly 10–12px range is a soft preference, not a minimum; ADR-011 supersedes this subsection's former numeric floor.
+2. Isotropically downscale foreground artwork while preserving exact image ratios.
+3. Consider horizontal-ribbon or multi-column topology shifts that spread content along the dominant canvas axis.
+4. Compress margins and element spacing where the source relationships and hard constraints allow.
 
-A tight or minimal layout that satisfies all hard structural rules will receive valid structural marks and partial aesthetic points from the evaluator, whereas omitting files guarantees zero points. `INFEASIBLE_LAYOUT` is strictly reserved for mathematically impossible geometry (e.g. elements that physically cannot fit even at minimum readable bounds without collision, or non-positive canvas dimensions).
+The official score consequence of task failure is not established by this ADR. `INFEASIBLE_LAYOUT` is reserved for an exhausted finite search with no hard-valid candidate; a cutoff without a candidate remains `INCOMPLETE_SEARCH`. Neither status permits publishing a misleading design or PNG.
 
 ### 4. Commit the JSON and PNG as one task result
 

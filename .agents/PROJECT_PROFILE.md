@@ -7,7 +7,7 @@ This file supplies repository-specific context to the generic operating contract
 Read in this order:
 
 1. [`../AGENTS.md`](../AGENTS.md);
-2. [`../Docs/PROJECT_CONTRACT.md`](../Docs/PROJECT_CONTRACT.md) and Accepted ADR-001 through ADR-009;
+2. [`../Docs/PROJECT_CONTRACT.md`](../Docs/PROJECT_CONTRACT.md) and Accepted ADR-001 through ADR-012;
 3. [`../chameleon/chameleon_design_schema_v0.9.json`](../chameleon/chameleon_design_schema_v0.9.json);
 4. [`../Docs/DEPENDENCY_EVIDENCE.md`](../Docs/DEPENDENCY_EVIDENCE.md);
 5. [`../Docs/STATUS.md`](../Docs/STATUS.md) and [`../Docs/IMPLEMENTATION_ROADMAP.md`](../Docs/IMPLEMENTATION_ROADMAP.md);
@@ -19,11 +19,11 @@ The contract plus Accepted ADRs win conflicts. Starter comments, warning-only ch
 
 ## Current phase
 
-PR #14's bounded Ticket 06 source-aware routing and column-pivot implementation is merged into `main` at commit `58b697a`. The current tree includes exact column-pivot serialization and renderer-aware response text validation. Focused/full local evidence and supplemental arm64-host container evidence pass with the documented expected Level 3 failure; native amd64, cross-platform parity, apt locks, and wheelhouse closure remain unverified. Tickets 07-08, full candidate ranking, and held-out evaluation remain later work.
+PR #14's bounded Ticket 06 source-aware routing and column-pivot implementation is merged into `main`. Tickets 07-08 and four-topology search/ranking are implemented within their accepted bounds. Issue #61's PDF-grounded public Level 3 fix produces a hard-valid pair in repeated local tests under Accepted ADR-010 through ADR-012. Maintainer review and native-amd64 CI for the issue branch remain pending; cross-platform parity, organizer-held-out scoring, and release qualification remain unverified.
 
 Stage 1 MUST preserve source identity, IDs, counts, order, types, immutable fields, content, assets, and source relationships. Only target canvas dimensions, element geometry, and text `font_size` may change; serialized mutable values must be finite integers. Hard validation is authoritative for rotated bounds, exact foreground-image ratios, groups and source-separated overlap, text/render bounds, and missing assets. Invalid candidates fail closed without misleading output files.
 
-Do not add models, model weights/runtime, CP-SAT, OR-Tools, solver orchestration, shedding/removal, opacity-zero or zero-size workarounds, pixel generation/replacement, copy revision, font substitution, reduced previews, invented resource ceilings, or unapproved schema/API/dependency/runtime changes.
+Do not add models, model weights/runtime, CP-SAT, OR-Tools, solver dependencies, unbounded candidate/font search, shedding/removal, opacity-zero or zero-size workarounds, pixel generation/replacement, copy revision, font substitution, reduced previews, invented resource ceilings, or unapproved schema/API/dependency/runtime changes. The only Issue #61 contract changes are the narrow scopes accepted in ADR-010 through ADR-012.
 
 ## Role routing
 

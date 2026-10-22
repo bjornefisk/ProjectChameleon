@@ -489,6 +489,37 @@ class RunnerIntegrationTests(unittest.TestCase):
         for stem in ("infeasible", "cutoff"):
             self.assertFalse((self.output_dir / f"{stem}_output.json").exists())
             self.assertFalse((self.output_dir / f"{stem}_output.png").exists())
+    def test_real_incomplete_search_publishes_no_artifacts(self):
+        evaluation = json.loads(
+            (
+                PROJECT_ROOT
+                / "chameleon"
+                / "tests"
+                / "fixtures"
+                / "heldout_search_cases.json"
+            ).read_text(encoding="utf-8")
+        )
+        case = next(
+            item
+            for item in evaluation["cases"]
+            if item["id"] == "extreme-ratio-incomplete"
+        )
+        self.write_task(
+            "incomplete",
+            {"source": case["source"], "target_canvas": case["target_canvas"]},
+        )
+
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            result = main.main()
+
+        self.assertEqual(result, 1)
+        self.assertIn(
+            "[incomplete.json] status=INCOMPLETE_SEARCH",
+            stderr.getvalue(),
+        )
+        self.assertEqual(list(self.output_dir.iterdir()), [])
+
     def test_complete_batch_returns_zero_only_after_all_pairs_commit(self):
         self.write_task("first", self.task(100))
         self.write_task("second", self.task(100))

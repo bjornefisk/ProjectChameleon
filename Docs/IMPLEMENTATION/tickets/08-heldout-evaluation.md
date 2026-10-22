@@ -2,10 +2,10 @@
 
 This record closes the implementation gap for a **local, checked-in held-out-style
 corpus evaluator**. It does not turn the corpus into an official qualification
-set. `Docs/PROJECT_CONTRACT.md` §§5–9, Accepted ADR-001 through ADR-009 (in
-particular ADR-006, ADR-007, and ADR-009), the pinned renderer/dependency
-records, and the `chameleon-contract`, `chameleon-testing`, and
-`chameleon-review` skills remain authoritative.
+set. `Docs/PROJECT_CONTRACT.md` §§5–9, Accepted ADR-001 through ADR-012 (in
+particular ADR-006, ADR-007, and ADR-009 through ADR-012), the pinned
+renderer/dependency records, and the `chameleon-contract`, `chameleon-testing`,
+and `chameleon-review` skills remain authoritative.
 
 ## Corpus provenance and coverage matrix
 

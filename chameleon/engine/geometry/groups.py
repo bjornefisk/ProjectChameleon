@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 from typing import Any, Mapping, Sequence
 
-from .math_util import to_fraction
+from .math_util import quantize_to_int, to_fraction
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,6 +141,141 @@ def derive_common_transform(
     assert translation is not None
     return GroupTransform(scale, translation[0], translation[1])
 
+def _constrain_scale_interval(
+    low: Fraction,
+    high: Fraction | None,
+    source_delta: Fraction,
+    response_delta: Fraction,
+    tolerance: Fraction,
+) -> tuple[Fraction, Fraction | None]:
+    """Intersect a scale interval for one rounded linear constraint."""
+    if source_delta == 0:
+        if abs(response_delta) > tolerance:
+            raise ValueError("group children cannot share one quantized transform")
+        return low, high
+
+    first = (response_delta - tolerance) / source_delta
+    second = (response_delta + tolerance) / source_delta
+    low = max(low, min(first, second))
+    upper = max(first, second)
+    if high is None or upper < high:
+        high = upper
+    if high is not None and low > high:
+        raise ValueError("group children cannot share one quantized transform")
+    return low, high
+
+
+def derive_quantized_common_transform(
+    source_elements: Sequence[Mapping[str, Any]],
+    response_elements: Sequence[Mapping[str, Any]],
+) -> GroupTransform:
+    """Find one exact transform whose canonical geometry rounding matches output.
+
+    Serialized positions and dimensions are rounded independently, but they
+    must all be reconstructible from the same rational scale and translation.
+    Text font size is deliberately outside this geometry-only relation.
+    """
+
+    if not source_elements or len(source_elements) != len(response_elements):
+        raise ValueError("group child sequences must be non-empty and equal in length")
+
+    low = Fraction(0)
+    high: Fraction | None = None
+    half = Fraction(1, 2)
+    one = Fraction(1)
+
+    for source, response in zip(source_elements, response_elements):
+        for field in ("width", "height"):
+            source_value = to_fraction(source[field])
+            response_value = to_fraction(response[field])
+            if source_value == 0:
+                if response_value != 0:
+                    raise ValueError("zero source dimension changed inside a rigid group")
+                continue
+            low, high = _constrain_scale_interval(
+                low, high, source_value, response_value, half
+            )
+
+    for left in range(len(source_elements)):
+        for right in range(left + 1, len(source_elements)):
+            for field in ("x", "y"):
+                source_delta = (
+                    to_fraction(source_elements[right][field])
+                    - to_fraction(source_elements[left][field])
+                )
+                response_delta = (
+                    to_fraction(response_elements[right][field])
+                    - to_fraction(response_elements[left][field])
+                )
+                if source_delta == 0:
+                    if response_delta != 0:
+                        raise ValueError(
+                            "equal source positions must remain equal after quantization"
+                        )
+                    continue
+                low, high = _constrain_scale_interval(
+                    low, high, source_delta, response_delta, one
+                )
+
+    if high is None:
+        scale = max(one, low)
+    else:
+        if low > high or high <= 0:
+            raise ValueError("group children cannot share one positive quantized scale")
+        scale = low if low == high else (low + high) / 2
+    if scale <= 0:
+        raise ValueError("rigid group scale must be positive")
+
+    translations: list[Fraction] = []
+    for field in ("x", "y"):
+        translation_low: Fraction | None = None
+        translation_high: Fraction | None = None
+        for source, response in zip(source_elements, response_elements):
+            source_position = to_fraction(source[field])
+            response_position = to_fraction(response[field])
+            interval_low = response_position - half - scale * source_position
+            interval_high = response_position + half - scale * source_position
+            translation_low = (
+                interval_low
+                if translation_low is None
+                else max(translation_low, interval_low)
+            )
+            translation_high = (
+                interval_high
+                if translation_high is None
+                else min(translation_high, interval_high)
+            )
+        assert translation_low is not None and translation_high is not None
+        if translation_low > translation_high:
+            raise ValueError("group children do not share one quantized translation")
+        translations.append((translation_low + translation_high) / 2)
+
+    transform = GroupTransform(scale, translations[0], translations[1])
+    for source, response in zip(source_elements, response_elements):
+        for field, translation in zip(("x", "y"), translations):
+            if quantize_to_int(scale * to_fraction(source[field]) + translation) != to_fraction(
+                response[field]
+            ):
+                raise ValueError("group positions do not share one quantized transform")
+        for field in ("width", "height"):
+            if quantize_to_int(scale * to_fraction(source[field])) != to_fraction(
+                response[field]
+            ):
+                raise ValueError("group dimensions do not share one quantized scale")
+    return transform
+
+
+def has_quantized_common_transform(
+    source_elements: Sequence[Mapping[str, Any]],
+    response_elements: Sequence[Mapping[str, Any]],
+) -> bool:
+    """Return whether one exact transform reproduces the serialized geometry."""
+    try:
+        derive_quantized_common_transform(source_elements, response_elements)
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return False
+    return True
+
 
 def has_common_transform(
     source_elements: Sequence[Mapping[str, Any]],
@@ -159,6 +294,8 @@ __all__ = [
     "GroupTransform",
     "apply_transform",
     "derive_common_transform",
+    "derive_quantized_common_transform",
     "element_center",
     "has_common_transform",
+    "has_quantized_common_transform",
 ]
