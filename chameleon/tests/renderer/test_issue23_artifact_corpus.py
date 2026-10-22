@@ -1,9 +1,9 @@
 """Persisted renderer edge evidence for issue #23.
 
 The corpus is intentionally small and source-derived: every expected PNG hash
-is tied to the serialized input document, packaged asset bytes, fonts, and the
-pinned renderer revision.  Assertions exercise the real adapter rather than a
-mock or a synthetic publication path.
+is tied to the serialized input document, packaged asset bytes, fonts, pinned
+renderer revision, Python 3.11, and direct Pillow/Skia versions. Assertions
+exercise the real adapter rather than a mock or synthetic publication path.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import sys
 import tempfile
 import unittest
 from copy import deepcopy
-from importlib.metadata import distribution
+from importlib.metadata import distribution, version
 from pathlib import Path
 from unittest.mock import patch
 
@@ -41,14 +41,17 @@ ASSETS = ROOT / "brand_kit" / "assets"
 FONTS = ROOT / "brand_kit" / "fonts"
 CORPUS = ROOT / "tests" / "fixtures" / "renderer_artifact_hashes.json"
 PINNED_RENDERER_SHA = "a17e1fb9a732959dd6c21ae168d5ee09d74bd64f"
+CANONICAL_PYTHON_MINOR = "3.11"
 
 
 def _platform_hash_key() -> str:
+    system = platform.system().strip().lower()
     machine = platform.machine().strip().lower().replace("-", "_")
-    return {
+    machine = {
         "amd64": "x86_64",
         "x64": "x86_64",
     }.get(machine, machine)
+    return f"{system}-{machine}"
 
 def _canonical_digest(value: object) -> str:
     payload = json.dumps(
@@ -194,6 +197,14 @@ class RendererArtifactCorpusTests(unittest.TestCase):
 
     def test_persisted_hashes_bind_documents_assets_fonts_and_renderer(self):
         self.assertEqual(self.manifest["renderer_commit"], PINNED_RENDERER_SHA)
+        self.assertEqual(self.manifest["python_minor_version"], CANONICAL_PYTHON_MINOR)
+        self.assertEqual(
+            f"{sys.version_info.major}.{sys.version_info.minor}",
+            CANONICAL_PYTHON_MINOR,
+            "renderer PNG hashes are bound to the project's Python 3.11 baseline",
+        )
+        for distribution_name, expected_version in self.manifest["dependencies"].items():
+            self.assertEqual(expected_version, version(distribution_name), distribution_name)
         self.assertEqual(self.manifest["font_tree_sha256"], _font_tree_digest())
         direct_url = json.loads(distribution("cr-renderer").read_text("direct_url.json"))
         self.assertEqual(direct_url["vcs_info"]["commit_id"], PINNED_RENDERER_SHA)
@@ -207,14 +218,30 @@ class RendererArtifactCorpusTests(unittest.TestCase):
             self.assertEqual(expected["document_sha256"], _canonical_digest(document), name)
             payload, warnings, size = _render(document, self.font_manager)
             expected_hashes = expected.get("png_sha256_by_platform", {})
-            expected_hash = expected_hashes.get(_platform_hash_key(), expected["png_sha256"])
+            if expected_hashes:
+                platform_key = _platform_hash_key()
+                self.assertIn(platform_key, expected_hashes, name)
+                expected_hash = expected_hashes[platform_key]
+            else:
+                expected_hash = expected["png_sha256"]
             self.assertEqual(expected_hash, hashlib.sha256(payload).hexdigest(), name)
             self.assertEqual(tuple(expected["size"]), size, name)
             self.assertEqual(expected["warnings"], warnings, name)
 
     def test_platform_aliases_select_persisted_hashes(self):
-        with patch.object(platform, "machine", return_value="AMD64"):
-            self.assertEqual(_platform_hash_key(), "x86_64")
+        with patch.object(platform, "system", return_value="Linux"), patch.object(
+            platform, "machine", return_value="AMD64"
+        ):
+            self.assertEqual(_platform_hash_key(), "linux-x86_64")
+        with patch.object(platform, "system", return_value="Linux"), patch.object(
+            platform, "machine", return_value="aarch64"
+        ):
+            self.assertEqual(_platform_hash_key(), "linux-aarch64")
+        with patch.object(platform, "system", return_value="Darwin"), patch.object(
+            platform, "machine", return_value="arm64"
+        ):
+            self.assertEqual(_platform_hash_key(), "darwin-arm64")
+
     def test_fit_modes_have_distinct_rendered_provenance(self):
         payloads = {
             name: _render(self.documents[name], self.font_manager)[0]
