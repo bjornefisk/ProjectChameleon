@@ -17,6 +17,8 @@ from engine.geometry.groups import (
     GroupTransform,
     apply_transform,
     derive_common_transform,
+    derive_quantized_common_transform,
+    has_quantized_common_transform,
 )
 from engine.geometry.math_util import quantize_to_int, to_fraction
 from engine.geometry.ratios import (
@@ -118,6 +120,36 @@ class GroupTests(unittest.TestCase):
         self.assertEqual(target[1]["font_size"], 12)
         self.assertEqual(source[0]["x"], 10)
         self.assertEqual(target[0]["width"], 6)
+
+    def test_quantized_common_transform_accepts_fractional_geometry(self):
+        source = [
+            {"x": 10, "y": 10, "width": 20, "height": 10},
+            {"x": 10, "y": 20, "width": 20, "height": 10},
+        ]
+        serialized = [
+            {"x": 6, "y": 6, "width": 10, "height": 5},
+            {"x": 6, "y": 10, "width": 10, "height": 5},
+        ]
+        transform = derive_quantized_common_transform(source, serialized)
+
+        for source_element, response_element in zip(source, serialized):
+            for field, translation in (("x", transform.tx), ("y", transform.ty)):
+                self.assertEqual(
+                    quantize_to_int(transform.scale * to_fraction(source_element[field]) + translation),
+                    response_element[field],
+                )
+            for field in ("width", "height"):
+                self.assertEqual(
+                    quantize_to_int(transform.scale * to_fraction(source_element[field])),
+                    response_element[field],
+                )
+        self.assertTrue(has_quantized_common_transform(source, serialized))
+        self.assertFalse(
+            has_quantized_common_transform(
+                source,
+                [serialized[0], {**serialized[1], "x": 7}],
+            )
+        )
 
     def test_zero_dimension_and_rejection_cases(self):
         source = [{"x": 0, "y": 0, "width": 0, "height": 4}]

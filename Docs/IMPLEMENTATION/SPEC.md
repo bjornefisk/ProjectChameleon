@@ -1,8 +1,8 @@
 # Project Chameleon implementation specification
 
-**Status:** Bounded implementation and local evidence are present for the ratified Stage 1 engine; public Level 3, held-out/native-amd64, and broader qualification boundaries remain explicit in `Docs/STATUS.md`.
-**Date:** 2026-10-06
-**Normative Authority:** [`../PROJECT_CONTRACT.md`](../PROJECT_CONTRACT.md) and [`../DECISIONS/`](../DECISIONS/) (ADR-001 through ADR-009)
+**Status:** The public Level 3 sample succeeds in local integration tests under the Issue #61 changes; issue-branch native-amd64 CI, held-out scoring, and broader qualification remain explicit in `Docs/STATUS.md`.
+**Date:** 2026-10-21
+**Normative Authority:** [`../PROJECT_CONTRACT.md`](../PROJECT_CONTRACT.md) and [`../DECISIONS/`](../DECISIONS/) (ADR-001 through ADR-012)
 
 **Consolidated architecture:** [`../FINAL_ARCHITECTURE.md`](../FINAL_ARCHITECTURE.md) summarizes the implementation boundary and remains subordinate to the contract and Accepted ADRs.
 
@@ -34,9 +34,9 @@ A deterministic, renderer-aware adaptive layout engine that separates macro-topo
    - Column pivot (for square-to-landscape banners);
    - Horizontal ribbon (for ultra-wide banners like 728×90);
    - Vertical re-stack (for wide-to-tall conversions).
-4. **Solve layout & typography:** Place rigid units and independent elements along computed slot bounds. Measure text using Skia against the exact brand fonts with Unicode grapheme-cluster safety (UAX #29 / UAX #14), searching for the largest measured font size that fits the slot. Prefer the readable size floor near 10px unless the source is smaller; the schema hard minimum remains `1`.
+4. **Solve layout & typography:** Place rigid units and independent elements along computed slot bounds. Measure text using Skia against the exact brand fonts with Unicode grapheme-cluster safety (UAX #29 / UAX #14); use the deterministic bounded renderer-measured font probes. Readability is a soft preference without a universal numeric floor; actual glyph bounds and qualitative legibility remain mandatory.
 5. **Serialize & quantize:** Quantize mutable coordinates and font sizes once using `round-half-even` into finite integers.
-6. **Hard validate:** Recompute rotated AABB bounds, exact integer lattice image ratios, group offsets, non-collision of source-separated pairs, and actual glyph bounds. Reject invalid candidates immediately.
+6. **Hard validate:** Recompute rotated AABB bounds, exact integer-lattice image ratios, one common group transform reconstructed after canonical quantization, source-separated non-collision, and actual glyph bounds. Reject invalid candidates immediately.
 7. **Rank & commit:** Score surviving candidates using fixed-point quality metrics (readability, balance, alignment, hierarchy, whitespace). Stage and commit the winning design JSON and rendered PNG atomically as one logical pair.
 
 ---

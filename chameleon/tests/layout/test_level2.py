@@ -31,7 +31,12 @@ try:
         _serialize_column_candidate,
         is_column_pivot_suitable,
     )
-    from engine.layout.near_isomorphic import _largest_fitting_font_size
+    from engine.layout.near_isomorphic import (
+        _MAX_FONT_SEARCH_PROBES,
+        _MAX_RENDERER_FONT_SIZE,
+        _font_size_probe_order,
+        _largest_fitting_font_size,
+    )
     from engine.layout.roles import RoleKind, infer_roles
     from engine.resize import resize
 except ModuleNotFoundError:
@@ -50,7 +55,12 @@ except ModuleNotFoundError:
         _serialize_column_candidate,
         is_column_pivot_suitable,
     )
-    from chameleon.engine.layout.near_isomorphic import _largest_fitting_font_size
+    from chameleon.engine.layout.near_isomorphic import (
+        _MAX_FONT_SEARCH_PROBES,
+        _MAX_RENDERER_FONT_SIZE,
+        _font_size_probe_order,
+        _largest_fitting_font_size,
+    )
     from chameleon.engine.layout.roles import RoleKind, infer_roles
     from chameleon.engine.resize import resize
 
@@ -306,7 +316,7 @@ class Level2IntegrationTests(unittest.TestCase):
         )
 
 
-    def test_huge_font_size_reduces_to_readable_floor(self):
+    def test_huge_font_size_finds_fitting_soft_preference(self):
         element = {
             "id": "headline",
             "type": "text",
@@ -336,7 +346,7 @@ class Level2IntegrationTests(unittest.TestCase):
         self.assertTrue(calls)
         self.assertLessEqual(max(calls), 1 << 20)
 
-    def test_huge_preferred_font_size_reports_cutoff_after_floor_probe(self):
+    def test_huge_preferred_font_size_reports_cutoff_after_small_size_probes(self):
         element = {
             "id": "headline",
             "type": "text",
@@ -371,7 +381,7 @@ class Level2IntegrationTests(unittest.TestCase):
         self.assertTrue(details["preferred_clamped"])
         self.assertTrue(details["attempted"])
         self.assertFalse(details["no_attempt"])
-        self.assertEqual(details["candidate_order"], "descending_with_readable_floor")
+        self.assertEqual(details["candidate_order"], "descending_with_soft_preference_probe")
         self.assertTrue(details["hit_cutoff"])
         self.assertEqual(details["status_reason"], "font_search_step_limit_reached")
         self.assertFalse(details["search_exhausted"])
@@ -408,6 +418,13 @@ class Level2IntegrationTests(unittest.TestCase):
                         source_element["height"],
                     )
                 )
+
+    def test_font_size_probe_order_caps_schema_valid_large_values(self):
+        levels = _font_size_probe_order(10**100)
+        self.assertEqual(len(levels), _MAX_FONT_SEARCH_PROBES)
+        self.assertEqual(levels[0], _MAX_RENDERER_FONT_SIZE)
+        self.assertEqual(levels[-10:], tuple(range(10, 0, -1)))
+        self.assertEqual(levels, _font_size_probe_order(10**100))
 
     def test_pivot_columns_and_rigid_assemblies(self):
         task = self._load_task()

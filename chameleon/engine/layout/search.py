@@ -75,12 +75,20 @@ class Candidate:
     candidate_index: int | None = None
     hard_validity: int = 1
     warnings: tuple[str, ...] = ()
+    diagnostics: Mapping[str, Any] = field(
+        default_factory=lambda: MappingProxyType({})
+    )
 
     def __post_init__(self) -> None:
         # Older callers identify candidates by their per-family variant index;
         # use that stable value when a global index was not supplied.
         if self.candidate_index is None:
             object.__setattr__(self, "candidate_index", self.variant_index)
+        if not isinstance(self.diagnostics, Mapping):
+            raise TypeError("candidate diagnostics must be a mapping")
+        object.__setattr__(
+            self, "diagnostics", MappingProxyType(dict(self.diagnostics))
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -708,6 +716,7 @@ def search(
                     rendered_png=bytes(rendered_png),
                     quality=quality,
                     warnings=warnings,
+                    diagnostics=solver_candidate.diagnostics,
                 )
             )
         except InfeasibleLayoutError as error:
@@ -797,13 +806,23 @@ def search(
         "rejected_topologies": tuple(
             dict.fromkeys(failure["topology"] for failure in failures)
         ),
+        "failures": tuple(failures),
         "hard_valid_candidates": len(admitted),
         "cutoff": cutoff,
         "finite_work_exhausted": search_exhausted,
         "unexamined_work": unexamined_work,
         "search_exhausted": search_exhausted,
         "selected_quality": selected_quality,
-        "failures": tuple(failures),
+        "candidate_work": tuple(
+            {
+                "topology": candidate.topology,
+                "variant": candidate.variant,
+                "candidate_index": candidate.candidate_index,
+                "details": deepcopy(dict(candidate.diagnostics)),
+            }
+            for candidate in admitted
+            if candidate.diagnostics
+        ),
     }
     return SearchResult(
         response=deepcopy(dict(selected.response)),

@@ -23,15 +23,18 @@ from ..geometry.bounds import (
 from ..geometry.math_util import quantize_to_int, to_fraction
 from ..geometry.ratios import reduced_ratio
 from .near_isomorphic import (
+    _MAX_FONT_SEARCH_PROBES,
+    _font_size_probe_order,
     _largest_fitting_font_size,
     _preferred_font_size,
     _render_candidate,
-    _smallest_integral_scale,
 )
 from .candidate import RenderedCandidate
 from .roles import RoleModel, infer_roles
 
 _GEOMETRY_FIELDS = ("x", "y", "width", "height")
+
+_MAX_GROUP_SCALE_REFINEMENT_STEPS = _MAX_FONT_SEARCH_PROBES
 
 
 def _fail(message: str, **details: Any) -> NoReturn:
@@ -107,24 +110,19 @@ def _source_span(elements: list[Mapping[str, Any]]) -> tuple[Fraction, Fraction,
     )
 
 
-def _group_scale(elements: list[Mapping[str, Any]], desired: Fraction) -> Fraction:
-    values: list[Fraction] = []
-    first_x = to_fraction(elements[0]["x"])
-    first_y = to_fraction(elements[0]["y"])
+def _minimum_positive_group_scale(elements: list[Mapping[str, Any]]) -> Fraction:
+    """Keep every positive source dimension positive after integer output."""
+    scale = Fraction(0)
     for element in elements:
-        values.extend(
-            (
-                to_fraction(element["width"]),
-                to_fraction(element["height"]),
-                to_fraction(element["x"]) - first_x,
-                to_fraction(element["y"]) - first_y,
-            )
-        )
-    unit = _smallest_integral_scale(values)
-    if desired <= unit:
-        return unit
-    multiplier = (desired / unit).numerator // (desired / unit).denominator
-    return unit * max(1, multiplier)
+        for field in ("width", "height"):
+            dimension = to_fraction(element[field])
+            if dimension > 0:
+                scale = max(scale, Fraction(3, 4) / dimension)
+    return scale
+
+
+def _group_scale(elements: list[Mapping[str, Any]], desired: Fraction) -> Fraction:
+    return max(desired, _minimum_positive_group_scale(elements))
 
 
 def _relative_group_boxes(
@@ -414,6 +412,538 @@ def _serialize_extreme_candidate(response: Mapping[str, Any]) -> dict[str, Any]:
     return serialized
 
 
+def _group_plan(
+    source_elements: list[Mapping[str, Any]],
+    first: int,
+    indices: list[int],
+    scale: Fraction,
+    target_width: int,
+    target_height: int,
+) -> dict[str, Any] | None:
+    elements = [source_elements[index] for index in indices]
+    boxes = _relative_group_boxes(elements, scale)
+    local = []
+    for element, box in zip(elements, boxes):
+        candidate = dict(element)
+        candidate.update(dict(zip(_GEOMETRY_FIELDS, box)))
+        local.append(candidate)
+    base_span = _source_span(local)
+    footprint = _extent_size(base_span)
+    if footprint[0] > target_width or footprint[1] > target_height:
+        return None
+    return {
+        "first": first,
+        "indices": tuple(indices),
+        "kind": "group",
+        "boxes": tuple(boxes),
+        "base_aabbs": tuple(rotated_aabb(element) for element in local),
+        "base_span": base_span,
+        "footprint": footprint,
+        "bleed": None,
+        "pack_priority": 0,
+    }
+
+
+def _group_scale_for_text(
+    elements: list[Mapping[str, Any]],
+    font_sizes: Mapping[int, int],
+    source_indices: list[int],
+    font_manager,
+    measure_text_height,
+    desired_scale: Fraction,
+    work_diagnostics: dict[str, Any] | None = None,
+) -> Fraction | None:
+    scale = max(desired_scale, _minimum_positive_group_scale(elements))
+    for element in elements:
+        if element["type"] == "text" and to_fraction(element["height"]) <= 0:
+            return None
+
+    if work_diagnostics is not None:
+        work_diagnostics["group_scale_refinement_invocations"] = (
+            work_diagnostics.get("group_scale_refinement_invocations", 0) + 1
+        )
+        work_diagnostics["group_scale_refinement_status"] = "running"
+
+    def required_scale_at(candidate_scale: Fraction) -> Fraction:
+        required = _minimum_positive_group_scale(elements)
+        for index, element in zip(source_indices, elements):
+            if element["type"] != "text":
+                continue
+            source_width = to_fraction(element["width"])
+            width = quantize_to_int(source_width * candidate_scale)
+            if source_width > 0:
+                width = max(1, width)
+            minimum_height = measure_text_height(
+                element,
+                width,
+                font_sizes[index],
+                font_manager,
+            )
+            required = max(
+                required,
+                Fraction(minimum_height, 1) / to_fraction(element["height"]),
+            )
+        return required
+
+    refinement_steps = 0
+    for _ in range(_MAX_GROUP_SCALE_REFINEMENT_STEPS):
+        refinement_steps += 1
+        if work_diagnostics is not None:
+            work_diagnostics["group_scale_refinement_iterations"] = (
+                work_diagnostics.get("group_scale_refinement_iterations", 0) + 1
+            )
+        required = required_scale_at(scale)
+        if required > scale:
+            scale = required
+            continue
+        if required == scale:
+            return scale
+        try:
+            smaller_required = required_scale_at(required)
+        except InfeasibleLayoutError:
+            raise
+        except (TypeError, ValueError, OverflowError):
+            return scale
+        if smaller_required <= required:
+            return required
+        if smaller_required >= scale:
+            return scale
+        scale = smaller_required
+
+    if work_diagnostics is not None:
+        work_diagnostics["group_scale_refinement_status"] = "cutoff"
+    _fail(
+        "grouped-text scale refinement reached its deterministic step limit",
+        group_scale_refinement_iterations=refinement_steps,
+        group_scale_refinement_step_limit=_MAX_GROUP_SCALE_REFINEMENT_STEPS,
+        candidate_work={
+            "dominant_copy_layout": dict(work_diagnostics or {}),
+        },
+    )
+
+def _build_copy_band_candidate(
+    source: Mapping[str, Any],
+    target_canvas: Mapping[str, Any],
+    model: RoleModel,
+    source_elements: list[Mapping[str, Any]],
+    units: list[tuple[int, list[int]]],
+    font_manager,
+    fonts_dir: str | None,
+    work_diagnostics: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    """Try one measured, full-width copy-band layout for the dominant-copy variant."""
+    if work_diagnostics is not None:
+        work_diagnostics.update(
+            {
+                "status": "not_applicable",
+                "font_size_probe_limit": _MAX_FONT_SEARCH_PROBES,
+                "font_measurement_calls": 0,
+                "group_scale_refinement_iterations": 0,
+                "group_scale_refinement_invocations": 0,
+                "group_scale_refinement_step_limit": _MAX_GROUP_SCALE_REFINEMENT_STEPS,
+                "group_scale_refinement_status": "not_started",
+                "layout_configurations_considered": 0,
+                "semantic_validation_attempts": 0,
+            }
+        )
+    if __package__.startswith("chameleon."):
+        from chameleon.renderer.converter.convert import minimum_text_box_height
+    else:
+        from renderer.converter.convert import minimum_text_box_height
+
+    if font_manager is None:
+        from .near_isomorphic import _renderer_components
+
+        load_brand_font_manager = _renderer_components()[0]
+        resolved_fonts_dir = fonts_dir or str(
+            Path(__file__).resolve().parents[2] / "brand_kit" / "fonts"
+        )
+        font_manager = load_brand_font_manager(resolved_fonts_dir)
+
+    background = model.background_index
+    if background is not None and source_elements[background].get("group_id") is not None:
+        return None
+    copy_indices = [
+        index
+        for index, element in enumerate(source_elements)
+        if element["type"] == "text" and element.get("group_id") is None
+    ]
+    if not copy_indices:
+        return None
+
+    target_width = int(target_canvas["width"])
+    target_height = int(target_canvas["height"])
+    font_scale = min(
+        Fraction(1),
+        Fraction(target_height, 1) / to_fraction(source["canvas"]["height"]),
+    )
+    preferred_sizes = {
+        index: _preferred_font_size(
+            to_fraction(source_elements[index]["font_size"]), font_scale
+        )
+        for index, element in enumerate(source_elements)
+        if element["type"] == "text"
+    }
+    grouped_units = [
+        (first, indices)
+        for first, indices in units
+        if len(indices) > 1 or source_elements[first].get("group_id") is not None
+    ]
+    row_units = [
+        (first, indices)
+        for first, indices in units
+        if not (len(indices) == 1 and indices[0] in copy_indices)
+    ]
+    grouped_text_indices = [
+        index
+        for _first, indices in grouped_units
+        for index in indices
+        if source_elements[index]["type"] == "text"
+    ]
+
+    copy_levels = _font_size_probe_order(
+        max(preferred_sizes[index] for index in copy_indices)
+    )
+    group_levels = (
+        _font_size_probe_order(
+            max(preferred_sizes[index] for index in grouped_text_indices)
+        )
+        if grouped_text_indices
+        else ()
+    )
+    font_measurement_calls = 0
+
+    def measure_height(element, width, font_size, manager):
+        nonlocal font_measurement_calls
+        font_measurement_calls += 1
+        if work_diagnostics is not None:
+            work_diagnostics["font_measurement_calls"] = font_measurement_calls
+        return minimum_text_box_height(element, width, font_size, manager)
+
+    copy_options: list[tuple[dict[int, int], dict[int, int]]] = []
+    seen_copy_options: set[tuple[tuple[int, int], ...]] = set()
+    for level in copy_levels:
+        sizes = {
+            index: min(level, preferred_sizes[index]) for index in copy_indices
+        }
+        key = tuple(sizes.items())
+        if key in seen_copy_options:
+            continue
+        seen_copy_options.add(key)
+        try:
+            heights = {
+                index: measure_height(
+                    source_elements[index], target_width, size, font_manager
+                )
+                for index, size in sizes.items()
+            }
+        except (TypeError, ValueError, OverflowError):
+            continue
+        copy_options.append((sizes, heights))
+
+    if not copy_options:
+        if work_diagnostics is not None:
+            work_diagnostics.update(
+                {
+                    "status": "no_copy_font_option",
+                    "copy_font_size_probe_count": len(copy_levels),
+                    "group_font_size_probe_count": len(group_levels),
+                    "font_size_probe_limit": _MAX_FONT_SEARCH_PROBES,
+                    "font_measurement_calls": font_measurement_calls,
+                    "layout_configurations_considered": 0,
+                    "semantic_validation_attempts": 0,
+                }
+            )
+        return None
+
+    group_spans = [
+        _source_span([source_elements[index] for index in indices])
+        for _first, indices in grouped_units
+    ]
+    group_primary_extent = sum(
+        (span[2] - span[0] for span in group_spans),
+        Fraction(0),
+    )
+    group_budget = min(
+        Fraction(1),
+        Fraction(target_width, 1) / group_primary_extent
+        if group_primary_extent > 0
+        else Fraction(1),
+    )
+    group_options: list[tuple[dict[int, int], dict[int, Fraction]]] = []
+    levels = group_levels or (0,)
+    seen_group_options: set[tuple[tuple[int, int], ...]] = set()
+    for level in levels:
+        sizes = {
+            index: min(level, preferred_sizes[index])
+            for index in grouped_text_indices
+        }
+        key = tuple(sizes.items())
+        if key in seen_group_options:
+            continue
+        seen_group_options.add(key)
+        scales: dict[int, Fraction] = {}
+        valid = True
+        for first, indices in grouped_units:
+            elements = [source_elements[index] for index in indices]
+            if any(element["type"] == "text" for element in elements):
+                try:
+                    scale = _group_scale_for_text(
+                        elements,
+                        sizes,
+                        indices,
+                        font_manager,
+                        measure_height,
+                        group_budget,
+                        work_diagnostics,
+                    )
+                except InfeasibleLayoutError:
+                    raise
+                except (TypeError, ValueError, OverflowError):
+                    valid = False
+                    break
+                if scale is None:
+                    valid = False
+                    break
+                scales[first] = scale
+        if valid:
+            group_options.append((sizes, scales))
+
+    if work_diagnostics is not None and grouped_text_indices:
+        work_diagnostics["group_scale_refinement_status"] = "complete"
+
+    art_scales = (Fraction(1), Fraction(1, 2))
+    configuration_limit = (
+        len(copy_levels) * max(1, len(group_levels)) * len(art_scales)
+    )
+    configurations_considered = 0
+    semantic_validation_attempts = 0
+    diagnostic_base = {
+        "copy_font_size_probe_count": len(copy_levels),
+        "group_font_size_probe_count": len(group_levels),
+        "font_size_probe_limit": _MAX_FONT_SEARCH_PROBES,
+        "font_measurement_calls": font_measurement_calls,
+        "group_scale_refinement_iterations": (
+            work_diagnostics.get("group_scale_refinement_iterations", 0)
+            if work_diagnostics is not None
+            else 0
+        ),
+        "group_scale_refinement_invocations": (
+            work_diagnostics.get("group_scale_refinement_invocations", 0)
+            if work_diagnostics is not None
+            else 0
+        ),
+        "group_scale_refinement_step_limit": _MAX_GROUP_SCALE_REFINEMENT_STEPS,
+    }
+
+    def record_work(status: str) -> None:
+        if work_diagnostics is not None:
+            work_diagnostics.update(
+                {
+                    **diagnostic_base,
+                    "layout_configurations_considered": configurations_considered,
+                    "layout_configuration_limit": configuration_limit,
+                    "semantic_validation_attempts": semantic_validation_attempts,
+                    "status": status,
+                }
+            )
+
+    if not group_options:
+        record_work("no_group_font_option")
+        return None
+
+    best_quality: tuple[Any, ...] | None = None
+    best_response: dict[str, Any] | None = None
+
+    for copy_sizes, copy_heights in copy_options:
+        copy_height = sum(copy_heights.values())
+        available_height = target_height - copy_height
+        if available_height <= 0:
+            continue
+        for group_sizes, group_scales in group_options:
+            for art_scale in art_scales:
+                configurations_considered += 1
+                plans: list[dict[str, Any]] = []
+                for first, indices in row_units:
+                    elements = [source_elements[index] for index in indices]
+                    if (
+                        len(indices) > 1
+                        or source_elements[first].get("group_id") is not None
+                    ):
+                        if first in group_scales:
+                            scale = group_scales[first]
+                        else:
+                            span = _source_span(elements)
+                            primary_extent = span[2] - span[0]
+                            cross_extent = span[3] - span[1]
+                            desired = min(
+                                group_budget,
+                                Fraction(target_width, 1)
+                                / max(Fraction(1), primary_extent),
+                                Fraction(available_height, 1)
+                                / max(Fraction(1), cross_extent),
+                            )
+                            scale = max(
+                                desired, _minimum_positive_group_scale(elements)
+                            )
+                        plan = _group_plan(
+                            source_elements,
+                            first,
+                            indices,
+                            scale,
+                            target_width,
+                            target_height,
+                        )
+                    else:
+                        plan = _make_plan(
+                            source_elements,
+                            first,
+                            indices,
+                            source_canvas=source["canvas"],
+                            target_width=target_width,
+                            target_height=target_height,
+                            unit_count=len(units),
+                            group_budget=group_budget,
+                            axis="horizontal",
+                            art_scale=art_scale,
+                        )
+                    if plan is None:
+                        plans = []
+                        break
+                    plans.append(plan)
+                if row_units and not plans:
+                    continue
+
+                response = [dict(element) for element in source_elements]
+                if background is not None:
+                    response[background].update(
+                        {"x": 0, "y": 0, "width": target_width, "height": target_height}
+                    )
+                for index, size in group_sizes.items():
+                    response[index]["font_size"] = size
+
+                occupied: list[tuple[tuple[int, ...], list[Any]]] = []
+                cursor = 0
+                row_bottom = 0
+                placement_failed = False
+                for plan in sorted(plans, key=lambda item: item["first"]):
+                    base_span = plan["base_span"]
+                    anchor_x = _ceil_fraction(
+                        Fraction(cursor) - to_fraction(base_span[0])
+                    )
+                    anchor_y = _ceil_fraction(-to_fraction(base_span[1]))
+                    boxes, aabbs = _materialize_plan(
+                        plan, source_elements, anchor_x, anchor_y
+                    )
+                    if not _valid_plan_placement(
+                        plan,
+                        source_elements,
+                        boxes,
+                        aabbs,
+                        occupied,
+                        target_canvas,
+                        model,
+                    ):
+                        placement_failed = True
+                        break
+                    for index, box in zip(plan["indices"], boxes):
+                        response[index].update(dict(zip(_GEOMETRY_FIELDS, box)))
+                    occupied.append((plan["indices"], aabbs))
+                    cursor = _ceil_fraction(
+                        max(to_fraction(aabb[2]) for aabb in aabbs)
+                    )
+                    row_bottom = max(
+                        row_bottom,
+                        _ceil_fraction(max(to_fraction(aabb[3]) for aabb in aabbs)),
+                    )
+                if placement_failed or cursor > target_width or row_bottom > available_height:
+                    continue
+
+                text_cursor = row_bottom
+                for index in copy_indices:
+                    element = source_elements[index]
+                    width = target_width
+                    height = copy_heights[index]
+                    local = dict(element)
+                    local.update(
+                        {"x": 0, "y": 0, "width": width, "height": height}
+                    )
+                    local["font_size"] = copy_sizes[index]
+                    base_aabb = rotated_aabb(local)
+                    anchor_x = _ceil_fraction(-to_fraction(base_aabb[0]))
+                    anchor_y = _ceil_fraction(
+                        Fraction(text_cursor) - to_fraction(base_aabb[1])
+                    )
+                    candidate = dict(local)
+                    candidate.update({"x": anchor_x, "y": anchor_y})
+                    aabb = rotated_aabb(candidate)
+                    plan = {
+                        "indices": (index,),
+                        "bleed": source_bleed_sides(
+                            element, rotated_aabb(element), source["canvas"]
+                        ),
+                    }
+                    if not _valid_plan_placement(
+                        plan,
+                        source_elements,
+                        [(anchor_x, anchor_y, width, height)],
+                        [aabb],
+                        occupied,
+                        target_canvas,
+                        model,
+                    ):
+                        placement_failed = True
+                        break
+                    response[index].update(
+                        {
+                            "x": anchor_x,
+                            "y": anchor_y,
+                            "width": width,
+                            "height": height,
+                            "font_size": copy_sizes[index],
+                        }
+                    )
+                    occupied.append(((index,), [aabb]))
+                    text_cursor = _ceil_fraction(to_fraction(aabb[3]))
+                if placement_failed or text_cursor > target_height:
+                    continue
+
+                text_sizes = list(copy_sizes.values()) + list(group_sizes.values())
+                quality = (
+                    min(text_sizes),
+                    sum(copy_sizes.values()),
+                    sum(group_sizes.values()),
+                    art_scale,
+                )
+                if best_quality is None or quality > best_quality:
+                    best_quality = quality
+                    best_response = {
+                        "canvas": dict(target_canvas),
+                        "elements": response,
+                    }
+
+    if best_response is None:
+        record_work("no_geometric_candidate")
+        return None
+    result = _serialize_extreme_candidate(best_response)
+    semantic_validation_attempts = 1
+    try:
+        validate_response(
+            source,
+            target_canvas,
+            result,
+            font_manager=font_manager,
+            fonts_dir=fonts_dir,
+        )
+    except InfeasibleLayoutError as error:
+        if error.reason_code is InfeasibleReasonCode.RUNTIME_IO_FAILURE:
+            raise
+        record_work("semantic_validation_rejected")
+        return None
+    record_work("hard_valid")
+    return result
+
+
 def _build_extreme_candidate(
     source: Mapping[str, Any],
     target_canvas: Mapping[str, Any],
@@ -422,6 +952,7 @@ def _build_extreme_candidate(
     axis: str = "horizontal",
     font_manager=None,
     fonts_dir: str | None = None,
+    work_diagnostics: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     validate_source(source)
     validate_target_canvas(target_canvas)
@@ -431,6 +962,23 @@ def _build_extreme_candidate(
     target_height = int(target_canvas["height"])
     background = model.background_index
     units = _candidate_units(source, background)
+
+    if variant == "dominant_copy" and axis == "horizontal":
+        copy_band_work: dict[str, Any] = {}
+        compact = _build_copy_band_candidate(
+            source,
+            target_canvas,
+            model,
+            source_elements,
+            units,
+            font_manager,
+            fonts_dir,
+            copy_band_work,
+        )
+        if work_diagnostics is not None:
+            work_diagnostics["dominant_copy_layout"] = copy_band_work
+        if compact is not None:
+            return compact
     unit_count = len(units)
     group_source_spans = []
     for _first, indices in units:
@@ -649,10 +1197,15 @@ def _build_extreme_candidate(
                     continue
                 return result
 
+    failure_details: dict[str, Any] = {
+        "attempts": attempts,
+        "search_exhausted": True,
+    }
+    if work_diagnostics is not None:
+        failure_details["candidate_work"] = work_diagnostics
     _fail(
         "bounded extreme-topology search exhausted without a hard-valid candidate",
-        attempts=attempts,
-        search_exhausted=True,
+        **failure_details,
     )
 
 
@@ -669,18 +1222,21 @@ def generate_horizontal_ribbon_candidate(
     validate_target_canvas(target_canvas)
     if not is_horizontal_ribbon_suitable(source, target_canvas):
         _fail("source and target proportions do not support a horizontal ribbon")
+    work_diagnostics: dict[str, Any] = {}
     response = _build_extreme_candidate(
         source,
         target_canvas,
         font_manager=font_manager,
         fonts_dir=fonts_dir,
-        variant=variant
+        variant=variant,
+        work_diagnostics=work_diagnostics,
     )
     rendered_png, warnings = _render_candidate(response, assets_dir, fonts_dir, font_manager)
     return RenderedCandidate(
         response=response,
         rendered_png=rendered_png,
         warnings=warnings,
+        diagnostics=work_diagnostics,
     )
 
 

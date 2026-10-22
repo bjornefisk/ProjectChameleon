@@ -29,7 +29,7 @@ from .geometry.bounds import (
     rotated_aabb,
     source_bleed_sides,
 )
-from .geometry.groups import derive_common_transform
+from .geometry.groups import derive_quantized_common_transform
 from .geometry.math_util import to_fraction
 from .geometry.ratios import preserves_source_ratio
 
@@ -640,7 +640,7 @@ def _validate_groups(
         source_group = [source_elements[index] for index in indices]
         response_group = [response_elements[index] for index in indices]
         try:
-            derive_common_transform(source_group, response_group)
+            derive_quantized_common_transform(source_group, response_group)
         except (KeyError, TypeError, ValueError) as error:
             _group_fail(group_id, indices[0], str(error))
 

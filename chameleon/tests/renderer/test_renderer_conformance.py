@@ -1,3 +1,4 @@
+import copy
 import sys
 import unittest
 from pathlib import Path
@@ -6,7 +7,10 @@ PROJECT_ROOT = Path(__file__).parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from chameleon.renderer.converter.brand_fonts import MissingFontError, load_brand_font_manager
-from chameleon.renderer.converter.convert import convert_chameleon_to_crello
+from chameleon.renderer.converter.convert import (
+    convert_chameleon_to_crello,
+    minimum_text_box_height,
+)
 from chameleon.engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
 from chameleon.renderer.converter.shapes import render_shape
 from chameleon.renderer.converter.wrap import (
@@ -202,6 +206,44 @@ class RendererConformanceTests(unittest.TestCase):
 
         with self.assertRaises(TextOverflowError):
             self.convert_text(content="\n", max_lines=1)
+
+        empty_lines = self.convert_text(
+            content="\n", max_lines=2, height=24, font_size=10
+        )
+        self.assertEqual(empty_lines["top"][0], 0)
+
+    def test_negative_glyph_top_uses_minimal_transient_inset(self):
+        element = {
+            "id": "legal",
+            "type": "text",
+            "x": 0,
+            "y": 7,
+            "width": 728,
+            "height": 1,
+            "content": "Please drink responsibly. See solstice.com/terms for full details.",
+            "font_family": "Solstice Sans",
+            "font_size": 9,
+            "color": "rgba(255,255,255,1)",
+            "text_align": "center",
+        }
+        element["height"] = minimum_text_box_height(
+            element, element["width"], element["font_size"], self.font_manager
+        )
+        document = {"canvas": {"width": 728, "height": 90}, "elements": [element]}
+        before = copy.deepcopy(document)
+
+        converted, _warnings = convert_chameleon_to_crello(
+            document, self.font_manager
+        )
+
+        self.assertGreater(converted["top"][0], element["y"])
+        self.assertEqual(converted["height"][0], element["height"])
+        self.assertEqual(document, before)
+
+        too_short = copy.deepcopy(document)
+        too_short["elements"][0]["height"] -= 1
+        with self.assertRaises(TextOverflowError):
+            convert_chameleon_to_crello(too_short, self.font_manager)
 
     def test_non_space_breaks_preserve_line_map_offsets(self):
         for text in ("ab-cd", "ab/cd"):

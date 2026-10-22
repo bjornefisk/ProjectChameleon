@@ -1,19 +1,19 @@
 # 07: Horizontal Ribbon Topology and Level 3 Extreme Leaderboard Solver
 
 **What to build:**  
-A horizontal ribbon layout generator and spatial compression engine for Level 3 ($1080 \times 1350 \to 728 \times 90$) and other extreme aspect ratios. The solver packs source groups along the primary horizontal axis using inferred source order and relationships, not a universal logo/headline/product/CTA slot order. It proactively compresses text toward the readable preference near $10$–$12\text{px}$ unless the source is smaller, scales down artwork isotropically, preserves rotated elements, and handles missing assets without crashing or replacing files. It must fail through the typed protocol if no hard-valid candidate exists after the permitted feasibility levers are exhausted.
+A horizontal ribbon layout generator and spatial compression engine for Level 3 ($1080 \times 1350 \to 728 \times 90$) and other extreme aspect ratios. The solver packs source groups along the primary horizontal axis using inferred source order and relationships, not a universal logo/headline/product/CTA slot order. It treats roughly $10$–$12\text{px}$ as a readability preference, not a floor; any smaller positive size must pass the pinned renderer's hard checks and be reviewed for qualitative legibility. It scales artwork isotropically, preserves rotated elements, and handles missing assets without crashing or replacing files. It must fail through the typed protocol if no hard-valid candidate exists after the permitted feasibility levers are exhausted.
 
 **Dependency:**
 `06: Multi-Signal Role Inference and Level 2 Column Pivot Solver` — ✅ COMPLETE
 
 **Status:**
-Bounded horizontal-ribbon and vertical-restack generation is implemented in the integrated tree. The public Level 3 fixture remains a typed fail-closed `INCOMPLETE_SEARCH` result with no artifact pair; feasible synthetic extreme-ratio candidates pass local hard validation. Full ranking/qualification and organizer-held-out acceptance remain outside this ticket's bounded evidence.
+The bounded horizontal-ribbon and vertical-restack families remain within the four-topology / twelve-candidate search. Issue #61 adds a source-PDF-grounded, renderer-measured copy-band candidate; the public Level 3 sample now publishes a hard-valid JSON/PNG pair in repeated local integration tests. Font probes and each grouped-text scale-refinement invocation are capped at 74 steps; cutoff work is reported and remains typed `INCOMPLETE_SEARCH`, never infeasibility. Superseding decisions ADR-010 through ADR-012 preserve one common quantized group transform, remove the unsupported numeric readability floor, and keep actual glyphs inside unchanged declared bounds. Native-amd64 PR CI, maintainer review, and official scoring remain separate evidence gates.
 
 **Current evidence:**
 See [`Docs/STATUS.md`](../../STATUS.md) and [`Docs/IMPLEMENTATION/tickets/08-heldout-evaluation.md`](08-heldout-evaluation.md) for current local results and explicit native-amd64/organizer qualification boundaries.
 
 **Dispatch gate:**
-Ticket 06 is complete. Do not expand Ticket 07 beyond its bounded topology slice or claim full ranking, held-out evaluation, or complete runtime qualification.
+Ticket 06 is complete. The public sample now passes locally through Issue #61 and Accepted ADR-010 through ADR-012; keep this slice bounded, do not broaden it into solver dependencies, altered wire fields, or organizer-qualification claims, and do not close the issue until the PR is reviewed and merged.
 
 The checklist below is the historical implementation proposal; the current disposition and evidence above supersede its unchecked starter-state wording.
 

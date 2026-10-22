@@ -4,6 +4,8 @@
 
 This file applies source-driven development only to external libraries, platforms, and packaging. It does not decide internal product intent; those decisions are in `PROJECT_CONTRACT.md` and the ADRs.
 
+**Revision note:** The native-amd64 measurements below are for the earlier commit `7f39a3e`, before Issue #61. They remain valid observations for that revision, not qualification evidence for the Issue #61 branch; branch-specific native CI is pending and tracked in `STATUS.md`.
+
 ## Evidence matrix
 
 | Topic | Detected state | Source-backed fact | Decision/pin | Required conformance test |

@@ -528,9 +528,34 @@ def _text_fits(
     return True
 
 _MAX_FONT_SEARCH_STEPS = 64
-_FONT_SEARCH_FLOOR = 10
+_FONT_SEARCH_PREFERENCE_PROBE_LIMIT = 10
 _MAX_FONT_SEARCH_BITS = 63
 _MAX_RENDERER_FONT_SIZE = 1 << 20
+
+_MAX_FONT_SEARCH_PROBES = (
+    _MAX_FONT_SEARCH_STEPS + _FONT_SEARCH_PREFERENCE_PROBE_LIMIT
+)
+
+
+def _font_size_probe_order(preferred: int) -> tuple[int, ...]:
+    """Return the bounded deterministic font-size probe sequence."""
+    search_start = max(1, int(preferred))
+    if (
+        search_start > _MAX_RENDERER_FONT_SIZE
+        or search_start.bit_length() > _MAX_FONT_SEARCH_BITS
+    ):
+        search_start = _MAX_RENDERER_FONT_SIZE
+    main_count = min(search_start, _MAX_FONT_SEARCH_STEPS)
+    sizes = list(range(search_start, search_start - main_count, -1))
+    seen = set(sizes)
+    sizes.extend(
+        size
+        for size in range(
+            min(search_start, _FONT_SEARCH_PREFERENCE_PROBE_LIMIT), 0, -1
+        )
+        if size not in seen
+    )
+    return tuple(sizes)
 
 
 def _largest_fitting_font_size(
@@ -545,8 +570,9 @@ def _largest_fitting_font_size(
     """Find a fitting integer with a deterministic bounded search.
 
     Very large source font sizes are clamped only as a renderer probe ceiling;
-    the search still tests the readable floor so a valid smaller candidate is
-    not rejected solely because the source value is large.
+    the search also probes the soft-preference band through size one so a
+    smaller hard-valid candidate is not rejected solely because the source is
+    large.
     """
 
     preferred = max(1, int(preferred))
@@ -565,13 +591,7 @@ def _largest_fitting_font_size(
         tested_sizes.append(size)
         return bool(fits(element, size, font_manager, target))
 
-    main_budget = _MAX_FONT_SEARCH_STEPS
-    for offset in range(min(search_start, main_budget)):
-        size = search_start - offset
-        if try_size(size):
-            return size
-
-    for size in range(min(search_start, _FONT_SEARCH_FLOOR), 0, -1):
+    for size in _font_size_probe_order(search_start):
         if try_size(size):
             return size
 
@@ -584,10 +604,10 @@ def _largest_fitting_font_size(
                 "search_start": search_start,
                 "preferred_clamped": preferred_clamped,
                 "max_steps": _MAX_FONT_SEARCH_STEPS,
-                "floor_probe_limit": _FONT_SEARCH_FLOOR,
+                "preference_probe_limit": _FONT_SEARCH_PREFERENCE_PROBE_LIMIT,
                 "max_bits": _MAX_FONT_SEARCH_BITS,
                 "max_renderer_size": _MAX_RENDERER_FONT_SIZE,
-                "candidate_order": "descending_with_readable_floor",
+                "candidate_order": "descending_with_soft_preference_probe",
                 "work_unit": "font_size_candidate",
                 "attempted": bool(tested_sizes),
                 "no_attempt": not tested_sizes,
@@ -654,9 +674,9 @@ def _preferred_font_size(source_size: Fraction, scale: Fraction) -> int:
         if source_size < Fraction(10)
         else quantize_to_int(source_size)
     )
-    readable_floor = min(source_limit, 10)
+    readability_preference = min(source_limit, 10)
     scaled_size = quantize_to_int(source_size * scale)
-    preferred = min(source_limit, max(readable_floor, scaled_size))
+    preferred = min(source_limit, max(readability_preference, scaled_size))
     return max(1, preferred)
 
 

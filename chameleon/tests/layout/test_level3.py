@@ -1,3 +1,5 @@
+import contextlib
+import io
 import copy
 import hashlib
 import json
@@ -5,7 +7,9 @@ import sys
 import tempfile
 import unittest
 from decimal import Decimal
+from fractions import Fraction
 from pathlib import Path
+from unittest.mock import patch
 
 from PIL import Image
 
@@ -14,21 +18,32 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 try:
+    from engine import main as runner_main
     from engine.contract import validate_response
     from engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
     from engine.geometry.bounds import positive_aabb_intersection, rotated_aabb
     from engine.geometry.ratios import preserves_source_ratio
-    from engine.layout.horizontal_ribbon import generate_horizontal_ribbon_candidate
+    from engine.layout.horizontal_ribbon import (
+        _MAX_GROUP_SCALE_REFINEMENT_STEPS,
+        _group_scale_for_text,
+        generate_horizontal_ribbon_candidate,
+    )
+    from engine.layout.search import search
     from engine.resize import resize
     from renderer.converter.convert import render_design_to_png
 except ModuleNotFoundError:
+    from chameleon.engine import main as runner_main
     from chameleon.engine.contract import validate_response
     from chameleon.engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
     from chameleon.engine.geometry.bounds import positive_aabb_intersection, rotated_aabb
     from chameleon.engine.geometry.ratios import preserves_source_ratio
-    from chameleon.engine.layout.horizontal_ribbon import generate_horizontal_ribbon_candidate
-    from chameleon.engine.resize import resize
+    from chameleon.engine.layout.horizontal_ribbon import (
+        _MAX_GROUP_SCALE_REFINEMENT_STEPS,
+        _group_scale_for_text,
+        generate_horizontal_ribbon_candidate,
+    )
     from chameleon.renderer.converter.convert import render_design_to_png
+    from chameleon.engine.resize import resize
 
 ROOT = PROJECT_ROOT / "chameleon"
 FIXTURE = ROOT / "input" / "chameleon_sample_level3_advanced.json"
@@ -37,7 +52,8 @@ ASSETS = ROOT / "brand_kit" / "assets"
 
 class Level3IntegrationTests(unittest.TestCase):
     def _load_task(self):
-        return json.loads(FIXTURE.read_text(encoding="utf-8"))
+        return json.loads(FIXTURE.read_text(encoding="utf-8"), parse_float=Decimal)
+
     def _horizontal_fixture(self):
         return (
             {
@@ -111,21 +127,157 @@ class Level3IntegrationTests(unittest.TestCase):
             {"width": 400, "height": 80},
         )
 
-    def test_level3_sample_fails_closed_after_bounded_search(self):
+    def test_level3_sample_publishes_stable_hard_valid_pair(self):
         task = self._load_task()
         source = task["source"]
+        target = task["target_canvas"]
         before = copy.deepcopy(source)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            input_dir = root / "input"
+            output_dir = root / "output"
+            input_dir.mkdir()
+            output_dir.mkdir()
+            (input_dir / "public_level3.json").write_bytes(FIXTURE.read_bytes())
+
+            signatures = []
+            with patch.multiple(
+                runner_main,
+                INPUT_DIR=input_dir,
+                OUTPUT_DIR=output_dir,
+                ASSETS_DIR=ASSETS,
+            ):
+                for _repeat in range(2):
+                    stdout = io.StringIO()
+                    stderr = io.StringIO()
+                    with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(
+                        stderr
+                    ):
+                        exit_code = runner_main.main()
+                    self.assertEqual(exit_code, 0, stderr.getvalue())
+                    self.assertIn(
+                        "[public_level3.json] status=SUCCESS", stdout.getvalue()
+                    )
+
+                    json_files = list(output_dir.glob("*_output.json"))
+                    png_files = list(output_dir.glob("*_output.png"))
+                    self.assertEqual(
+                        [path.name for path in json_files],
+                        ["public_level3_output.json"],
+                    )
+                    self.assertEqual(
+                        [path.name for path in png_files],
+                        ["public_level3_output.png"],
+                    )
+                    serialized_bytes = json_files[0].read_bytes()
+                    response = json.loads(
+                        serialized_bytes.decode("utf-8"), parse_float=Decimal
+                    )
+                    validate_response(
+                        source,
+                        target,
+                        response,
+                        fonts_dir=ROOT / "brand_kit" / "fonts",
+                    )
+                    self.assertEqual(source, before)
+                    self.assertEqual(response["canvas"], target)
+                    self.assertEqual(
+                        [element["id"] for element in response["elements"]],
+                        [element["id"] for element in source["elements"]],
+                    )
+                    for element in response["elements"]:
+                        for field in ("x", "y", "width", "height"):
+                            self.assertIs(type(element[field]), int)
+                        if element["type"] == "text":
+                            self.assertIs(type(element["font_size"]), int)
+
+                    with Image.open(png_files[0]) as artifact:
+                        artifact.verify()
+                    with Image.open(png_files[0]) as artifact:
+                        self.assertEqual(artifact.size, (728, 90))
+                    signatures.append(
+                        (
+                            hashlib.sha256(serialized_bytes).digest(),
+                            hashlib.sha256(png_files[0].read_bytes()).digest(),
+                        )
+                    )
+
+            self.assertEqual(signatures[0], signatures[1])
+
+    def test_dominant_copy_reports_bounded_font_and_layout_work(self):
+        task = self._load_task()
+        result = search(
+            task["source"],
+            task["target_canvas"],
+            assets_dir=ASSETS,
+            fonts_dir=ROOT / "brand_kit" / "fonts",
+        )
+        self.assertLessEqual(result.diagnostics["candidate_count"], 12)
+        work = next(
+            item
+            for item in result.diagnostics["candidate_work"]
+            if item["topology"] == "horizontal_ribbon"
+            and item["variant"] == "dominant_copy"
+        )
+        details = work["details"]["dominant_copy_layout"]
+        self.assertEqual(details["status"], "hard_valid")
+        self.assertLessEqual(details["copy_font_size_probe_count"], 74)
+        self.assertLessEqual(details["group_font_size_probe_count"], 74)
+        self.assertGreater(details["font_measurement_calls"], 0)
+        self.assertLessEqual(
+            details["layout_configurations_considered"],
+            details["layout_configuration_limit"],
+        )
+        self.assertEqual(
+            details["group_scale_refinement_step_limit"],
+            _MAX_GROUP_SCALE_REFINEMENT_STEPS,
+        )
+        self.assertLessEqual(
+            details["group_scale_refinement_iterations"],
+            details["group_scale_refinement_invocations"]
+            * _MAX_GROUP_SCALE_REFINEMENT_STEPS,
+        )
+        self.assertGreater(details["group_scale_refinement_invocations"], 0)
+
+    def test_grouped_text_scale_refinement_hits_typed_cutoff(self):
+        diagnostics = {
+            "group_scale_refinement_iterations": 0,
+            "group_scale_refinement_invocations": 0,
+            "group_scale_refinement_step_limit": _MAX_GROUP_SCALE_REFINEMENT_STEPS,
+        }
+        elements = [{"type": "text", "width": 1, "height": 1}]
+
         with self.assertRaises(InfeasibleLayoutError) as raised:
-            resize(source, task["target_canvas"])
-        self.assertEqual(raised.exception.reason_code, InfeasibleReasonCode.INCOMPLETE_SEARCH)
-        self.assertEqual(source, before)
-        failures = [
-            failure
-            for failure in raised.exception.details["failures"]
-            if failure["topology"] == "horizontal_ribbon"
-        ]
-        self.assertTrue(failures)
-        self.assertTrue(failures[0]["details"]["search_exhausted"])
+            _group_scale_for_text(
+                elements,
+                {0: 1},
+                [0],
+                None,
+                lambda _element, width, _font_size, _manager: width + 1,
+                Fraction(1),
+                diagnostics,
+            )
+
+        error = raised.exception
+        self.assertEqual(
+            error.reason_code,
+            InfeasibleReasonCode.INCOMPLETE_SEARCH,
+        )
+        self.assertFalse(error.details["search_exhausted"])
+        self.assertEqual(
+            error.details["group_scale_refinement_iterations"],
+            _MAX_GROUP_SCALE_REFINEMENT_STEPS,
+        )
+        self.assertEqual(
+            error.details["candidate_work"]["dominant_copy_layout"][
+                "group_scale_refinement_status"
+            ],
+            "cutoff",
+        )
+        self.assertEqual(
+            diagnostics["group_scale_refinement_iterations"],
+            _MAX_GROUP_SCALE_REFINEMENT_STEPS,
+        )
 
     def test_horizontal_ribbon_preserves_rotated_groups(self):
         source, target = self._horizontal_fixture()

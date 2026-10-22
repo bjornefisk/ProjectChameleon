@@ -261,8 +261,8 @@ class Issue23SearchEvidenceTests(unittest.TestCase):
                 self._assert_work_set_accounting(specs, admitted, failures, evaluated)
 
     def test_search_on_unfittable_target_accounts_for_every_rejection(self):
-        # A 10x10 canvas cannot hold the headline at the readable floor plus the
-        # image: nothing is admitted, so the typed InfeasibleLayoutError must carry
+        # A 10x10 canvas cannot fit the preserved headline and foreground image
+        # together as a hard-valid composition, so nothing is admitted.
         # one record per work item.  The target is deliberately far from any
         # boundary: borderline sizes such as 40x12 or 400x12 are infeasible with
         # macOS (fractional) Skia advances but feasible with Linux (hinted integer)

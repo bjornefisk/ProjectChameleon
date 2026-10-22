@@ -409,6 +409,19 @@ class ContractValidatorTests(unittest.TestCase):
         scale_drift["elements"][1]["width"] = 42
         self.assert_reason(source, target, scale_drift, InfeasibleReasonCode.GROUP_VIOLATION)
 
+    def test_group_accepts_one_transform_reconstructed_after_rounding(self):
+        source = grouped_source()
+        source["elements"][1]["y"] = 30
+        target = {"width": 400, "height": 200}
+        response = copy.deepcopy(source)
+        response["canvas"] = target
+        response["elements"][0].update({"x": 6, "y": 6, "width": 10, "height": 5})
+        response["elements"][1].update(
+            {"x": 6, "y": 16, "width": 10, "height": 5, "font_size": 2}
+        )
+
+        validate_response(source, target, response)
+
     def test_singleton_group_still_requires_uniform_scale(self):
         source = design_with_elements(
             [
@@ -435,7 +448,7 @@ class ContractValidatorTests(unittest.TestCase):
             InfeasibleReasonCode.GROUP_VIOLATION,
         )
 
-    def test_zero_size_group_scale_is_inferred_from_centers(self):
+    def test_zero_size_group_accepts_quantized_common_transform(self):
         source = design_with_elements(
             [
                 {
@@ -481,8 +494,12 @@ class ContractValidatorTests(unittest.TestCase):
         response["elements"][2].update({"x": 20, "y": 60})
         validate_response(source, target, response)
 
+        quantized_drift = copy.deepcopy(response)
+        quantized_drift["elements"][1]["x"] += 1
+        validate_response(source, target, quantized_drift)
+
         drift = copy.deepcopy(response)
-        drift["elements"][1]["x"] += 1
+        drift["elements"][1]["x"] += 3
         self.assert_reason(source, target, drift, InfeasibleReasonCode.GROUP_VIOLATION)
 
     def test_expanded_degenerate_source_cannot_create_collision(self):

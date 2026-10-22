@@ -1,11 +1,11 @@
 # Ticket 08 qualification evidence
 
-This record belongs to Ticket 08 and is intentionally separate from the parallel Ticket 07 implementation. The post-issue-32 integration evidence below was measured on the local Darwin arm64 workstation unless stated otherwise.
+This is an earlier Ticket 08 evidence record, not qualification evidence for the Issue #61 branch. The native-amd64 run below is for commit `7f39a3e`, which predates Issue #61; branch-specific native-amd64 CI is pending. Local Darwin arm64 observations are identified separately.
 The issue #23/F-07 normative evidence expansion is recorded separately in [`08-issue-23-evidence.md`](08-issue-23-evidence.md).
 
-## Current F-06 native-amd64 qualification evidence
+## Historical F-06 native-amd64 qualification for commit `7f39a3e`
 
-The authoritative native qualification observation is GitHub Actions run [39481028806](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39481028806), job `118829322922`, for commit `7f39a3e`. It built and loaded the pinned `linux/amd64` image, generated a non-empty SPDX SBOM with pinned Syft `v1.42.3`, loaded the packaged local assets and seven Solstice TTF files under `--network none`, and passed offline `cr_renderer`/Skia imports plus native `ldd` closure checks.
+The prior authoritative native qualification observation is GitHub Actions run [39481028806](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39481028806), job `118829322922`, for commit `7f39a3e`. It built and loaded the pinned `linux/amd64` image, generated a non-empty SPDX SBOM with pinned Syft `v1.42.3`, loaded the packaged local assets and seven Solstice TTF files under `--network none`, and passed offline `cr_renderer`/Skia imports plus native `ldd` closure checks.
 
 The runtime report measured `13.690699821` seconds wall time, `13.256694` user and `0.51691` system CPU seconds, `307076 KiB` maximum RSS, peak `3` Linux threads from procfs, and `2` available CPUs on Python `3.11.11`/`x86_64`. Level 1 and Level 2 returned `SUCCESS` with committed JSON/PNG pairs; Level 3 returned the contract-correct `INCOMPLETE_SEARCH` without a pair, so the aggregate process return code was the expected nonzero `1`. The loaded image was `sha256:6c555cecec045651bcadc3d5f28215ff9a5b9dd9257e367e3fe5e26975642d4b` and `886388964` bytes; the SBOM SHA-256 was `944833771af7e92d0bae7da85fe4924c54175ac1e2027c9dd3407b75acb9a0fc`.
 

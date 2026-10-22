@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted pre-implementation documentation package. ADR-006 through ADR-009 are accepted contract decisions for Stage 1; they do not claim implementation, conformance qualification, or runtime verification, and they do not authorize code changes by themselves.
+Accepted pre-implementation documentation package. ADR-006 through ADR-009 were accepted contract decisions for Stage 1 and remain part of the historical record. ADR-010 through ADR-012 were later accepted on 2026-10-21; they authorize only their explicitly scoped implementation changes and supersede the clauses named in those ADRs.
 
 ## Date
 
@@ -12,7 +12,7 @@ Accepted pre-implementation documentation package. ADR-006 through ADR-009 are a
 
 This package records accepted operational decisions and remaining external questions for Stage 1 only:
 
-- `Docs/PROJECT_CONTRACT.md` and Accepted ADR-001 through ADR-009 are the ratified authority.
+- `Docs/PROJECT_CONTRACT.md` and Accepted ADR-001 through ADR-012 are the current ratified authority.
 - The ratified `chameleon/chameleon_design_schema_v0.9.json`, pinned renderer evidence, and Accepted ADRs are not silently overridden by starter code, fixtures, or lower-precedence guidance.
 - A conflict with the contract requires an explicit superseding ADR or contract update before implementation. Acceptance of this package records decisions but does not change runtime behavior.
 - No code, schema, fixture, Docker, requirements, engine, renderer, validator, solver, model, or runtime behavior changes are authorized by this register; implementation and qualification remain pending.
@@ -110,7 +110,7 @@ Even after these decisions are ratified, the following implementation/evidence d
 ADR-006, ADR-007, ADR-008, and ADR-009 are accepted pre-implementation decisions:
 
 - these files are documentation-only contract records; they do not claim implementation or qualification;
-- they preserve and extend `PROJECT_CONTRACT.md` and ADR-001 through ADR-005; together with those prior decisions they form the accepted ADR-001 through ADR-009 package without adding wire fields or weakening hard constraints;
+- they preserve and extend `PROJECT_CONTRACT.md` and ADR-001 through ADR-005; together with those prior decisions they form the accepted ADR-001 through ADR-012 package without adding wire fields or weakening hard constraints;
 - no code/schema/fixture/Docker/requirements/engine/renderer/validator/solver/model/runtime behavior changes on the strength of this register; and
 - an implementation that encounters a conflict must stop and request a superseding accepted ADR or contract update rather than silently choosing a different behavior.
 
@@ -123,3 +123,13 @@ ADR-006, ADR-007, ADR-008, and ADR-009 are accepted pre-implementation decisions
 - `Docs/DECISIONS/ADR-009-initial-search-strategy.md`
 
 No implementation files were changed for this documentation-only package. No tests, builds, linters, formatters, or network commands were run.
+
+## Subsequent accepted implementation decisions
+
+The following decisions were accepted after this documentation-only register. Their implementation changes are authorized only within the listed scope; all remaining contract rules stay in force:
+
+| ADR | Accepted decision | Supersession / scope |
+| --- | --- | --- |
+| [ADR-010](DECISIONS/ADR-010-quantized-rigid-groups.md) | Reconstruct one shared group transform through canonical half-even geometry serialization | Supersedes ADR-007 §4's exact post-serialization group equality only |
+| [ADR-011](DECISIONS/ADR-011-no-numeric-readable-font-floor.md) | Keep readable size as a renderer-validated soft preference with no universal numeric floor | Supersedes ADR-006 §3b's numeric floor and the matching contract wording only |
+| [ADR-012](DECISIONS/ADR-012-render-text-inside-declared-bounds.md) | Apply a minimal renderer-measured transient glyph inset inside unchanged text geometry | Extends ADR-008's glyph-bound semantics only |
