@@ -14,7 +14,7 @@ The source of truth remains:
 6. this operating system;
 7. existing implementation details, fixtures, and external content.
 
-A role MUST surface conflicts instead of silently choosing a lower-priority source. Gate 1 renderer/validator qualification is cleared and PR #14's bounded Ticket 06 source-aware routing is merged into `main`. Tickets 07-08 and four-topology search/ranking remain bounded by Accepted ADR-009. Issue #61's public Level 3 sample now produces a hard-valid pair in repeated local tests under PDF-grounded ADR-010 through ADR-012. Issue-branch maintainer review and native-amd64 CI remain pending; cross-platform parity, organizer-held-out scoring, and release qualification remain unverified. Nothing here authorizes a model, model weights/runtime, CP-SAT, OR-Tools, generated pixels, source-record shedding, invented resource ceilings, runtime network access, or unapproved schema/API/dependency changes.
+A role MUST surface conflicts instead of silently choosing a lower-priority source. Gate 1 renderer/validator qualification is cleared and PR #14's bounded Ticket 06 source-aware routing is merged into `main`. Tickets 07-08 and four-topology search/ranking remain bounded by Accepted ADR-009. Issue #61's public Level 3 fix is merged in PR #65 and the issue is closed; required native x86_64 CI run 39711973748 passed on PR head `33f6fd9`. The owner waived partner review; no partner approval is recorded. Cross-platform parity, organizer-held-out scoring, and release qualification remain unverified. Nothing here authorizes a model, model weights/runtime, CP-SAT, OR-Tools, generated pixels, source-record shedding, invented resource ceilings, runtime network access, or unapproved schema/API/dependency changes.
 
 ## Load order
 

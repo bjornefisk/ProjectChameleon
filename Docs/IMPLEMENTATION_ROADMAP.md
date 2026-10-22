@@ -1,12 +1,12 @@
 # Implementation roadmap and review report
 
-**Status:** Execution plan; `PROJECT_CONTRACT.md` and Accepted ADRs remain authoritative. Gate 1 is cleared, Tickets 01–08 have bounded implementation/evidence, and Issue #61 now produces a hard-valid public Level 3 JSON/PNG pair in local integration tests using ADR-010 through ADR-012. The issue-linked PR's maintainer review and native-amd64 CI remain pending; held-out evaluation, cross-platform parity, full packaging closure, and organizer-controlled qualification remain unverified.
+**Status:** Execution plan; `PROJECT_CONTRACT.md` and Accepted ADRs remain authoritative. Gate 1 is cleared, Tickets 01–08 have bounded implementation/evidence, and Issue #61's hard-valid public Level 3 pair is merged via PR #65; the issue is closed. Required native x86_64 CI run 39711973748 passed on PR head `33f6fd9`; the owner waived partner review and no partner approval is recorded. Held-out evaluation, cross-platform parity, full packaging closure, and organizer-controlled qualification remain unverified.
 
 ## Issue #16 reconciliation
 
 The current implementation is not the pre-implementation plan described by several historical paragraphs below. F-01/F-02/F-03/F-04/F-07 have bounded local evidence at their authoritative seams; F-05 has local renderer/artifact seam evidence but not complete platform qualification; F-06 has native-amd64 CI observations, while cross-platform parity, full packaging closure, and broad held-out evaluation remain open. See the audit matrix and exact paths in [`STATUS.md`](STATUS.md). No warning-only check, soft score, arm64 emulation, or missing artifact is contract or qualification evidence.
 
-Decision ratification is complete, including the PDF-grounded Issue #61 changes in ADR-010 through ADR-012. The public Level 3 sample-pass behavior is now implemented and locally evidenced; do not claim issue completion until its PR is reviewed/merged, or claim official scoring, broad held-out evaluation, cross-platform parity, or complete organizer runtime qualification without corresponding evidence.
+Decision ratification is complete, including the PDF-grounded Issue #61 changes in ADR-010 through ADR-012. The public Level 3 sample-pass behavior is implemented and merged in PR #65, and Issue #61 is closed. Do not claim official scoring, broad held-out evaluation, cross-platform parity, or complete organizer runtime qualification without corresponding evidence.
 
 ### Gate 0 — Contract and evidence (complete; documentation only)
 
@@ -34,11 +34,11 @@ Decision ratification is complete, including the PDF-grounded Issue #61 changes 
 - Apply one round-half-even serialization step and validate serialized integers, reduced image-ratio lattice, rotated AABB containment, positive-area overlap, deterministic background tie-break, and same-side source bleed.
 - Acceptance: Level 1 plus geometry fixtures pass structural validation. The baseline must never hide or drop an element. **Gate 2 acceptance achieved** - Ticket 05 Level 1 solver complete with 20 layout tests passing.
 
-### Gate 3 — Source-aware routing (Ticket 06 complete; Ticket 07 public sample implementation ready for review)
+### Gate 3 — Source-aware routing (Ticket 06 complete; Issue #61 public sample merged in PR #65)
 
 - Infer roles from multiple signals without fixed z-index/coverage thresholds.
 - Derive slots from target proportions, source group extents, measured text, and image ratios. Never reserve fixed logo/hero/CTA pixels.
-- Acceptance: Ticket 06 implementation, focused/full tests, and Level 2 sample evidence are recorded and merged. The Issue #61 implementation now produces the hard-valid Level 3 sample pair locally with source identities, groups, image ratios, overlap, and renderer checks intact; PR review and native-amd64 CI evidence for this change remain pending.
+- Acceptance: Ticket 06 implementation, focused/full tests, and Level 2 sample evidence are recorded and merged. The Issue #61 implementation produces the hard-valid Level 3 sample pair with source identities, groups, image ratios, overlap, and renderer checks intact. PR #65 merged the implementation and required native x86_64 `Verify and test` run 39711973748 passed on PR head `33f6fd9`; official organizer acceptance remains unverified.
 
 ### Gate 4 — Typography and candidate generation
 
@@ -54,7 +54,7 @@ Decision ratification is complete, including the PDF-grounded Issue #61 changes 
 - Start with the accepted bounded structured search: at most three source-derived variants per each of four topology families, renderer-in-loop hard validation, and fixed-point ranking. Ticket 06 MUST remain deterministic and MUST NOT add CP-SAT, OR-Tools, models, or model weights/runtime; any later solver-dependency proposal requires separate authority and change control.
 - Represent only source-separated pairs in no-overlap constraints. Keep intentional overlaps and rigid groups out of universal separation constraints.
 - Rank only hard-valid candidates using alignment, even spacing, hierarchy, balance, whitespace, readability, and source relationship preservation. A cutoff with no hard-valid candidate is `INCOMPLETE_SEARCH`, never proven infeasibility.
-- Acceptance: the current bounded tree records hard-validation reports and reproducible fixed-point candidate scores in `Docs/STATUS.md` and the held-out-style evaluator. Native-amd64 F-06 evidence is recorded for its prior revision; issue-branch native-amd64 CI, official/native cross-platform, and organizer-held-out qualification remain pending.
+- Acceptance: the current bounded tree records hard-validation reports and reproducible fixed-point candidate scores in `Docs/STATUS.md` and the held-out-style evaluator. Native-amd64 F-06 evidence is recorded for its prior revision; Issue #61's required native x86_64 CI run 39711973748 passed on the PR head. Official/native cross-platform and organizer-held-out qualification remain pending.
 
 ### Gate 6 — Offline submission qualification
 

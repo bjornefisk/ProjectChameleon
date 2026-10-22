@@ -1,7 +1,7 @@
 # Project Chameleon implementation specification
 
-**Status:** The public Level 3 sample succeeds in local integration tests under the Issue #61 changes; issue-branch native-amd64 CI, held-out scoring, and broader qualification remain explicit in `Docs/STATUS.md`.
-**Date:** 2026-10-21
+**Status:** The public Level 3 sample succeeds in local integration tests under the Issue #61 changes; PR #65 merged the implementation and Issue #61 is closed. Required native x86_64 CI run 39711973748 passed on PR head `33f6fd9`; held-out scoring, cross-platform parity, and broader qualification remain explicit in `Docs/STATUS.md`.
+**Date:** 2026-10-22
 **Normative Authority:** [`../PROJECT_CONTRACT.md`](../PROJECT_CONTRACT.md) and [`../DECISIONS/`](../DECISIONS/) (ADR-001 through ADR-012)
 
 **Consolidated architecture:** [`../FINAL_ARCHITECTURE.md`](../FINAL_ARCHITECTURE.md) summarizes the implementation boundary and remains subordinate to the contract and Accepted ADRs.

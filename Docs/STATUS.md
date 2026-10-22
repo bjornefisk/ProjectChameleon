@@ -1,10 +1,10 @@
 # Project Chameleon status
 
-**Date:** 2026-10-21
+**Date:** 2026-10-22
 
-**Phase:** Gate 1 is cleared. Tickets 01-08 are implemented within their accepted bounded scopes. Issue #61's PDF-grounded fix now produces the public 1080×1350 → 728×90 sample as one hard-valid JSON/PNG pair in repeated local runs. The issue branch is awaiting independent maintainer review and native-amd64 CI; no official organizer score, cross-platform parity, or release qualification is claimed.
-**Decision status:** The current issue branch preserves bounded four-topology search, at most twelve source-derived candidates, renderer-gated hard validation, fixed-point ranking, deterministic output, and typed fail-closed behavior. Accepted ADR-010 through ADR-012 reconcile only quantized common group transforms, the absence of a numeric readability floor, and the renderer-measured transient glyph inset against the source challenge PDF. Local success does not establish organizer qualification; prior native-amd64 evidence applies to an earlier revision.
-**Ticket 06 authority:** User-requested GitHub issue #13; owner @bjornefisk; partner reviewer @gabegaines24. Implementation branch `feat/ticket-06-column-pivot-level2`, merged PR #14, now included in the current issue branch's `main` base `c5b1159`.
+**Phase:** Gate 1 is cleared. Tickets 01-08 are implemented within their accepted bounded scopes. Issue #61's PDF-grounded fix produces the public 1080×1350 → 728×90 sample as one hard-valid JSON/PNG pair in repeated local runs. PR #65 merged the fix as `6dbbc0a3eaba3090997ad9731a4026677dc6978c`, and Issue #61 closed automatically. Required native x86_64 `Verify and test` run 39711973748 passed on PR head `33f6fd9`; the owner waived partner review and no partner approval is recorded. No official organizer score, cross-platform parity, or release qualification is claimed.
+**Decision status:** The merged implementation preserves bounded four-topology search, at most twelve source-derived candidates, renderer-gated hard validation, fixed-point ranking, deterministic output, and typed fail-closed behavior. Accepted ADR-010 through ADR-012 reconcile only quantized common group transforms, the absence of a numeric readability floor, and the renderer-measured transient glyph inset against the source challenge PDF. Local success and native CI do not establish organizer qualification; cross-platform parity and organizer-held-out scoring remain unverified.
+**Ticket 06 authority:** User-requested GitHub issue #13; owner @bjornefisk; partner reviewer @gabegaines24. Implementation branch `feat/ticket-06-column-pivot-level2` merged as PR #14. The Issue #61 branch was based on main commit `c5b1159` before PR #65 merged the fix into main.
 
 ## Issue #61 public Level 3 acceptance
 
@@ -23,7 +23,7 @@ Accepted ADR-010 through ADR-012 are based on the original challenge PDF §§2.3
 - Local bounded evaluator: `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python ../scripts/evaluate_heldout_search.py --corpus tests/fixtures/heldout_search_cases.json --repeats 2 --output /tmp/issue61-heldout-search.json` — seven locally authored cases, six `SUCCESS`, one `INCOMPLETE_SEARCH`; all repeated outcomes and response/PNG signatures stable across four topology families, each within the 12-candidate cap. Report SHA-256 `56b8630f241774a82170ad3907378afce1dab9737bb3de0377eebf9b47c50f45`. This corpus is not organizer-held-out evidence.
 - Bounded work: font probes are capped at 74; grouped-text scale refinement is capped at 74 iterations per invocation and reports aggregate invocation/iteration counts. Hitting the refinement cutoff propagates `INCOMPLETE_SEARCH` with `search_exhausted=false`, never infeasibility.
 - Initial native-amd64 run 39710388785 exposed one font-metric-dependent test assertion; the regression was made deterministic and the focused plus full local suites passed. Required `Verify and test` run 39711291284 passed on code/test commit `eebe55e` on GitHub's x86_64 runner, including repository tests, native renderer qualification, linux/amd64 Buildx/offline smoke, repeated/clean-cache hashes, and native import/library checks.
-- PR state: implementation is not merged. The status-documentation follow-up requires the same native check to rerun; partner review remains pending. Keep the PR draft and issue #61 open until current checks and review pass and the PR is merged.
+- PR #65's final required `Verify and test` run 39711973748 passed on GitHub's native x86_64 runner for PR head `33f6fd9`, including repository tests, native renderer qualification, linux/amd64 Buildx/offline smoke, repeated/clean-cache hashes, and native import/library checks. PR #65 merged as `6dbbc0a3eaba3090997ad9731a4026677dc6978c`; Issue #61 closed automatically. The owner waived partner review before merge; no partner approval is recorded.
 
 ## Issue #16 F-01..F-09 disposition matrix
 
@@ -209,7 +209,7 @@ These are contract artifacts, not solver or renderer implementation:
 - `chameleon/chameleon_design_schema_v0.9.json` is no longer provisional, accepts empty designs, and records structural ranges/defaults.
 - Contract fixtures live under `chameleon/tests/fixtures/contract/`.
 - The Level 2 public sample's style range is corrected to valid end-exclusive `[6, 15)` semantics; this is fixture/source-data correction, not solver implementation.
-- Ticket 01's semantic validator and contract tests, ticket 02's renderer adapter/tests, ticket 03's fail-closed runner, ticket 04's exact geometry package/tests, and ticket 05's bounded Level 1 solver/tests are implemented. Gate 1 qualification is complete in the historical transition record; Ticket 06 is merged; Issue #61 resolves the public Level 3 local sample acceptance gap under ADR-010 through ADR-012. Issue-branch review/native-amd64 CI and organizer-held-out evaluation remain pending.
+- Ticket 01's semantic validator and contract tests, ticket 02's renderer adapter/tests, ticket 03's fail-closed runner, ticket 04's exact geometry package/tests, and ticket 05's bounded Level 1 solver/tests are implemented. Gate 1 qualification is complete in the historical transition record; Ticket 06 is merged; Issue #61's public Level 3 acceptance gap is resolved and merged via PR #65. Native x86_64 CI passed on PR head; cross-platform and organizer-held-out qualification remain unverified.
 
 ## Solver work after Gate 1
 
@@ -259,7 +259,7 @@ The hidden `.<stem>_output.commit` marker is the pair manifest and commit author
 - `.venv/bin/python -m py_compile chameleon/engine/errors.py chameleon/engine/main.py chameleon/renderer/converter/assets.py chameleon/renderer/converter/brand_fonts.py chameleon/renderer/converter/wrap.py chameleon/renderer/converter/convert.py scripts/inspect_layout.py chameleon/tests/runner/test_main.py chameleon/tests/runner/test_inspect_layout.py chameleon/tests/renderer/test_assets.py chameleon/tests/renderer/test_renderer_conformance.py` — passed.
 - `make test` — 71 tests passed in the project `.venv`.
 - `cd chameleon && docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — passed with the documented `FromPlatformFlagConstDisallowed` warning.
-- `cd chameleon && docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — exit 1 for the nonconforming baseline; no task artifacts beyond `output/.gitkeep`. Docker reported arm64-host emulation, so native-amd64 qualification remains pending.
+- `cd chameleon && docker run --rm --network none -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" chameleon-stage1` — exit 1 for the nonconforming baseline; no task artifacts beyond `output/.gitkeep`. Docker reported arm64-host emulation, so this run itself did not establish native-amd64 qualification; subsequent native x86_64 CI is recorded in the Issue #61 evidence above.
 
 ## Ticket 03 verification record
 
@@ -289,7 +289,7 @@ The hidden `.<stem>_output.commit` marker is the pair manifest and commit author
 - **Ticket 01 — aligned.** The semantic validator preserves identity, immutable fields, omission/default semantics, serialized integer geometry, AABB containment, bleed, ratios, rigid groups, source-separated overlap, and typed failures. Its geometry predicates are intentionally shared with Ticket 04; the remaining evidence risk is that tests do not independently duplicate every predicate calculation.
 - **Ticket 02 — corrected and locally aligned.** The audit found and fixed CRLF rendering as two transient newlines and inconsistent non-integer font-size handling. The adapter now collapses CRLF to one transient break, projects style maps onto that transient text, and requires the staging-serialized integer font size. Native `cr-renderer` goldens, repeated PNG hashes, and native-amd64 parity remain unverified.
 - **Ticket 03 — partially aligned by design.** Atomic staging, marker-gated pair publication, cleanup/quarantine, exact ingress, typed dispatch, continuation, and aggregate exit are locally evidenced. The audit added rejection of symlinked inspection paths, including parent components. The current runner distinguishes `INCOMPLETE_SEARCH` and `INFEASIBLE_LAYOUT`; bounded solver producers must report incomplete search until an approved finite search is exhausted.
-- **Ticket 04 — aligned locally.** Exact ingress, half-even quantization, AABBs, bleed, ratios, positive-area contact, and rigid transforms are integrated into validator/staging paths and covered by geometry/contract tests. Cross-platform/native-amd64 qualification remains pending.
+- **Ticket 04 — aligned locally.** Exact ingress, half-even quantization, AABBs, bleed, ratios, positive-area contact, and rigid transforms are integrated into validator/staging paths and covered by geometry/contract tests. This audit predates Issue #61; native x86_64 CI passed for the later integrated tree, while cross-platform parity remains unverified.
 
 ## Ticket 05 boundary and verification record
 

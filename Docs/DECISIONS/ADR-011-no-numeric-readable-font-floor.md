@@ -8,7 +8,7 @@ Accepted — the issue owner authorized this PDF-grounded decision and an indepe
 
 - Date: 2026-10-21
 - Owner: @bjornefisk (issue owner/project authority)
-- Reviewers: independent reviewer role (ADR proposal review, APPROVE, 2026-10-21); repository maintainer PR review pending
+- Reviewers: independent reviewer role (ADR proposal review, APPROVE, 2026-10-21); partner review on implementation PR #65 was waived by repository owner @bjornefisk before merge; no partner approval is recorded.
 
 ## Context / authority
 

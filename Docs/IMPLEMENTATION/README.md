@@ -4,7 +4,7 @@ This directory houses the complete engineering specification, module architectur
 
 It is structured using the industry-standard **`to-spec`**, **`to-tickets`**, and **`writing-for-agents`** methodologies so autonomous AI agents have explicit implementation boundaries and dependency-sequenced work.
 Use `../FINAL_ARCHITECTURE.md` as the consolidated implementation summary. This directory decomposes that architecture into the executable specification and dependency-sequenced tickets.
-Current frontier is review of the Issue #61 public Level 3 implementation on the bounded four-topology search. The public 1080×1350 to 728×90 sample now yields a hard-valid pair in repeated local integration tests; ADR-010 through ADR-012 reconcile the project-authored serialized-group equality, numeric font floor, and text-origin rules against the supplied PDF. Font probes and grouped-text scale refinement have fixed 74-step bounds with candidate-work diagnostics and typed cutoff propagation. Issue-branch maintainer review/native-amd64 CI, broad organizer-held-out scoring, and release qualification remain unverified.
+Issue #61's public Level 3 implementation is merged in PR #65 and the issue is closed. The public 1080×1350 to 728×90 sample yields a hard-valid pair in repeated local integration tests; ADR-010 through ADR-012 reconcile the project-authored serialized-group equality, numeric font floor, and text-origin rules against the supplied PDF. Font probes and grouped-text scale refinement have fixed 74-step bounds with candidate-work diagnostics and typed cutoff propagation. Required native x86_64 CI passed on PR head `33f6fd9`; cross-platform parity, broad organizer-held-out scoring, and release qualification remain unverified.
 
 ---
 

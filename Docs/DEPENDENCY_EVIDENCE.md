@@ -4,7 +4,7 @@
 
 This file applies source-driven development only to external libraries, platforms, and packaging. It does not decide internal product intent; those decisions are in `PROJECT_CONTRACT.md` and the ADRs.
 
-**Revision note:** The native-amd64 measurements below are for the earlier commit `7f39a3e`, before Issue #61. They remain valid observations for that revision, not qualification evidence for the Issue #61 branch; branch-specific native CI is pending and tracked in `STATUS.md`.
+**Revision note:** The native-amd64 measurements below are for the earlier commit `7f39a3e`, before Issue #61. They remain valid observations for that revision, not qualification evidence for the Issue #61 branch. Later native x86_64 CI run 39711973748 passed on PR #65's head commit `33f6fd9`; cross-platform parity and organizer-controlled qualification remain open in `STATUS.md`.
 
 ## Evidence matrix
 
