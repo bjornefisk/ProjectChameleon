@@ -22,7 +22,8 @@ Accepted ADR-010 through ADR-012 are based on the original challenge PDF §§2.3
 - Isolated artifact inspection: the public sample was emitted to temporary input/output directories and inspected with `scripts/inspect_layout.py`, leaving pre-existing `chameleon/output` untouched. Inspector exit 0; 17 elements, 728×90, and zero unintended foreground collisions.
 - Local bounded evaluator: `cd chameleon && /Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python ../scripts/evaluate_heldout_search.py --corpus tests/fixtures/heldout_search_cases.json --repeats 2 --output /tmp/issue61-heldout-search.json` — seven locally authored cases, six `SUCCESS`, one `INCOMPLETE_SEARCH`; all repeated outcomes and response/PNG signatures stable across four topology families, each within the 12-candidate cap. Report SHA-256 `56b8630f241774a82170ad3907378afce1dab9737bb3de0377eebf9b47c50f45`. This corpus is not organizer-held-out evidence.
 - Bounded work: font probes are capped at 74; grouped-text scale refinement is capped at 74 iterations per invocation and reports aggregate invocation/iteration counts. Hitting the refinement cutoff propagates `INCOMPLETE_SEARCH` with `search_exhausted=false`, never infeasibility.
-- PR state: implementation is not merged. Maintainer review and this branch's native-amd64 CI remain pending; keep issue #61 open until acceptance is complete.
+- Initial native-amd64 CI run 39710388785 failed one renderer-conformance assertion that assumed a negative glyph top from host-specific font metrics. The regression now injects a deterministic one-pixel overhang; the focused test and full local suite pass. Replacement CI is pending.
+- PR state: implementation is not merged. Partner review and replacement native-amd64 CI remain pending; keep issue #61 open until acceptance is complete.
 
 ## Issue #16 F-01..F-09 disposition matrix
 

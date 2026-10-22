@@ -2,6 +2,9 @@ import copy
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+
+import skia
 
 PROJECT_ROOT = Path(__file__).parents[3]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -226,24 +229,62 @@ class RendererConformanceTests(unittest.TestCase):
             "color": "rgba(255,255,255,1)",
             "text_align": "center",
         }
-        element["height"] = minimum_text_box_height(
-            element, element["width"], element["font_size"], self.font_manager
-        )
-        document = {"canvas": {"width": 728, "height": 90}, "elements": [element]}
-        before = copy.deepcopy(document)
+        real_font = skia.Font
+        # Force a deterministic one-pixel overhang; real font metrics vary
+        # across platforms.
 
-        converted, _warnings = convert_chameleon_to_crello(
-            document, self.font_manager
-        )
+        class NegativeTopBounds:
+            def __init__(self, bounds, top):
+                self.bounds = bounds
+                self._top = top
 
-        self.assertGreater(converted["top"][0], element["y"])
-        self.assertEqual(converted["height"][0], element["height"])
-        self.assertEqual(document, before)
+            def left(self):
+                return self.bounds.left()
 
-        too_short = copy.deepcopy(document)
-        too_short["elements"][0]["height"] -= 1
-        with self.assertRaises(TextOverflowError):
-            convert_chameleon_to_crello(too_short, self.font_manager)
+            def top(self):
+                return self._top
+
+            def right(self):
+                return self.bounds.right()
+
+            def bottom(self):
+                return self.bounds.bottom()
+
+        class NegativeTopFont:
+            def __init__(self, typeface, size):
+                self.font = real_font(typeface, size)
+
+            def __getattr__(self, name):
+                return getattr(self.font, name)
+
+            def getBounds(self, glyphs):
+                negative_top = self.font.getMetrics().fAscent - 1
+                return [
+                    NegativeTopBounds(bounds, negative_top)
+                    for bounds in self.font.getBounds(glyphs)
+                ]
+
+        with patch.object(skia, "Font", NegativeTopFont):
+            element["height"] = minimum_text_box_height(
+                element, element["width"], element["font_size"], self.font_manager
+            )
+            document = {
+                "canvas": {"width": 728, "height": 90},
+                "elements": [element],
+            }
+            before = copy.deepcopy(document)
+            converted, _warnings = convert_chameleon_to_crello(
+                document, self.font_manager
+            )
+
+            self.assertEqual(converted["top"][0], element["y"] + 1)
+            self.assertEqual(converted["height"][0], element["height"])
+            self.assertEqual(document, before)
+
+            too_short = copy.deepcopy(document)
+            too_short["elements"][0]["height"] -= 1
+            with self.assertRaises(TextOverflowError):
+                convert_chameleon_to_crello(too_short, self.font_manager)
 
     def test_non_space_breaks_preserve_line_map_offsets(self):
         for text in ("ab-cd", "ab/cd"):
