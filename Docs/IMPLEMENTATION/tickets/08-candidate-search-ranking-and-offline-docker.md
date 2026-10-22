@@ -4,10 +4,10 @@
 A bounded macro-candidate search coordinating all four layout topologies, paired with offline `linux/amd64` qualification. For any task, the engine generates at most 12 candidates across the four families, validates each through the actual renderer, ranks only hard-valid survivors, selects deterministically, and records qualification evidence rather than assuming every task is feasible.
 
 **Dependency:**
-`07: Horizontal Ribbon Topology and Level 3 Extreme Leaderboard Solver` supplies topology interfaces. Bounded Ticket 08 integration is present; Issue #61 now produces the public Level 3 pair in repeated local tests. Issue-branch review/native-amd64 CI, official held-out scoring, and release qualification remain pending.
+`07: Horizontal Ribbon Topology and Level 3 Extreme Leaderboard Solver` supplies topology interfaces. Bounded Ticket 08 integration is present; Issue #61's public Level 3 pair is merged in PR #65, with the issue closed. Required native x86_64 CI passed on PR head `33f6fd9`; official held-out scoring and release qualification remain unverified.
 
 **Status:**
-implemented; local bounded evidence recorded; issue-branch native-amd64 CI, cross-platform parity, and organizer-held-out qualification remain unverified.
+implemented; local bounded evidence and native x86_64 CI recorded; PR #65 merged and Issue #61 closed. Cross-platform parity, organizer-held-out scoring, and release qualification remain unverified.
 
 The checkboxes below preserve the earlier Ticket 08 evidence record. Current Issue #61 behavior and verification are recorded in [`../../STATUS.md`](../../STATUS.md); do not treat the historical Level 3 `INCOMPLETE_SEARCH` result below as current.
 

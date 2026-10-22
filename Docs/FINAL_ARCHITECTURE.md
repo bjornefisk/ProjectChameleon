@@ -1,6 +1,6 @@
 # Project Chameleon final architecture
 
-**Status:** Gate 1 qualification is cleared and Tickets 06–08 have bounded implementation on the integrated review tree. Issue #61 now has a PDF-grounded implementation path that produces a hard-valid Level 3 pair in local tests; issue-linked PR review, new native-amd64 CI evidence, cross-platform parity, organizer-held-out scoring, and release qualification remain unverified.
+**Status:** Gate 1 qualification is cleared and Tickets 06–08 have bounded implementation on the integrated tree. Issue #61's PDF-grounded public Level 3 fix is merged via PR #65 (`6dbbc0a3eaba3090997ad9731a4026677dc6978c`), and the issue is closed. Required native x86_64 CI run 39711973748 passed on PR head `33f6fd9`; cross-platform parity, organizer-held-out scoring, and release qualification remain unverified.
 
 **Scope:** Stage 1 retargeting engine and the separate finale integration boundary.
 
@@ -23,7 +23,7 @@ The architecture must:
 - produce deterministic results in an offline `linux/amd64` container; and
 - keep the autonomous Stage 1 engine separate from the interactive finale.
 
-The current phase is **Issue #61 public Level 3 resolution and bounded four-topology search review**. Source-aware role inference, column pivot, horizontal ribbon, vertical restack, candidate variants, renderer-in-loop admission, and fixed-point ranking remain bounded. The public 1080×1350 to 728×90 fixture now produces a hard-valid pair in local integration tests using the narrow superseding decisions in ADR-010 through ADR-012. Native-amd64 CI on the issue branch, cross-platform parity, broad organizer-held-out scoring, and release qualification remain separate.
+Issue #61's public Level 3 resolution is implemented within the accepted bounded four-topology search and merged in PR #65. Source-aware role inference, column pivot, horizontal ribbon, vertical restack, candidate variants, renderer-in-loop admission, and fixed-point ranking remain bounded. The public 1080×1350 to 728×90 fixture produces a hard-valid pair under ADR-010 through ADR-012. Required native x86_64 CI passed on the PR head; the owner waived partner review and no partner approval is recorded. Cross-platform parity, broad organizer-held-out scoring, and release qualification remain separate unverified evidence boundaries.
 
 ### Terminology
 

@@ -1,6 +1,6 @@
 # Ticket 08 qualification evidence
 
-This is an earlier Ticket 08 evidence record, not qualification evidence for the Issue #61 branch. The native-amd64 run below is for commit `7f39a3e`, which predates Issue #61; branch-specific native-amd64 CI is pending. Local Darwin arm64 observations are identified separately.
+This is an earlier Ticket 08 evidence record, not qualification evidence for the Issue #61 branch. The native-amd64 run below is for commit `7f39a3e`, which predates Issue #61; the later native x86_64 `Verify and test` run 39711973748 passed on PR #65's head commit `33f6fd9` and is recorded in `STATUS.md`. Local Darwin arm64 observations are identified separately.
 The issue #23/F-07 normative evidence expansion is recorded separately in [`08-issue-23-evidence.md`](08-issue-23-evidence.md).
 
 ## Historical F-06 native-amd64 qualification for commit `7f39a3e`

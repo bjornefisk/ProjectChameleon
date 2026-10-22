@@ -19,7 +19,7 @@ The contract plus Accepted ADRs win conflicts. Starter comments, warning-only ch
 
 ## Current phase
 
-PR #14's bounded Ticket 06 source-aware routing and column-pivot implementation is merged into `main`. Tickets 07-08 and four-topology search/ranking are implemented within their accepted bounds. Issue #61's PDF-grounded public Level 3 fix produces a hard-valid pair in repeated local tests under Accepted ADR-010 through ADR-012. Maintainer review and native-amd64 CI for the issue branch remain pending; cross-platform parity, organizer-held-out scoring, and release qualification remain unverified.
+PR #14's bounded Ticket 06 source-aware routing and column-pivot implementation is merged into `main`. Tickets 07-08 and four-topology search/ranking remain within their accepted bounds. Issue #61's PDF-grounded public Level 3 fix is merged in PR #65 (`6dbbc0a3eaba3090997ad9731a4026677dc6978c`) and the issue is closed. Required native x86_64 `Verify and test` run 39711973748 passed on PR head `33f6fd9`. The owner waived partner review; no partner approval is recorded. Cross-platform parity, organizer-held-out scoring, and release qualification remain unverified.
 
 Stage 1 MUST preserve source identity, IDs, counts, order, types, immutable fields, content, assets, and source relationships. Only target canvas dimensions, element geometry, and text `font_size` may change; serialized mutable values must be finite integers. Hard validation is authoritative for rotated bounds, exact foreground-image ratios, groups and source-separated overlap, text/render bounds, and missing assets. Invalid candidates fail closed without misleading output files.
 
