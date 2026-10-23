@@ -36,13 +36,18 @@ PR #74 records the current release-candidate input inventory at source-input
 revision `2548c82`; the evidence record was committed at PR head `de935eb` in
 [`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md). The base image, direct
 Python pins, renderer commit, schema, packaged assets, and packaged font
-hashes are observed. Apt versions, complete transitive wheel hashes, current
-native-amd64 closure, and clean-cache artifact parity remain
+hashes are observed.
+
+Required native amd64 CI run `39981979377` passed on the PR merge ref. It
+verified the linux/amd64 image, non-empty SBOM, clean-cache build, offline
+three-sample success, repeated and clean-cache artifact hashes, native imports,
+and Skia/Pillow library closure. Apt versions, complete transitive wheel hashes,
+cross-platform parity, and release qualification remain
 `UNVERIFIED_EXTERNAL_FACT`.
 
 No dependency or Docker input changes are authorized by this inventory slice.
-The next decision is a reviewed apt/wheelhouse lock strategy, followed by a
-native `linux/amd64` clean-cache qualification run.
+The next decision is a reviewed apt/wheelhouse lock strategy and complete
+package-closure evidence.
 
 ## Issue #61 public Level 3 acceptance
 

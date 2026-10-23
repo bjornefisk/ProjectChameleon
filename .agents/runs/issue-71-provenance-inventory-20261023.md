@@ -12,8 +12,9 @@ evidence capture commit: de935ebde2e949728ad95a904cd165243bf7e943
 ## Outcome and acceptance
 
 Recorded the current Docker, Python, renderer, schema, asset, and font inputs
-for Issue #71. This slice does not claim apt closure, wheelhouse
-reproducibility, native-amd64 qualification, or release qualification.
+for Issue #71. Required native amd64 CI evidence now passes for this candidate.
+This slice does not claim apt closure, wheelhouse reproducibility, cross-platform
+parity, or release qualification.
 
 ## Authority/ADR impact
 
@@ -34,7 +35,7 @@ Repository maintainer and release manager.
 
 - Available: local Docker Desktop, Buildx, repository verifier, offline container.
 - Host: Darwin arm64.
-- Native amd64 CI qualification: unavailable locally; current run is emulation.
+- Native amd64 CI qualification: available through GitHub Actions; unavailable locally.
 - Organizer package-lock policy and official limits: unavailable.
 
 ## Integration checks
@@ -47,24 +48,33 @@ Repository maintainer and release manager.
 - Offline renderer import — passed with Python `3.11.11`, machine `x86_64`, pinned `cr_renderer`, and `skia`.
 - Local Skia/Pillow `ldd` closure check — passed with no `not found` output.
 
+- GitHub Actions run [39981979377](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39981979377), job `120511316262` — passed on merge ref `cc4670e5cd2c02d5f766d15f54f7f99cbb2a762f`, including branch head `779f4fc37790bd7e939cfc8bb95c1be365e315a1`.
+- Native image — `linux/amd64`, ID `sha256:2a128ecda7a70ce599ea48566c5512dae1b389bffc7d50b43aecdb82fec43572`, size `896530824` bytes.
+- Syft `v1.42.3` SPDX SBOM — non-empty, SHA-256 `81efac5640b2592ad798f90565866d54196295a4ace251cccc2ffd6ec454c9aa`.
+- Native offline smoke — all three samples returned `SUCCESS`; repeated and clean-cache JSON/PNG/marker hashes matched.
+- Native runtime — return code `0`, elapsed `17.95671395200003` seconds, maximum RSS `314092 KiB`, peak `3` procfs threads, and `2` available CPUs.
+- Native renderer imports and Skia/Pillow `ldd` closure — passed with no `not found` entries.
+
 ## Failures/abandoned work/unrun checks
 
 - The first Docker build attempt failed because Docker Desktop was stopped.
   Docker Desktop was started, and the same build then passed.
-- Native amd64 runner qualification, clean-cache rebuild, SBOM capture, apt
-  version closure, complete wheelhouse hash closure, and cross-platform parity
-  were not run locally.
+- Local native amd64 qualification, apt version closure, complete wheelhouse hash
+  closure, and cross-platform parity were not run locally.
+- Native amd64 CI, clean-cache rebuild, SBOM capture, and repeated artifact
+  parity passed in run `39981979377`.
 - No dependency or packaging change was attempted without an approved lock
   strategy.
 
 ## Security or external-fact notes
 
-Apt package versions, complete transitive wheel hashes, organizer resource
-limits, and release qualification remain `UNVERIFIED_EXTERNAL_FACT`. The image
-ran with `--network none`; no runtime download was permitted.
+Apt package versions, complete transitive wheel hashes, cross-platform parity,
+organizer resource limits, and release qualification remain
+`UNVERIFIED_EXTERNAL_FACT`. The image ran with `--network none`; no runtime
+download was permitted.
 
 ## Next concrete action/owner
 
-Owner: `@gabegaines24`. Approve a package-lock strategy, then run the exact
-native-amd64 CI path with clean-cache image, SBOM, dependency closure, repeated
-artifact hashes, and failure-path publication checks.
+Owner: `@gabegaines24`. Approve a package-lock strategy, then collect complete
+apt and wheelhouse closure evidence. Do not change dependency or packaging
+inputs before that decision.

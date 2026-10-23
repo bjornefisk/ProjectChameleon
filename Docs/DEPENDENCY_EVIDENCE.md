@@ -112,11 +112,11 @@ native-amd64 qualification.
 | --- | --- | --- |
 | Base image | `python:3.11.11-slim-bookworm@sha256:081075da77b2b55c23c088251026fb69a7b2bf92471e491ff5fd75c192fd38e5` | Manifest digest is pinned; amd64 child digest requires candidate qualification. |
 | Apt/build packages | `git`, `libgl1`, `libegl1`, `libglib2.0-0`, `fontconfig` | Names are declared in `chameleon/Dockerfile`; apt versions are unpinned. |
-| Python runtime | Python `3.11.11` base image; CI selects Python `3.11` | Native runner patch version and wheel closure require the qualification run. |
+| Python runtime | Python `3.11.11` base image; CI selects Python `3.11` | Native CI observed Python `3.11.11`; complete wheel closure remains unresolved. |
 | Direct Python requirements | Pillow `11.1.0`; datasets `3.2.0`; pydantic `2.10.6`; skia-python `132.0b11`; jsonschema `4.23.0` | Direct versions are pinned; no complete hash-locked wheelhouse is committed. |
 | Renderer | `cr-renderer` commit `a17e1fb9a732959dd6c21ae168d5ee09d74bd64f` | VCS revision is immutable; native import and library closure remain run evidence. |
 | Source inputs | Dockerfile `735b1d7f102874045c9f35afaa98d9dd439eb2b4e8d1a7ef6a2da5953cad39b2`; requirements `432fc158c299c37e15b52e0464401df62f72d786aa7af6e4086fc7de73209a1b`; schema `d084eb524b7b0e683c9a31a63706ea4101ee0e3cd4a9a3b8218a59975fa55e41` | Hashes bind this inventory to the checked-out source revision. |
-| Native-library path | Skia and Pillow are checked with offline imports and `ldd` in `.github/workflows/ci.yml` | Current PR has no native-amd64 `ldd` result; emulation is supplemental. |
+| Native-library path | Skia and Pillow are checked with offline imports and `ldd` in `.github/workflows/ci.yml` | Native CI run `39981979377` passed imports and `ldd` with no `not found`; local emulation remains supplemental. |
 
 Packaged runtime assets were hashed with the repository paths:
 
@@ -138,10 +138,41 @@ files and sorted `find` output for packaged assets and fonts. Runtime network
 remains disabled by `HF_HUB_OFFLINE=1`, `HF_HUB_DISABLE_TELEMETRY=1`, and the
 CI `docker run --network none` path.
 
-**UNVERIFIED_EXTERNAL_FACT:** This inventory does not establish apt-version
-closure, wheelhouse reproducibility, native-amd64 parity, organizer limits, or
-release qualification. A reviewed lock strategy and native clean-cache run are
-required before closing Issue #71.
+### Native amd64 CI qualification evidence
+
+**OBSERVED, 2026-10-23:** Required GitHub Actions run
+[39981979377](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39981979377),
+job `120511316262`, passed for PR #74. The workflow tested merge ref
+`cc4670e5cd2c02d5f766d15f54f7f99cbb2a762f`, which includes branch head
+`779f4fc37790bd7e939cfc8bb95c1be365e315a1`.
+
+- Native platform: Linux `x86_64`, Python `3.11.11`.
+- Image: `sha256:2a128ecda7a70ce599ea48566c5512dae1b389bffc7d50b43aecdb82fec43572`,
+  `linux/amd64`, `896530824` bytes.
+- SBOM: non-empty SPDX output from pinned Syft `v1.42.3`, SHA-256
+  `81efac5640b2592ad798f90565866d54196295a4ace251cccc2ffd6ec454c9aa`.
+- Offline native smoke: all three samples returned `SUCCESS`; JSON, PNG, and
+  commit-marker files were present.
+- Repeated and clean-cache artifact hashes matched.
+- Runtime: return code `0`, elapsed `17.95671395200003` seconds, maximum RSS
+  `314092 KiB`, peak `3` procfs threads, and `2` available CPUs.
+- Native `cr_renderer`/`skia` imports and Skia/Pillow `ldd` closure passed with
+  no `not found` entries.
+
+The run establishes native amd64 evidence for this candidate, not organizer
+qualification. Apt-version closure, complete wheelhouse hashes,
+cross-platform parity, and the reviewed package-lock decision remain open.
+
+Native sample artifacts were:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Level 1 JSON | `7b93fdfd44ad8e669c00aeae3a8e96931f85a761a60e67cc31d2bb02b10853b9` |
+| Level 1 PNG | `172d23ca87020478d24568a603ba6f9deaf272629b59d73608789aca9789a85c` |
+| Level 2 JSON | `3e26ef9e95df3f9b9f3fc9fa8149382962081531936e5f01480f5161e3b5f8f6` |
+| Level 2 PNG | `bf24e67125529d96b65df1f049d3f4b11cd0fcc9e05a2c7a765a60c3e5952f99` |
+| Level 3 JSON | `10c7b96bea147205da2ba24030f1b2d8970e46f83f76bccc67c9f6798b955fdd` |
+| Level 3 PNG | `1cbe6edde1ee854439dda7e3eb1061a61964a1d4116bda0fc1fd9e90629fe6ff` |
 
 ## Unverified or intentionally deferred
 
