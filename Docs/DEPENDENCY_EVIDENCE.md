@@ -35,33 +35,70 @@ This file applies source-driven development only to external libraries, platform
 
 ## Issue #70 packaged-font provenance and redistribution (evidence date: 2026-10-22)
 
-**Scope:** the seven TTFs below are the current Stage 1 placeholder fonts. Their upstream family attribution was verified from embedded copyright/version data and table-level comparisons against pinned upstream font files, not from filenames or successful rendering alone.
+**Task:** Issue #70. **Verification run:** `PR-73-font-provenance-fix`. The run uses
+the local Darwin arm64 environment and pinned project font files. It is local
+evidence, not native-amd64 or organizer qualification.
 
 ### Source and redistribution terms
 
-- **Lora 3.008:** Google Fonts [`METADATA.pb` at `b2f711240d262008a28fb639ff31211ba1ff5403`](https://github.com/google/fonts/blob/b2f711240d262008a28fb639ff31211ba1ff5403/ofl/lora/METADATA.pb) records source repository [`cyrealtype/Lora-Cyrillic` at `403b1a66ca2e79f81d749c5299559e168591a4df`](https://github.com/cyrealtype/Lora-Cyrillic/tree/403b1a66ca2e79f81d749c5299559e168591a4df), dated 2023-12-14, with `fonts/variable/Lora[wght].ttf` and `fonts/variable/Lora-Italic[wght].ttf`. FontTools 4.61.0 instances at weights 400 and 700 match the local glyph outlines, metrics, and Unicode mappings. Local face naming and static bold metadata identify the requested `Solstice Serif` faces. The upstream [`OFL.txt`](https://github.com/cyrealtype/Lora-Cyrillic/blob/403b1a66ca2e79f81d749c5299559e168591a4df/OFL.txt) reserves the primary name `Lora`; no local family, full, or PostScript name uses it.
-- **Poppins 4.004:** the upstream static faces are in the Google Fonts [`7dc16b7de42db624b902f2292b68ed9e489e5053` release commit](https://github.com/google/fonts/commit/7dc16b7de42db624b902f2292b68ed9e489e5053), dated 2020-06-23; that commit records the 4.004 update and corrected copyright/license metadata. Google Fonts [`METADATA.pb` at `4d560ddf8585f187eb2e959ca9847e2da3d82c16`](https://github.com/google/fonts/blob/4d560ddf8585f187eb2e959ca9847e2da3d82c16/ofl/poppins/METADATA.pb), dated 2025-11-07, records the source repository commit [`itfoundry/Poppins` `738d9d691b66f1ad917123c58df104d16c74e1a7`](https://github.com/itfoundry/Poppins/tree/738d9d691b66f1ad917123c58df104d16c74e1a7), dated 2019-12-25. Local static faces match the upstream glyph outlines, metrics, OS/2 and layout tables, and Unicode mappings; their family/name records are rebranded as `Solstice Sans`.
-- Both authoritative license files grant modification and redistribution, including bundling with software, subject to their conditions: fonts may not be sold by themselves; each redistributed copy must include the copyright notice and license; modified fonts remain under OFL 1.1; Lora derivatives must not use the reserved primary name `Lora`. Full copies are packaged beside the fonts as [`OFL-Lora.txt`](../chameleon/brand_kit/fonts/OFL-Lora.txt) and [`OFL-Poppins.txt`](../chameleon/brand_kit/fonts/OFL-Poppins.txt); they match their cited upstream text with source trailing whitespace removed to satisfy the repository whitespace check. The image copies `brand_kit/` as a directory, so the notices ship with the fonts.
+- **OBSERVED, source retrieval 2026-10-22 — Lora 3.008:** Google Fonts
+  [`METADATA.pb` at `b2f711240d262008a28fb639ff31211ba1ff540b`](https://github.com/google/fonts/blob/b2f711240d262008a28fb639ff31211ba1ff540b/ofl/lora/METADATA.pb)
+  records source repository [`cyrealtype/Lora-Cyrillic` at
+  `403b1a66ca2e79f81d749c5299559e168591a4df`](https://github.com/cyrealtype/Lora-Cyrillic/tree/403b1a66ca2e79f81d749c5299559e168591a4df),
+  dated 2023-12-14, with `fonts/variable/Lora[wght].ttf` and
+  `fonts/variable/Lora-Italic[wght].ttf`. The cited metadata revision is
+  immutable and maps the local Lora source files.
+- **OBSERVED, source retrieval 2026-10-22 — Poppins 4.004:** Google Fonts
+  [`OFL.txt` at the 4.004 release](https://raw.githubusercontent.com/google/fonts/7dc16b7de42db624b902f2292b68ed9e489e5053/ofl/poppins/OFL.txt)
+  supplies the bundled 2020 copyright notice. Google Fonts
+  [`METADATA.pb` at `4d560ddf8585f187eb2e959ca9847e2da3d82c16`](https://github.com/google/fonts/blob/4d560ddf8585f187eb2e959ca9847e2da3d82c16/ofl/poppins/METADATA.pb),
+  dated 2025-11-07, records source repository commit
+  [`itfoundry/Poppins` `738d9d691b66f1ad917123c58df104d16c74e1a7`](https://github.com/itfoundry/Poppins/tree/738d9d691b66f1ad917123c58df104d16c74e1a7).
+  The source-face revision and Google Fonts license-package revision are
+  distinct and intentionally recorded separately.
+- **OBSERVED, owner inspection 2026-10-22:** FontTools 4.61.0 instances at
+  Lora weights 400 and 700, plus the Poppins static faces, matched local
+  glyph outlines, metrics, Unicode mappings, OS/2 data, and layout tables.
+  Local family/name records identify the requested Solstice faces.
+- **OBSERVED, repository verification run `PR-73-font-provenance-fix`:**
+  `python3 scripts/verify_font_provenance.py` checks every listed TTF/license
+  path, rejects missing or extra files, and compares SHA-256 values.
+- **INFERRED:** Both bundled license texts permit modification and redistribution
+  with software under OFL 1.1 conditions. This is evidence for these exact
+  placeholder files, not legal approval for future production fonts.
 
 ### File inventory and embedded metadata
 
-Weights are the embedded OS/2 weight classes; names and versions are from the TTF name table. “Sample” means a face declared by one of the three checked-in Stage 1 samples.
+Weights are embedded OS/2 weight classes; names and versions come from the TTF
+name table. “Sample” means a face declared by one of three checked-in samples.
 
-| Packaged file | SHA-256 | Embedded family / subfamily; weight; version | Sample |
+| Packaged path | SHA-256 | Embedded family / subfamily; weight; version | Sample |
 | --- | --- | --- | --- |
-| `SolsticeSerif-Regular.ttf` | `b7eb2a832ae91824a7c670469f4a4e0c4910a3ceedc1d31aad07ea2bc336d2a7` | Solstice Serif / Regular; 400; 3.008 | No |
-| `SolsticeSerif-Bold.ttf` | `837d42cc1b336364b69714c73288a0ec7ceded41c137d5f62943df5f0745551a` | Solstice Serif / Bold; 700; 3.008 | Yes |
-| `SolsticeSerif-Italic.ttf` | `07526ca6ef70e5a7853abcdd614aeb62cdb958ed0cabc0f771f85094b4c67ccf` | Solstice Serif / Italic; 400; 3.008 | No |
-| `SolsticeSans-Regular.ttf` | `4500567b25fc1af2983cee01c1e57e01a0108b8b3844c182936d14c7dec7f69c` | Solstice Sans / Regular; 400; 4.004 | Yes |
-| `SolsticeSans-Bold.ttf` | `609a215925701021b97578c71702bfc492882556ce05602b670aaa74a32a1156` | Solstice Sans / Bold; 700; 4.004 | Yes |
-| `SolsticeSans-Italic.ttf` | `848a0433face0f273e313e4fdb3497a764f3c96b3b6670dffcc3cc38dcc83f2a` | Solstice Sans / Italic; 400; 4.004 | No |
-| `SolsticeSans-BoldItalic.ttf` | `e47af214406befc181508cf7ff87b774a955a670f7a54d8563a9757d45b2167d` | Solstice Sans / Bold Italic; 700; 4.004 | No |
+| `chameleon/brand_kit/fonts/SolsticeSerif-Regular.ttf` | `b7eb2a832ae91824a7c670469f4a4e0c4910a3ceedc1d31aad07ea2bc336d2a7` | Solstice Serif / Regular; 400; 3.008 | No |
+| `chameleon/brand_kit/fonts/SolsticeSerif-Bold.ttf` | `837d42cc1b336364b69714c73288a0ec7ceded41c137d5f62943df5f0745551a` | Solstice Serif / Bold; 700; 3.008 | Yes |
+| `chameleon/brand_kit/fonts/SolsticeSerif-Italic.ttf` | `07526ca6ef70e5a7853abcdd614aeb62cdb958ed0cabc0f771f85094b4c67ccf` | Solstice Serif / Italic; 400; 3.008 | No |
+| `chameleon/brand_kit/fonts/SolsticeSans-Regular.ttf` | `4500567b25fc1af2983cee01c1e57e01a0108b8b3844c182936d14c7dec7f69c` | Solstice Sans / Regular; 400; 4.004 | Yes |
+| `chameleon/brand_kit/fonts/SolsticeSans-Bold.ttf` | `609a215925701021b97578c71702bfc492882556ce05602b670aaa74a32a1156` | Solstice Sans / Bold; 700; 4.004 | Yes |
+| `chameleon/brand_kit/fonts/SolsticeSans-Italic.ttf` | `848a0433face0f273e313e4fdb3497a764f3c96b3b6670dffcc3cc38dcc83f2a` | Solstice Sans / Italic; 400; 4.004 | No |
+| `chameleon/brand_kit/fonts/SolsticeSans-BoldItalic.ttf` | `e47af214406befc181508cf7ff87b774a955a670f7a54d8563a9757d45b2167d` | Solstice Sans / Bold Italic; 700; 4.004 | No |
 
 ### Sample face and glyph verification
 
-The three sample inputs require `SolsticeSerif-Bold.ttf` (35 distinct codepoints), `SolsticeSans-Regular.ttf` (35), and `SolsticeSans-Bold.ttf` (33). The pinned local font loader selected each exact face; Skia 132.0b11 mapped every required codepoint to a nonzero glyph ID. No required sample codepoint is missing. The Serif Bold sample includes U+2014. Other scripts, unseen inputs, and unused packaged faces are not covered by this sample-coverage result.
+- **OBSERVED, owner inspection 2026-10-22:** The three samples require
+  `SolsticeSerif-Bold.ttf` (35 distinct codepoints),
+  `SolsticeSans-Regular.ttf` (35), and `SolsticeSans-Bold.ttf` (33).
+  Skia 132.0b11 mapped every required codepoint to a nonzero glyph ID;
+  the Serif Bold sample includes U+2014.
+- **OBSERVED, focused repository test 2026-10-22:** `.venv/bin/python -m
+  unittest chameleon.tests.renderer.test_font_provenance -v` passed four tests.
+  The test derives the three sample face sets from checked-in JSON and verifies
+  every glyph through the exact local face lookup. Other scripts, unseen inputs,
+  and unused faces remain outside this result.
 
-The exact local font files, embedded naming/weight/style metadata, source-face tables, license copies, and these sample codepoints were inspected on 2026-10-22. This resolves redistribution evidence for these exact placeholder-font files under OFL 1.1 conditions. It does not qualify final Adobe/Solstice production fonts, arbitrary hidden-task glyphs, organizer scoring, or native-amd64 rendering.
+The exact local font files, metadata, source-face tables, license copies, and
+sample codepoints were inspected on 2026-10-22. Final Adobe/Solstice production
+font availability and authorization remain **UNVERIFIED_EXTERNAL_FACT**.
+Release manager must obtain written production-font direction before release.
 
 ## Unverified or intentionally deferred
 

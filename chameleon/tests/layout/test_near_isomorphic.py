@@ -350,7 +350,7 @@ class NearIsomorphicTests(unittest.TestCase):
                     width=160,
                     height=40,
                     content="A",
-                    font_family="Custom Family",
+                    font_family="Solstice Sans",
                     font_size=12,
                     text_align="center",
                 )
@@ -360,18 +360,20 @@ class NearIsomorphicTests(unittest.TestCase):
             custom_fonts = Path(directory) / "fonts"
             custom_fonts.mkdir()
             (
-                custom_fonts / "CustomFamily-Regular.ttf"
+                custom_fonts / "SolsticeSans-Regular.ttf"
             ).write_bytes((FONTS / "SolsticeSans-Regular.ttf").read_bytes())
+            unavailable_fonts = Path(directory) / "unavailable-fonts"
+            unavailable_fonts.mkdir()
             manager = load_brand_font_manager(str(custom_fonts))
 
             response = solve_near_isomorphic(
                 source,
                 source["canvas"],
                 font_manager=manager,
-                fonts_dir=str(FONTS),
+                fonts_dir=str(unavailable_fonts),
             ).response
 
-        self.assertEqual(response["elements"][0]["font_family"], "Custom Family")
+        self.assertEqual(response["elements"][0]["font_family"], "Solstice Sans")
 
     def test_renderer_warnings_are_logged(self):
         source = {

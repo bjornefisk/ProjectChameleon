@@ -24,12 +24,14 @@ handles a missing asset gracefully instead of crashing.
   `SolsticeSans-BoldItalic.ttf`
   (Poppins 4.004 faces under SIL OFL 1.1.)
 
-Full source license texts ship beside the font files as `OFL-Lora.txt` and
-`OFL-Poppins.txt`. Embedded family/style/weight names were checked against each
-face; the project loader derives exact faces from the renamed filenames and
-fails closed for missing combinations. Provenance, license conditions, hashes,
-and checked-sample glyph coverage are recorded in
-[`../../Docs/DEPENDENCY_EVIDENCE.md`](../../Docs/DEPENDENCY_EVIDENCE.md).
+Full source license texts ship beside font files as `OFL-Lora.txt` and
+`OFL-Poppins.txt`. The loader derives face mappings from filenames, validates
+embedded family/weight/style metadata, rejects unknown suffixes and duplicate
+mappings, and fails closed for missing or invalid faces. Hashes, provenance,
+and sample glyph coverage are recorded in
+[`../../Docs/font_provenance_manifest.json`](../../Docs/font_provenance_manifest.json)
+and [`../../Docs/DEPENDENCY_EVIDENCE.md`](../../Docs/DEPENDENCY_EVIDENCE.md);
+`make verify` rejects missing, extra, or changed packaged files.
 
 ## Before this goes out to students
 

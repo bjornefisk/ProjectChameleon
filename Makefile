@@ -8,12 +8,13 @@ PYTHON := $(VENV_DIR)/bin/python
 PIP := $(VENV_DIR)/bin/pip
 PYTHON_BOOTSTRAP ?= python3.11
 
-.PHONY: help setup verify install-hooks preflight test run agent-check inspect synthetic docker-build docker-test clean
+.PHONY: help setup verify verify-fonts install-hooks preflight test run agent-check inspect synthetic docker-build docker-test clean
 
 help:
 	@echo "Project Chameleon Developer & Agent Commands:"
 	@echo "  make setup        - Initialize .venv (Python 3.11) and install dependencies"
-	@echo "  make verify       - Verify repository governance and implementation wiring"
+	@echo "  make verify        - Verify repository governance and implementation wiring"
+	@echo "  make verify-fonts  - Verify packaged font and license hashes"
 	@echo "  make install-hooks - Install the versioned repository Git hooks"
 	@echo "  make preflight    - Verify repository wiring and require the nested engine"
 	@echo "  make test         - Run all unit tests via unittest"
@@ -36,8 +37,11 @@ setup:
 	@$(PIP) install -r chameleon/requirements.txt
 	@echo "Environment setup complete."
 
-verify:
+verify: verify-fonts
 	@$(PYTHON_BOOTSTRAP) scripts/verify_repository.py
+
+verify-fonts:
+	@$(PYTHON_BOOTSTRAP) scripts/verify_font_provenance.py
 
 install-hooks:
 	@mkdir -p .git/hooks
@@ -53,6 +57,7 @@ test:
 	@cd chameleon && $(PYTHON) -m unittest discover -s tests -t . -p 'test_*.py' -v
 	@$(PYTHON) -m unittest scripts.test_review_pr -v
 	@$(PYTHON) -m unittest scripts.test_qualify_runtime -v
+	@$(PYTHON) -m unittest scripts.test_font_provenance -v
 
 run:
 	@echo "Running engine.main on chameleon/input/..."
