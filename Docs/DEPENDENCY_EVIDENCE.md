@@ -102,8 +102,9 @@ Release manager must obtain written production-font direction before release.
 ## Issue #71 clean-build dependency provenance
 
 `PR-74-build-provenance-inventory`. The source-input hashes were collected at
-source revision `2548c82`; the evidence record was committed in `fb0b5d7`.
-The records bind repository inputs; native CI evidence is recorded below.
+source revision `2548c82`; the latest evidence record was committed in
+`86c9218`. The records bind repository inputs; native CI evidence is recorded
+below.
 
 ### Current release-candidate input inventory
 

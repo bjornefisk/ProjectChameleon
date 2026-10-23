@@ -7,7 +7,7 @@ lead owner/role: @gabegaines24 / issue manager
 started/updated: 2026-10-23
 current workflow/gate: PR 74 draft evidence slice
 source input revision: 2548c828cfafea7e03f28644b026665856e8dd0a
-evidence capture commit: f8953ee058205601a4eaa78f57cc68b6e3db58df
+evidence capture commit: 86c92181a577b4ceab2862243295b754349dc46f
 
 ## Outcome and acceptance
 

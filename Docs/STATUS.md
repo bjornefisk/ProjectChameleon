@@ -33,9 +33,8 @@ The original Python 3.12 output bytes were not retained, so that historical same
 ## Issue #71 clean-build dependency provenance
 
 PR #74 records the current release-candidate input inventory at source-input
-revision `2548c82`; the evidence record was committed in `fb0b5d7`, with the
-run-record binding in `46449de`, at
-[`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md).
+revision `2548c82`; the latest evidence record and run-record binding are in
+`86c9218` at [`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md).
 The base image, direct Python pins, renderer commit, schema, packaged assets,
 and packaged font hashes are observed.
 
