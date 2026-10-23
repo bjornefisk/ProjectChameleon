@@ -33,10 +33,11 @@ The original Python 3.12 output bytes were not retained, so that historical same
 ## Issue #71 clean-build dependency provenance
 
 PR #74 records the current release-candidate input inventory at source-input
-revision `2548c82`; the evidence record was committed at PR head `de935eb` in
-[`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md). The base image, direct
-Python pins, renderer commit, schema, packaged assets, and packaged font
-hashes are observed.
+revision `2548c82`; the evidence record was committed in `fb0b5d7`, with the
+run-record binding in `46449de`, at
+[`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md).
+The base image, direct Python pins, renderer commit, schema, packaged assets,
+and packaged font hashes are observed.
 
 Required native amd64 CI run `39981979377` passed on the PR merge ref. It
 verified the linux/amd64 image, non-empty SBOM, clean-cache build, offline
