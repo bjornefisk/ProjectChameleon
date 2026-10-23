@@ -5,11 +5,14 @@ run_id: issue-70-production-font-licensing-research-20261023
 owner/role: @gabegaines24 / repository maintainer
 workflow/gate: Issue #70 release and research evidence
 started/updated: 2026-10-23T19:27:08Z / 2026-10-23
-branch: fix/issue-70-production-font-authorization
-source revision: 8d5f999 (source state used for the final focused checks; later record-only metadata follows)
-evidence capture revision: 8d5f999
+branch/ref: fix/issue-70-production-font-authorization @ d5dbec29929499d0087f61f2f6eec43bcfb69de7
+source revision: d5dbec29929499d0087f61f2f6eec43bcfb69de7
+evidence capture revision: d5dbec29929499d0087f61f2f6eec43bcfb69de7
+worktree state: clean before this documentation update; no generated files present
 
 Goal/acceptance: Add authoritative licensing-boundary evidence without changing packaged fonts; keep production authorization blocked until exact-file permission exists.
+
+Risk/data classification: High release risk because unverified production-font rights can invalidate packaging and redistribution. Public licensing pages and repository metadata only; no credentials, private inputs, or personal data stored.
 
 Authority and ADR impact: PROJECT_CONTRACT.md §§6 and 9; ADR-004; ADR-008; Issue #70. No contract, schema, dependency, font, or runtime behavior changes.
 
@@ -37,10 +40,11 @@ Out of scope: Production font replacement, font substitution, runtime download, 
 | Branch creation | `git switch -c fix/issue-70-production-font-authorization` | `PASS` (exit `0`) | Branch created from synchronized `main` |
 | Source check | `git diff --check` | `PASS` (exit `0`) | No whitespace errors |
 | Provenance check | `.venv/bin/python scripts/verify_font_provenance.py` | `PASS` (exit `0`) | `Docs/font_provenance_manifest.json` verified |
-| Focused font tests | `.venv/bin/python -m unittest chameleon.tests.renderer.test_font_provenance -v` | `PASS` (exit `0`) | 5 tests passed |
+| Focused font tests | `.venv/bin/python -m unittest chameleon.tests.renderer.test_font_provenance -v` | `PASS` (exit `0`; supplemental only) | 5 tests passed under Python `3.14.0` and `skia-python 144.0.post2`; not Stage 1 pinned-runtime evidence |
+| Pinned-runtime font tests | `python3.11 -m unittest chameleon.tests.renderer.test_font_provenance -v` | `NOT RUN` (exit `N/A`) | Host has no `python3.11`; Stage 1 pins Python `3.11.11` and `skia-python 132.0b11` |
 | Integration smoke | `make docker-build && make docker-test` | `NOT RUN` (exit `N/A`) | Documentation-only change; no runtime input changed |
-| Artifact inspection | `find chameleon/output -maxdepth 1 -type f -print` | `NOT RUN` (exit `N/A`) | No runtime output created by this docs-only slice |
-| Native qualification | GitHub Actions `Verify and test` workflow for this branch | `NOT RUN` (exit `N/A`) | No font replacement or runtime change; existing native evidence remains separate |
+| Artifact inspection | `find chameleon/output -maxdepth 1 -type f -print` | `NOT RUN` (exit `N/A`) | No runtime command ran; stale, partial, and published files were not inspected |
+| Native qualification | `.github/workflows/ci.yml`, job `Verify and test`, ref `fix/issue-70-production-font-authorization` | `NOT RUN` (exit `N/A`) | No font replacement or runtime change; existing native evidence remains separate |
 
 ## Public source observations
 
@@ -51,25 +55,25 @@ Out of scope: Production font replacement, font substitution, runtime download, 
 
 ## Artifacts
 
-- Published product files: none.
+- Published product files: not inspected; publication state is unverified because no runtime command ran.
 - Evidence record: this file.
 - Font manifest: `Docs/font_provenance_manifest.json`.
 - Font files: unchanged; no hashes changed in this slice.
-- Stale or partial files: not inspected; no runtime command created output in this documentation-only slice.
+- Stale or partial files: not inspected; the exact artifact inspection command is recorded as `NOT RUN`.
 
 ## Warnings and interpretation
 
-- **OBSERVED:** Existing Lora/Poppins-derived placeholder provenance and five focused font tests pass.
+- **OBSERVED, supplemental:** Existing Lora/Poppins-derived placeholder provenance and five focused font tests pass under Python `3.14.0` and `skia-python 144.0.post2`; this is not pinned Stage 1 runtime evidence.
 - **INFERRED:** The Adobe guidance makes written authorization necessary before packaging exact production Adobe/Solstice files for this runtime.
 - **UNVERIFIED_EXTERNAL_FACT:** Exact production Adobe/Solstice files, authorization scope, and redistribution permission are not present in the repository.
 
 ## Failures and unrun checks
 
-- Failure classification: none in the corrected focused run.
-- Exact error: none.
-- Checks not run: full repository tests, Docker build/run, native amd64 qualification, and official organizer evaluation.
-- Environment or platform limitation: this slice records public licensing evidence only; production font files and authorization are external.
-- Why the limitation does not prove product behavior: successful placeholder loading does not establish rights or metric parity for production files.
+- Failure classification: environment limitation for pinned-runtime execution; no focused supplemental test failure.
+- Exact unavailable condition: host has no `python3.11`; pinned-runtime command result is `NOT RUN` (exit `N/A`).
+- Checks not run: pinned Python 3.11 font tests, full repository tests, Docker build/run, artifact/stale-output inspection, native amd64 qualification, and official organizer evaluation.
+- Environment or platform limitation: this slice records public licensing evidence only; production font files and authorization are external; host has Python `3.14.0` and no Stage 1 Python `3.11.11` environment.
+- Why the limitation does not prove product behavior: successful placeholder loading under supplemental versions does not establish pinned-runtime behavior, rights, or metric parity for production files.
 
 ## Security and data notes
 
