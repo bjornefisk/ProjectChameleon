@@ -164,6 +164,17 @@ The run establishes native amd64 evidence for this candidate, not organizer
 qualification. Apt-version closure, complete wheelhouse hashes,
 cross-platform parity, and the reviewed package-lock decision remain open.
 
+### Proposed package-lock strategy
+
+ADR-013 (`Docs/DECISIONS/ADR-013-reproducible-package-lock-strategy.md`) records a proposed, not accepted, lock path for Issue #71. It recommends a timestamped Debian snapshot with exact apt package versions, a complete Python 3.11 `linux/amd64` wheelhouse with SHA-256 hashes for every transitive distribution, and an immutable local artifact for the pinned renderer revision.
+
+- **OBSERVED, Debian snapshot archive retrieved 2026-10-23:** [snapshot.debian.org](https://snapshot.debian.org/) documents timestamped historical Debian states that can be used as apt repositories.
+- **OBSERVED, pip secure-install guidance retrieved 2026-10-23:** [Secure installs](https://pip.pypa.io/en/stable/topics/secure-installs/) documents `--require-hashes`, pinned requirements, and hashes for every direct and transitive dependency.
+- **DECISION STATUS:** No exact apt versions, snapshot timestamp, wheelhouse, Dockerfile change, requirements change, or runtime change is authorized. `@bjornefisk` must approve the strategy and exact lock inputs before implementation.
+
+The proposal narrows the remaining acceptance decision; it does not close Issue #71 or claim complete package closure.
+
+### Native sample artifacts
 Native sample artifacts were:
 
 | Artifact | SHA-256 |
