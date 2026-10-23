@@ -64,7 +64,7 @@ Out of scope: Production font replacement, font substitution, runtime download, 
 ## Warnings and interpretation
 
 - **OBSERVED, supplemental:** Existing Lora/Poppins-derived placeholder provenance and five focused font tests pass under Python `3.14.0` and `skia-python 144.0.post2`; this is not pinned Stage 1 runtime evidence.
-- **INFERRED:** The Adobe guidance makes written authorization necessary before packaging exact production Adobe/Solstice files for this runtime.
+- **INFERRED, repository gate:** Project contract and Issue #70 acceptance criteria require written authorization before packaging exact production Adobe/Solstice files. Adobe sources provide a licensing boundary only; their applicability to unknown production files remains unverified.
 - **UNVERIFIED_EXTERNAL_FACT:** Exact production Adobe/Solstice files, authorization scope, and redistribution permission are not present in the repository.
 
 ## Failures and unrun checks
