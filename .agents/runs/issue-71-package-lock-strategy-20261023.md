@@ -5,10 +5,10 @@ run_id: issue-71-package-lock-strategy-20261023
 owner/role: @gabegaines24 / repository maintainer
 workflow/gate: Issue #71 release dependency provenance
 started/updated: 2026-10-23T19:27:08Z / 2026-10-23
-branch/ref: fix/issue-71-package-lock-strategy @ 31ef5264a3bdbe522388e2d162a95ae0dc64c049
-source revision: 31ef5264a3bdbe522388e2d162a95ae0dc64c049
-evidence capture revision: 31ef5264a3bdbe522388e2d162a95ae0dc64c049
-worktree state: clean before record update; this record update is documentation-only
+branch/ref: fix/issue-71-package-lock-strategy @ 3a303ddee6d0165027f66f7249c7c7a47c3f5b2f
+source revision: 3a303ddee6d0165027f66f7249c7c7a47c3f5b2f
+evidence capture revision: 3a303ddee6d0165027f66f7249c7c7a47c3f5b2f
+worktree state: clean at evidence capture; this final record edit binds checks run at the preceding substantive revision
 
 Goal/acceptance: Propose a reviewed apt and transitive Python lock strategy without changing dependency inputs; keep approval and package closure explicit.
 
