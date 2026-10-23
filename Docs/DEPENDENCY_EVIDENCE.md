@@ -89,8 +89,8 @@ name table. “Sample” means a face declared by one of three checked-in sample
   `SolsticeSans-Regular.ttf` (35), and `SolsticeSans-Bold.ttf` (33).
   Skia 132.0b11 mapped every required codepoint to a nonzero glyph ID;
   the Serif Bold sample includes U+2014.
-- **OBSERVED, focused repository test 2026-10-22:** `.venv/bin/python -m
-  unittest chameleon.tests.renderer.test_font_provenance -v` passed four tests.
+- **OBSERVED, focused repository test 2026-10-23:** `.venv/bin/python -m
+  unittest chameleon.tests.renderer.test_font_provenance -v` passed five tests.
   The test derives the three sample face sets from checked-in JSON and verifies
   every glyph through the exact local face lookup. Other scripts, unseen inputs,
   and unused faces remain outside this result.
