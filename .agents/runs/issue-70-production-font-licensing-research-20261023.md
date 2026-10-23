@@ -5,9 +5,9 @@ run_id: issue-70-production-font-licensing-research-20261023
 owner/role: @gabegaines24 / repository maintainer
 workflow/gate: Issue #70 release and research evidence
 started/updated: 2026-10-23T19:27:08Z / 2026-10-23
-branch/ref: fix/issue-70-production-font-authorization @ 3691d1cc2baa62021ae505ea8ac281f01df80e0f
-source revision: 3691d1cc2baa62021ae505ea8ac281f01df80e0f
-evidence capture revision: 3691d1cc2baa62021ae505ea8ac281f01df80e0f
+branch/ref: fix/issue-70-production-font-authorization @ 2d9faf1bc8a50d9c41700449a6ddefa188104830
+source revision: 2d9faf1bc8a50d9c41700449a6ddefa188104830
+evidence capture revision: 2d9faf1bc8a50d9c41700449a6ddefa188104830
 worktree state: clean at evidence capture; this final record edit binds checks run at the preceding substantive revision
 
 Goal/acceptance: Add authoritative licensing-boundary evidence without changing packaged fonts; keep production authorization blocked until exact-file permission exists.
@@ -44,7 +44,7 @@ Out of scope: Production font replacement, font substitution, runtime download, 
 | Stage 1 pinned-runtime font tests (unavailable) | `python3.11 -m unittest chameleon.tests.renderer.test_font_provenance -v` | `NOT RUN` (exit `N/A`) | Host has no `python3.11`; exact Stage 1 image also requires Python `3.11.11` and `skia-python 132.0b11` |
 | Integration smoke | `make docker-build && make docker-test` | `NOT RUN` (exit `N/A`) | Documentation-only change; no runtime input changed |
 | Artifact inspection | `find chameleon/output -maxdepth 1 -type f -print` | `NOT RUN` (exit `N/A`) | No runtime command ran; stale, partial, and published files were not inspected |
-| Native amd64 qualification | GitHub Actions CI run `40022921324`, job `120652169263`, `.github/workflows/ci.yml`, ref `fix/issue-70-production-font-authorization` @ `5c735351f233e9664abccf0a5d625d43a4b1ce1c` | `PASS` (workflow conclusion `success`; exit `N/A`) | Clean-cache amd64 rebuild, offline smoke, repeated/clean-cache artifact hashes, native imports, and `ldd` closure completed |
+| Native amd64 qualification | GitHub Actions CI run `40023970612`, job `120655882987`, `.github/workflows/ci.yml`, ref `fix/issue-70-production-font-authorization` @ `2d9faf1bc8a50d9c41700449a6ddefa188104830` | `PASS` (workflow conclusion `success`; exit `N/A`) | Clean-cache amd64 rebuild, offline smoke, repeated/clean-cache artifact hashes, native imports, and `ldd` closure completed |
 
 ## Public source observations
 
@@ -55,7 +55,7 @@ Out of scope: Production font replacement, font substitution, runtime download, 
 
 ## Artifacts
 
-- Published product files: not inspected; publication state is unverified because no runtime command ran.
+- Published product files: local publication state not inspected; GitHub Actions run `40023970612` completed native sample publication, repeated/clean-cache hash checks, and artifact validation.
 - Evidence record: this file.
 - Font manifest: `Docs/font_provenance_manifest.json`.
 - Font files: unchanged; no hashes changed in this slice.
