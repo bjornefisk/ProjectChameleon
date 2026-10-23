@@ -6,8 +6,8 @@ owner/role: @gabegaines24 / repository maintainer
 workflow/gate: Issue #70 release and research evidence
 started/updated: 2026-10-23T19:27:08Z / 2026-10-23
 branch: fix/issue-70-production-font-authorization
-source revision: 438f53e (source state used for the documented focused checks; later record-only metadata follows)
-worktree state: clean before record metadata update
+source revision: 8d5f999 (source state used for the final focused checks; later record-only metadata follows)
+evidence capture revision: 8d5f999
 
 Goal/acceptance: Add authoritative licensing-boundary evidence without changing packaged fonts; keep production authorization blocked until exact-file permission exists.
 
@@ -33,13 +33,14 @@ Out of scope: Production font replacement, font substitution, runtime download, 
 
 | Check | Exact command | Result | Evidence/artifact |
 |---|---|---|---|
-| Date snapshot | `date -u +%Y-%m-%dT%H:%M:%SZ` | `PASS` | `2026-10-23T19:27:08Z` |
-| Branch creation | `git switch -c fix/issue-70-production-font-authorization` | `PASS` | Branch created from synchronized `main` |
-| Source check | `git diff --check` | `PASS` | No whitespace errors |
-| Provenance check | `.venv/bin/python scripts/verify_font_provenance.py` | `PASS` | `Docs/font_provenance_manifest.json` verified |
-| Focused font tests | `.venv/bin/python -m unittest chameleon.tests.renderer.test_font_provenance -v` | `PASS` | 5 tests passed |
-| Integration smoke | Not run | `NOT RUN` | Documentation-only change; no runtime input changed |
-| Native qualification | Not run | `NOT RUN` | No font replacement or runtime change; existing native evidence remains separate |
+| Date snapshot | `date -u +%Y-%m-%dT%H:%M:%SZ` | `PASS` (exit `0`) | `2026-10-23T19:27:08Z` |
+| Branch creation | `git switch -c fix/issue-70-production-font-authorization` | `PASS` (exit `0`) | Branch created from synchronized `main` |
+| Source check | `git diff --check` | `PASS` (exit `0`) | No whitespace errors |
+| Provenance check | `.venv/bin/python scripts/verify_font_provenance.py` | `PASS` (exit `0`) | `Docs/font_provenance_manifest.json` verified |
+| Focused font tests | `.venv/bin/python -m unittest chameleon.tests.renderer.test_font_provenance -v` | `PASS` (exit `0`) | 5 tests passed |
+| Integration smoke | `make docker-build && make docker-test` | `NOT RUN` (exit `N/A`) | Documentation-only change; no runtime input changed |
+| Artifact inspection | `find chameleon/output -maxdepth 1 -type f -print` | `NOT RUN` (exit `N/A`) | No runtime output created by this docs-only slice |
+| Native qualification | GitHub Actions `Verify and test` workflow for this branch | `NOT RUN` (exit `N/A`) | No font replacement or runtime change; existing native evidence remains separate |
 
 ## Public source observations
 
@@ -54,7 +55,7 @@ Out of scope: Production font replacement, font substitution, runtime download, 
 - Evidence record: this file.
 - Font manifest: `Docs/font_provenance_manifest.json`.
 - Font files: unchanged; no hashes changed in this slice.
-- Stale or partial files: none observed.
+- Stale or partial files: not inspected; no runtime command created output in this documentation-only slice.
 
 ## Warnings and interpretation
 
