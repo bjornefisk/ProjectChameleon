@@ -5,9 +5,9 @@ run_id: issue-71-package-lock-strategy-20261023
 owner/role: @gabegaines24 / repository maintainer
 workflow/gate: Issue #71 release dependency provenance
 started/updated: 2026-10-23T19:27:08Z / 2026-10-23
-branch: fix/issue-71-package-lock-strategy
-source revision: 4fc57e8
-worktree state: clean before record normalization
+source revision: badbf8 (source state used for final governance checks; later record-only metadata follows)
+evidence capture revision: badbf8
+worktree state: clean before record metadata update
 
 Goal/acceptance: Propose a reviewed apt and transitive Python lock strategy without changing dependency inputs; keep approval and package closure explicit.
 
@@ -33,21 +33,23 @@ Out of scope: Choosing exact package versions before approval, changing apt/Pyth
 
 | Check | Exact command | Result | Evidence/artifact |
 |---|---|---|---|
-| Branch setup | `git switch main && git pull --ff-only origin main && git switch -c fix/issue-71-package-lock-strategy` | `PASS` | Branch created from synchronized `main` |
-| Source check | `git diff --check` | `PASS` | No whitespace errors before commit |
-| Governance check | `python3 scripts/verify_repository.py` | `PASS` | Repository governance and wiring consistent |
-| Default verification | `make verify` | `BLOCKED` | Host lacks `python3.11`; exact error: `make: python3.11: No such file or directory` |
-| Available-runtime verification | `make verify PYTHON_BOOTSTRAP=.venv/bin/python` | `PASS` | Font manifest and repository governance passed |
-| Integration smoke | Not run | `NOT RUN` | Documentation-only proposal; no runtime input changed |
-| Native amd64 qualification | Not run | `NOT RUN` | No lock candidate exists; existing native evidence remains separate |
+| Branch setup | `git switch main && git pull --ff-only origin main && git switch -c fix/issue-71-package-lock-strategy` | `PASS` (exit `0`) | Branch created from synchronized `main` |
+| Source check | `git diff --check` | `PASS` (exit `0`) | No whitespace errors before commit |
+| Governance check | `python3 scripts/verify_repository.py` | `PASS` (exit `0`) | Repository governance and wiring consistent |
+| Default verification | `make verify` | `BLOCKED` (exit `2`) | Host lacks `python3.11`; exact error: `make: python3.11: No such file or directory` |
+| Available-runtime verification | `make verify PYTHON_BOOTSTRAP=.venv/bin/python` | `PASS` (exit `0`) | Font manifest and repository governance passed |
+| Full Python 3.11 suite | `make test` | `NOT RUN` (exit `N/A`) | Host lacks the required Python 3.11 interpreter |
+| Integration smoke | `make docker-build && make docker-test` | `NOT RUN` (exit `N/A`) | Documentation-only proposal; no runtime input changed |
+| Native amd64 qualification | GitHub Actions `Verify and test` workflow for this branch | `NOT RUN` (exit `N/A`) | No lock candidate exists; existing native evidence remains separate |
 
 ## Public source observations
 
 - **OBSERVED:** Debian Project [snapshot.debian.org](https://snapshot.debian.org/) was retrieved on 2026-10-23. Inspected “Usage” and timestamped archive-source examples. The archive documents historical Debian states and apt source entries for those snapshots. It does not select this project's timestamp or package versions.
 - **OBSERVED:** Python Packaging Authority [pip Secure installs](https://pip.pypa.io/en/stable/topics/secure-installs/) documentation v26.2.2 was retrieved on 2026-10-23. Inspected “Hash-checking Mode,” “Additional restrictions,” and “Forcing Hash-checking mode.” pip documents `--require-hashes`, pinned requirements, and hashes for all direct and transitive dependencies. It does not lock Debian packages.
-- **NORMATIVE:** Project contract §9 and ADR-004 require a pinned offline `linux/amd64` runtime and prohibit unapproved dependency/runtime expansion.
+- **AUTHORITY REFERENCE (not an evidence classification):** Project contract §9 and ADR-004 require a pinned offline `linux/amd64` runtime and prohibit unapproved dependency/runtime expansion.
 - **OBSERVED:** Existing native CI evidence covers the current direct-pin image. It does not establish closure for a future lock candidate.
 - **OBSERVED:** Owner approval request and current dependency blocker are recorded in Issue #71 comments; no approval response is recorded in this run.
+- **OBSERVED:** GitHub publisher `bjornefisk/ProjectChameleon`, Issue #71 comment `6373327459`, created and retrieved 2026-10-23 at `19:44:28Z`: https://github.com/bjornefisk/ProjectChameleon/issues/71#issuecomment-6373327459. Inspected the request text only; it records a strategy-approval request, not an approval or lock decision.
 - **OBSERVED:** Proposed-strategy approval request posted to Issue #71 at https://github.com/bjornefisk/ProjectChameleon/issues/71#issuecomment-6373327459. No owner response is recorded yet.
 
 ## Artifacts

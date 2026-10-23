@@ -10,6 +10,9 @@ Proposed — owner approval is required before any dependency or packaging input
 - Owner: `@bjornefisk`
 - Proposer: `@gabegaines24`
 - Issue: #71
+- Reviewers: repository maintainer review pending; owner approval pending
+- Supersedes: None; new proposal
+- Recheck: 2026-10-30, or before the first dependency/package change, whichever comes first
 
 ## Context
 
@@ -55,8 +58,8 @@ Recommended. Debian documents snapshot archives as historical package states tha
 - **OBSERVED, Python Packaging Authority, pip documentation v26.2.2, Secure installs, retrieved 2026-10-23:** https://pip.pypa.io/en/stable/topics/secure-installs/
   - Inspected “Hash-checking Mode,” “Additional restrictions,” and “Forcing Hash-checking mode.” pip documents `--require-hashes`, pinned requirements, and hashes for every direct and transitive dependency.
   - Scope: pip distribution verification. It does not lock Debian packages or authorize a new project build tool.
-- **OBSERVED, project evidence:** `Docs/DEPENDENCY_EVIDENCE.md` records the current pins, native CI run, and unresolved package closure.
-- **NORMATIVE:** `Docs/PROJECT_CONTRACT.md` §9 and ADR-004 require the pinned offline `linux/amd64` runtime and prohibit unapproved dependency/runtime expansion.
+- **OBSERVED, repository evidence retrieved 2026-10-23:** `Docs/DEPENDENCY_EVIDENCE.md` at the `### Issue #71 clean-build dependency provenance` and `### Native amd64 CI qualification evidence` sections records the current direct-pin inputs, native CI run `39988562284`, and unresolved package closure. Scope limit: those observations bind the current direct-pin image, not the proposed lock candidate.
+- **AUTHORITY REFERENCE (not an evidence classification):** `Docs/PROJECT_CONTRACT.md` §9 and ADR-004 require the pinned offline `linux/amd64` runtime and prohibit unapproved dependency/runtime expansion.
 
 ## Consequences
 
