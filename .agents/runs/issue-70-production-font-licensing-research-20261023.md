@@ -46,6 +46,7 @@ Out of scope: Production font replacement, font substitution, runtime download, 
 - **OBSERVED:** Adobe Fonts [Font licensing FAQs](https://helpx.adobe.com/fonts/web/font-licensing/font-licensing.html) was retrieved on 2026-10-23. The page metadata reports `meta-lastModifiedDate: 2026-07-20`; the body says `Last updated on Mar 27, 2026`. Inspected sections: “Fonts added from Adobe Fonts,” the paragraphs on copying or moving font files, server installation, and custom licenses.
 - **OBSERVED:** Adobe Fonts [Packaging font files](https://helpx.adobe.com/fonts/web/getting-and-using-fonts/package-font-files.html) was retrieved on 2026-10-23. The page metadata reports `meta-lastModifiedDate: 2026-07-20`; the body says `Last updated on Nov 12, 2025`. Inspected section: “Font licensing requirements.”
 - **OBSERVED:** Adobe states that license terms vary by EULA, Adobe Fonts Terms do not allow copying or moving files, and server installation or customer-created content requires an appropriate license from the foundry or an authorized reseller.
+- **OBSERVED:** Dated owner/organizer request posted to Issue #70 at https://github.com/bjornefisk/ProjectChameleon/issues/70#issuecomment-6373288154. It requests exact production file identifiers, packaging authorization, redistribution scope, and disclosure permission. No authoritative response is recorded yet.
 
 ## Artifacts
 
