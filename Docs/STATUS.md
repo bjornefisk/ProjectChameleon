@@ -252,7 +252,7 @@ The current bounded capabilities are active:
 - Organizer-controlled M5 Pro CPU/RAM/disk/GPU limits.
 - Final model allowlist and model-size cap.
 - Official scoring threshold details and complete target catalogue.
-- Font licenses/embedded metadata and final Adobe Express font availability.
+- Packaged placeholder-font provenance, SHA-256 hashes, embedded face metadata, OFL 1.1 redistribution terms, and codepoint coverage for all three checked-in samples were verified on 2026-10-22; see [`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md). This resolves the current placeholder-font rights/metadata/coverage gate only; final Adobe/Solstice font availability and qualification remain open.
 - Native-amd64 CI for this issue branch, cross-platform parity, and release readiness. Earlier native-amd64 evidence pertains to a prior revision and does not verify this fix.
 - Final Adobe Express deployment/backend topology.
 
