@@ -1,0 +1,82 @@
+{
+  "manifest_version": 1,
+  "evidence_date": "2026-10-22",
+  "font_directory": "chameleon/brand_kit/fonts",
+  "fonts": [
+    {
+      "path": "chameleon/brand_kit/fonts/SolsticeSerif-Regular.ttf",
+      "sha256": "b7eb2a832ae91824a7c670469f4a4e0c4910a3ceedc1d31aad07ea2bc336d2a7",
+      "family": "Solstice Serif",
+      "subfamily": "Regular",
+      "weight": 400,
+      "version": "3.008",
+      "sample": false
+    },
+    {
+      "path": "chameleon/brand_kit/fonts/SolsticeSerif-Bold.ttf",
+      "sha256": "837d42cc1b336364b69714c73288a0ec7ceded41c137d5f62943df5f0745551a",
+      "family": "Solstice Serif",
+      "subfamily": "Bold",
+      "weight": 700,
+      "version": "3.008",
+      "sample": true
+    },
+    {
+      "path": "chameleon/brand_kit/fonts/SolsticeSerif-Italic.ttf",
+      "sha256": "07526ca6ef70e5a7853abcdd614aeb62cdb958ed0cabc0f771f85094b4c67ccf",
+      "family": "Solstice Serif",
+      "subfamily": "Italic",
+      "weight": 400,
+      "version": "3.008",
+      "sample": false
+    },
+    {
+      "path": "chameleon/brand_kit/fonts/SolsticeSans-Regular.ttf",
+      "sha256": "4500567b25fc1af2983cee01c1e57e01a0108b8b3844c182936d14c7dec7f69c",
+      "family": "Solstice Sans",
+      "subfamily": "Regular",
+      "weight": 400,
+      "version": "4.004",
+      "sample": true
+    },
+    {
+      "path": "chameleon/brand_kit/fonts/SolsticeSans-Bold.ttf",
+      "sha256": "609a215925701021b97578c71702bfc492882556ce05602b670aaa74a32a1156",
+      "family": "Solstice Sans",
+      "subfamily": "Bold",
+      "weight": 700,
+      "version": "4.004",
+      "sample": true
+    },
+    {
+      "path": "chameleon/brand_kit/fonts/SolsticeSans-Italic.ttf",
+      "sha256": "848a0433face0f273e313e4fdb3497a764f3c96b3b6670dffcc3cc38dcc83f2a",
+      "family": "Solstice Sans",
+      "subfamily": "Italic",
+      "weight": 400,
+      "version": "4.004",
+      "sample": false
+    },
+    {
+      "path": "chameleon/brand_kit/fonts/SolsticeSans-BoldItalic.ttf",
+      "sha256": "e47af214406befc181508cf7ff87b774a955a670f7a54d8563a9757d45b2167d",
+      "family": "Solstice Sans",
+      "subfamily": "Bold Italic",
+      "weight": 700,
+      "version": "4.004",
+      "sample": false
+    }
+  ],
+  "licenses": [
+    {
+      "path": "chameleon/brand_kit/fonts/OFL-Lora.txt",
+      "sha256": "6b78e05bfa5ced217cd995360c72c97f73b6d194c52791f9a19ea9a1282900c0",
+      "source_url": "https://raw.githubusercontent.com/cyrealtype/Lora-Cyrillic/403b1a66ca2e79f81d749c5299559e168591a4df/OFL.txt"
+    },
+    {
+      "path": "chameleon/brand_kit/fonts/OFL-Poppins.txt",
+      "sha256": "12da9c1e71ddb80c40029edb9c79c137f79b263c252fd0f8944e469ac8533b0f",
+      "source_url": "https://raw.githubusercontent.com/google/fonts/7dc16b7de42db624b902f2292b68ed9e489e5053/ofl/poppins/OFL.txt"
+    }
+  ]
+}

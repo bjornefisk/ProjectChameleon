@@ -33,6 +33,73 @@ This file applies source-driven development only to external libraries, platform
 | Adobe fonts | Stage 1 uses packaged TTF bytes, not Express document fonts. | [Express font API](https://developer.adobe.com/express/add-ons/docs/references/document-sandbox/document-apis/classes/fonts), [text guide](https://developer.adobe.com/express/add-ons/docs/guides/learn/how-to/use-text) | Do not promise Stage 1/Express metric parity or silent font substitution. | Resolve exact PostScript faces in entitled/unentitled accounts before finale typography claims. |
 | Challenge hardware/model limits | Rules name Apple M5 Pro and leave CPU/RAM/disk/GPU and model allowlist/size unresolved. No model runtime or weights are in the repository. | Repository facts: `chameleon/RULES.md`; external platform docs cannot establish organizer limits. | Keep these as open external blockers; do not invent limits. | Await organizer specification, then add resource and deterministic-runtime tests. |
 
+## Issue #70 packaged-font provenance and redistribution (evidence date: 2026-10-22)
+
+**Task:** Issue #70. **Verification run:** `PR-73-font-provenance-fix`. The run uses
+the local Darwin arm64 environment and pinned project font files. It is local
+evidence, not native-amd64 or organizer qualification.
+
+### Source and redistribution terms
+
+- **OBSERVED, source retrieval 2026-10-22 — Lora 3.008:** Google Fonts
+  [`METADATA.pb` at `b2f711240d262008a28fb639ff31211ba1ff540b`](https://github.com/google/fonts/blob/b2f711240d262008a28fb639ff31211ba1ff540b/ofl/lora/METADATA.pb)
+  records source repository [`cyrealtype/Lora-Cyrillic` at
+  `403b1a66ca2e79f81d749c5299559e168591a4df`](https://github.com/cyrealtype/Lora-Cyrillic/tree/403b1a66ca2e79f81d749c5299559e168591a4df),
+  dated 2023-12-14, with `fonts/variable/Lora[wght].ttf` and
+  `fonts/variable/Lora-Italic[wght].ttf`. The cited metadata revision is
+  immutable and maps the local Lora source files.
+- **OBSERVED, source retrieval 2026-10-22 — Poppins 4.004:** Google Fonts
+  [`OFL.txt` at the 4.004 release](https://raw.githubusercontent.com/google/fonts/7dc16b7de42db624b902f2292b68ed9e489e5053/ofl/poppins/OFL.txt)
+  supplies the bundled 2020 copyright notice. Google Fonts
+  [`METADATA.pb` at `4d560ddf8585f187eb2e959ca9847e2da3d82c16`](https://github.com/google/fonts/blob/4d560ddf8585f187eb2e959ca9847e2da3d82c16/ofl/poppins/METADATA.pb),
+  dated 2025-11-07, records source repository commit
+  [`itfoundry/Poppins` `738d9d691b66f1ad917123c58df104d16c74e1a7`](https://github.com/itfoundry/Poppins/tree/738d9d691b66f1ad917123c58df104d16c74e1a7).
+  The source-face revision and Google Fonts license-package revision are
+  distinct and intentionally recorded separately.
+- **OBSERVED, owner inspection 2026-10-22:** FontTools 4.61.0 instances at
+  Lora weights 400 and 700, plus the Poppins static faces, matched local
+  glyph outlines, metrics, Unicode mappings, OS/2 data, and layout tables.
+  Local family/name records identify the requested Solstice faces.
+- **OBSERVED, repository verification run `PR-73-font-provenance-fix`:**
+  `python3 scripts/verify_font_provenance.py` checks every listed TTF/license
+  path, rejects missing or extra files, and compares SHA-256 values.
+- **INFERRED:** Both bundled license texts permit modification and redistribution
+  with software under OFL 1.1 conditions. This is evidence for these exact
+  placeholder files, not legal approval for future production fonts.
+
+### File inventory and embedded metadata
+
+Weights are embedded OS/2 weight classes; names and versions come from the TTF
+name table. “Sample” means a face declared by one of three checked-in samples.
+
+| Packaged path | SHA-256 | Embedded family / subfamily; weight; version | Sample |
+| --- | --- | --- | --- |
+| `chameleon/brand_kit/fonts/SolsticeSerif-Regular.ttf` | `b7eb2a832ae91824a7c670469f4a4e0c4910a3ceedc1d31aad07ea2bc336d2a7` | Solstice Serif / Regular; 400; 3.008 | No |
+| `chameleon/brand_kit/fonts/SolsticeSerif-Bold.ttf` | `837d42cc1b336364b69714c73288a0ec7ceded41c137d5f62943df5f0745551a` | Solstice Serif / Bold; 700; 3.008 | Yes |
+| `chameleon/brand_kit/fonts/SolsticeSerif-Italic.ttf` | `07526ca6ef70e5a7853abcdd614aeb62cdb958ed0cabc0f771f85094b4c67ccf` | Solstice Serif / Italic; 400; 3.008 | No |
+| `chameleon/brand_kit/fonts/SolsticeSans-Regular.ttf` | `4500567b25fc1af2983cee01c1e57e01a0108b8b3844c182936d14c7dec7f69c` | Solstice Sans / Regular; 400; 4.004 | Yes |
+| `chameleon/brand_kit/fonts/SolsticeSans-Bold.ttf` | `609a215925701021b97578c71702bfc492882556ce05602b670aaa74a32a1156` | Solstice Sans / Bold; 700; 4.004 | Yes |
+| `chameleon/brand_kit/fonts/SolsticeSans-Italic.ttf` | `848a0433face0f273e313e4fdb3497a764f3c96b3b6670dffcc3cc38dcc83f2a` | Solstice Sans / Italic; 400; 4.004 | No |
+| `chameleon/brand_kit/fonts/SolsticeSans-BoldItalic.ttf` | `e47af214406befc181508cf7ff87b774a955a670f7a54d8563a9757d45b2167d` | Solstice Sans / Bold Italic; 700; 4.004 | No |
+
+### Sample face and glyph verification
+
+- **OBSERVED, owner inspection 2026-10-22:** The three samples require
+  `SolsticeSerif-Bold.ttf` (35 distinct codepoints),
+  `SolsticeSans-Regular.ttf` (35), and `SolsticeSans-Bold.ttf` (33).
+  Skia 132.0b11 mapped every required codepoint to a nonzero glyph ID;
+  the Serif Bold sample includes U+2014.
+- **OBSERVED, focused repository test 2026-10-23:** `.venv/bin/python -m
+  unittest chameleon.tests.renderer.test_font_provenance -v` passed five tests.
+  The test derives the three sample face sets from checked-in JSON and verifies
+  every glyph through the exact local face lookup. Other scripts, unseen inputs,
+  and unused faces remain outside this result.
+
+The exact local font files, metadata, source-face tables, license copies, and
+sample codepoints were inspected on 2026-10-22. Final Adobe/Solstice production
+font availability and authorization remain **UNVERIFIED_EXTERNAL_FACT**.
+Release manager must obtain written production-font direction before release.
+
 ## Unverified or intentionally deferred
 
 - **OBSERVED, 2026-10-20, commit `6c6bb21`:** GitHub Actions run [39353319577](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39353319577) stopped at `docker sbom chameleon-stage1 --format syft-json --output ...` because the runner provided no `docker sbom` command; native runtime, reproducibility, and closure steps were not reached. Disposition: use the pinned `anchore/sbom-action`/Syft path and rerun the workflow.
@@ -41,5 +108,5 @@ This file applies source-driven development only to external libraries, platform
 - **OBSERVED, supplemental, 2026-10-19:** Local arm64-host emulation produced expected Level 1/2 success and Level 3 `INCOMPLETE_SEARCH`, resolved Skia/Pillow `ldd` closure, and matching repeated/clean-cache hashes; it is not native-amd64 qualification.
 - **OBSERVED, supplemental, 2026-10-19:** Final local loaded image provenance was a `linux/amd64` image with ID `sha256:178c0feecdfb3100fc5266d663d438ac655743b1a7cac744a79bbe4857050390`, size `303795243` bytes, and Syft JSON SBOM SHA-256 `da40711f9edc5635c51f10ac6e730bb19c4151a415ea9dbb3b7e67bf18039844`; this remains arm64-host evidence.
 - **UNVERIFIED_EXTERNAL_FACT:** Apt package versions and a complete hash-locked transitive wheelhouse remain unverified; source: the Dockerfile's unpinned apt install and direct requirements at commit `7f39a3e`; impact: clean-cache builds do not prove byte-identical dependency resolution; disposition: retain the direct pins and do not claim full packaging closure.
-- **UNVERIFIED_EXTERNAL_FACT:** Font embedded metadata, glyph coverage, licensing, and redistribution rights remain unverified; source: the external font/dependency records cited above; impact: release licensing and final-font parity remain open; disposition: no font substitution or licensing claim is added.
+- **UNVERIFIED_EXTERNAL_FACT:** Final Adobe/Solstice production font availability remains unverified; source: final-stage Adobe font entitlement and production brand files are not present in the repository; impact: this evidence covers only the exact packaged Lora/Poppins placeholders; disposition: do not infer production-font authorization or substitute fonts.
 - **UNVERIFIED_EXTERNAL_FACT:** Exact organizer CPU/RAM/disk/GPU limits, model allowlist/size, official scoring thresholds, and Adobe deployment topology remain unverified; source: `chameleon/RULES.md` and the challenge brief at repository revision `6c6bb21` (2026-10-20); impact: measurements are observations, not hard qualification ceilings; disposition: do not invent limits or add runtime gates.

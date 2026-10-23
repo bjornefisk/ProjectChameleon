@@ -19,16 +19,19 @@ handles a missing asset gracefully instead of crashing.
 ## fonts/ (7 files, matching the `font_family` values in the schema)
 
 - `SolsticeSerif-Regular.ttf`, `SolsticeSerif-Bold.ttf`, `SolsticeSerif-Italic.ttf`
-  (renamed from Lora, SIL Open Font License — headline typeface)
+  (Lora 3.008 faces under SIL OFL 1.1; the Lora reserved primary name is replaced.)
 - `SolsticeSans-Regular.ttf`, `SolsticeSans-Bold.ttf`, `SolsticeSans-Italic.ttf`,
   `SolsticeSans-BoldItalic.ttf`
-  (renamed from Poppins, SIL Open Font License — everything else)
+  (Poppins 4.004 faces under SIL OFL 1.1.)
 
-Font family/style/weight metadata is set correctly (verified with `fc-scan`),
-so `font_family: "Solstice Serif"` / `"Solstice Sans"` and
-`font_weight: "bold"` / `font_style: "italic"` in the schema will resolve to
-the right file automatically in any standard font lookup (including
-cr-renderer's FontManager once these are folded into `fonts.pickle`).
+Full source license texts ship beside font files as `OFL-Lora.txt` and
+`OFL-Poppins.txt`. The loader derives face mappings from filenames, validates
+embedded family/weight/style metadata, rejects unknown suffixes and duplicate
+mappings, and fails closed for missing or invalid faces. Hashes, provenance,
+and sample glyph coverage are recorded in
+[`../../Docs/font_provenance_manifest.json`](../../Docs/font_provenance_manifest.json)
+and [`../../Docs/DEPENDENCY_EVIDENCE.md`](../../Docs/DEPENDENCY_EVIDENCE.md);
+`make verify` rejects missing, extra, or changed packaged files.
 
 ## Before this goes out to students
 

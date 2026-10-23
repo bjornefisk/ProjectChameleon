@@ -64,7 +64,7 @@ docker run --rm --network none \
 
 ## Evidence and external facts
 
-Every handoff records exact commands, outputs/artifacts, checks not run, and limitations. Keep hard-validation evidence separate from soft-quality scoring. M5 Pro limits, model allowlists, scoring thresholds, target catalogues, font licensing/availability, native-amd64 qualification, and final deployment topology remain `UNVERIFIED_EXTERNAL_FACT` until checked against an authoritative source.
+Every handoff records exact commands, outputs/artifacts, checks not run, and limitations. Keep hard-validation evidence separate from soft-quality scoring. M5 Pro limits, model allowlists, scoring thresholds, target catalogues, final Adobe/Solstice production-font licensing/availability, native-amd64 qualification, and final deployment topology remain `UNVERIFIED_EXTERNAL_FACT` until checked against an authoritative source.
 
 ## Process invariants
 
