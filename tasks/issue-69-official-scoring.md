@@ -9,6 +9,20 @@ dated request and explicit impact.
 This draft PR establishes the issue-specific work branch. It does not claim an
 official score and does not include hidden evaluation inputs.
 
+## Current blocker record
+
+Request recorded on 2026-10-23:
+
+- Public request: https://github.com/bjornefisk/ProjectChameleon/issues/69#issuecomment-6368953819
+- Requested: evaluator protocol and revision, Level 1/2/3 target coverage, rubric and thresholds, hardware/runtime constraints, failure semantics, result format, and disclosure permission.
+- Response: no authoritative response or public scoring result is recorded.
+- Impact: official scoring cannot bind to a frozen candidate or establish qualification.
+- Owner: `@bjornefisk` as organizer liaison.
+
+This record documents the blocker only. It does not claim official scoring,
+hidden-task access, or issue acceptance.
+
+
 ## Ordered slices
 
 1. Request the official evaluator protocol, thresholds, target catalogue,
