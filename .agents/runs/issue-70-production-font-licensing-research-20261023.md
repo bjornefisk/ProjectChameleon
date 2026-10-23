@@ -5,10 +5,10 @@ run_id: issue-70-production-font-licensing-research-20261023
 owner/role: @gabegaines24 / repository maintainer
 workflow/gate: Issue #70 release and research evidence
 started/updated: 2026-10-23T19:27:08Z / 2026-10-23
-branch/ref: fix/issue-70-production-font-authorization @ d5dbec29929499d0087f61f2f6eec43bcfb69de7
-source revision: d5dbec29929499d0087f61f2f6eec43bcfb69de7
-evidence capture revision: d5dbec29929499d0087f61f2f6eec43bcfb69de7
-worktree state: clean before this documentation update; no generated files present
+branch/ref: fix/issue-70-production-font-authorization @ d04df7d6d5d92718f2ea163d068dc24181541b9f
+source revision: d04df7d6d5d92718f2ea163d068dc24181541b9f
+evidence capture revision: d04df7d6d5d92718f2ea163d068dc24181541b9f
+worktree state: clean at evidence capture; this final record edit binds checks run at the preceding substantive revision
 
 Goal/acceptance: Add authoritative licensing-boundary evidence without changing packaged fonts; keep production authorization blocked until exact-file permission exists.
 
