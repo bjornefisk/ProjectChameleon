@@ -32,9 +32,10 @@ The original Python 3.12 output bytes were not retained, so that historical same
 
 ## Issue #71 clean-build dependency provenance
 
-PR #74 records the current release-candidate input inventory at branch commit
-`2548c82` in [`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md). The base image,
-direct Python pins, renderer commit, schema, packaged assets, and packaged font
+PR #74 records the current release-candidate input inventory at source-input
+revision `2548c82`; the evidence record was committed at PR head `de935eb` in
+[`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md). The base image, direct
+Python pins, renderer commit, schema, packaged assets, and packaged font
 hashes are observed. Apt versions, complete transitive wheel hashes, current
 native-amd64 closure, and clean-cache artifact parity remain
 `UNVERIFIED_EXTERNAL_FACT`.

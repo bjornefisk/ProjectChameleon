@@ -6,8 +6,8 @@ parent_task_id: issue-71
 lead owner/role: @gabegaines24 / issue manager
 started/updated: 2026-10-23
 current workflow/gate: PR 74 draft evidence slice
-source revision: 2548c828cfafea7e03f28644b026665856e8dd0a
-```
+source input revision: 2548c828cfafea7e03f28644b026665856e8dd0a
+evidence capture commit: de935ebde2e949728ad95a904cd165243bf7e943
 
 ## Outcome and acceptance
 

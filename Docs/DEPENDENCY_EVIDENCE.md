@@ -101,9 +101,10 @@ font availability and authorization remain **UNVERIFIED_EXTERNAL_FACT**.
 Release manager must obtain written production-font direction before release.
 ## Issue #71 clean-build dependency provenance
 
-**Task:** Issue #71. **Verification run:**
-`PR-74-build-provenance-inventory`. The inventory uses branch commit `2548c82`
-and records repository inputs without claiming native-amd64 qualification.
+`PR-74-build-provenance-inventory`. The source-input hashes were collected at
+source revision `2548c82`; the evidence record was committed at PR head
+`de935eb`. These records bind repository inputs without claiming
+native-amd64 qualification.
 
 ### Current release-candidate input inventory
 
@@ -149,7 +150,7 @@ required before closing Issue #71.
 - **UNVERIFIED:** The successful run is native-amd64 evidence for the pinned image and current runner, not a complete organizer qualification. Cross-platform hash parity is not established. The workflow compares repeated and clean-cache runs of the same native `linux/amd64` image; the 2026-10-19 arm64-host emulation evidence remains supplemental and is not a native-amd64 or cross-platform parity claim.
 - **OBSERVED, supplemental, 2026-10-19:** Local arm64-host emulation produced expected Level 1/2 success and Level 3 `INCOMPLETE_SEARCH`, resolved Skia/Pillow `ldd` closure, and matching repeated/clean-cache hashes; it is not native-amd64 qualification.
 - **OBSERVED, supplemental, 2026-10-19:** Final local loaded image provenance was a `linux/amd64` image with ID `sha256:178c0feecdfb3100fc5266d663d438ac655743b1a7cac744a79bbe4857050390`, size `303795243` bytes, and Syft JSON SBOM SHA-256 `da40711f9edc5635c51f10ac6e730bb19c4151a415ea9dbb3b7e67bf18039844`; this remains arm64-host evidence.
-- **UNVERIFIED_EXTERNAL_FACT, current branch `2548c82`:** Apt package versions
+- **UNVERIFIED_EXTERNAL_FACT, source-input revision `2548c82`:** Apt package versions
   and a complete hash-locked transitive wheelhouse remain unverified. The
   Dockerfile declares `git`, `libgl1`, `libegl1`, `libglib2.0-0`, and
   `fontconfig` without apt versions. The direct requirements are pinned, but
