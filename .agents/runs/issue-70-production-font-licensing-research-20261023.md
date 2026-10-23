@@ -41,10 +41,10 @@ Out of scope: Production font replacement, font substitution, runtime download, 
 | Source check | `git diff --check` | `PASS` (exit `0`) | No whitespace errors |
 | Provenance check | `.venv/bin/python scripts/verify_font_provenance.py` | `PASS` (exit `0`) | `Docs/font_provenance_manifest.json` verified |
 | Focused font tests | `.venv/bin/python -m unittest chameleon.tests.renderer.test_font_provenance -v` | `PASS` (exit `0`; supplemental only) | 5 tests passed under Python `3.14.0` and `skia-python 144.0.post2`; not Stage 1 pinned-runtime evidence |
-| Pinned-runtime font tests | `python3.11 -m unittest chameleon.tests.renderer.test_font_provenance -v` | `NOT RUN` (exit `N/A`) | Host has no `python3.11`; Stage 1 pins Python `3.11.11` and `skia-python 132.0b11` |
+| Stage 1 pinned-runtime font tests (unavailable) | `python3.11 -m unittest chameleon.tests.renderer.test_font_provenance -v` | `NOT RUN` (exit `N/A`) | Host has no `python3.11`; exact Stage 1 image also requires Python `3.11.11` and `skia-python 132.0b11` |
 | Integration smoke | `make docker-build && make docker-test` | `NOT RUN` (exit `N/A`) | Documentation-only change; no runtime input changed |
 | Artifact inspection | `find chameleon/output -maxdepth 1 -type f -print` | `NOT RUN` (exit `N/A`) | No runtime command ran; stale, partial, and published files were not inspected |
-| Native qualification | `.github/workflows/ci.yml`, job `Verify and test`, ref `fix/issue-70-production-font-authorization` | `NOT RUN` (exit `N/A`) | No font replacement or runtime change; existing native evidence remains separate |
+| Native amd64 qualification | GitHub Actions CI run `40022921324`, job `120652169263`, `.github/workflows/ci.yml`, ref `fix/issue-70-production-font-authorization` @ `5c735351f233e9664abccf0a5d625d43a4b1ce1c` | `PASS` (workflow conclusion `success`; exit `N/A`) | Clean-cache amd64 rebuild, offline smoke, repeated/clean-cache artifact hashes, native imports, and `ldd` closure completed |
 
 ## Public source observations
 
@@ -71,7 +71,7 @@ Out of scope: Production font replacement, font substitution, runtime download, 
 
 - Failure classification: environment limitation for pinned-runtime execution; no focused supplemental test failure.
 - Exact unavailable condition: host has no `python3.11`; pinned-runtime command result is `NOT RUN` (exit `N/A`).
-- Checks not run: pinned Python 3.11 font tests, full repository tests, Docker build/run, artifact/stale-output inspection, native amd64 qualification, and official organizer evaluation.
+- Checks not run locally: pinned Python 3.11 font tests, local full-suite command, local Docker build/run, local artifact/stale-output inspection, and official organizer evaluation. GitHub Actions native CI passed separately in the table above.
 - Environment or platform limitation: this slice records public licensing evidence only; production font files and authorization are external; host has Python `3.14.0` and no Stage 1 Python `3.11.11` environment.
 - Why the limitation does not prove product behavior: successful placeholder loading under supplemental versions does not establish pinned-runtime behavior, rights, or metric parity for production files.
 
