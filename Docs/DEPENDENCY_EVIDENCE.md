@@ -67,6 +67,14 @@ evidence, not native-amd64 or organizer qualification.
   with software under OFL 1.1 conditions. This is evidence for these exact
   placeholder files, not legal approval for future production fonts.
 
+### Official production-font licensing boundary
+
+- **OBSERVED, Adobe Fonts FAQ retrieved 2026-10-23:** [Font licensing FAQs](https://helpx.adobe.com/fonts/web/font-licensing/font-licensing.html), publisher Adobe, page metadata `meta-lastModifiedDate: 2026-07-20T14:09:41.259Z`, body date `Last updated on Mar 27, 2026`. Inspected “Fonts added from Adobe Fonts” and the paragraphs on copying or moving font files, server installation, and custom licenses. Adobe states that its rules apply to fonts added through an Adobe account, Adobe Fonts Terms do not permit copying or moving font files to another user or computer, and server installation or customer-created content requires an appropriate license from the foundry or an authorized reseller. Adobe exposes no immutable page revision or content hash in the retrieved page; retrieval timestamp and metadata are the available source binding.
+- **OBSERVED, Adobe Fonts packaging guidance retrieved 2026-10-23:** [Packaging font files](https://helpx.adobe.com/fonts/web/getting-and-using-fonts/package-font-files.html), publisher Adobe, page metadata `meta-lastModifiedDate: 2026-07-20T14:09:39.912Z`, body date `Last updated on Nov 12, 2025`. Inspected “Font licensing requirements.” Adobe states that font EULAs vary, many do not permit sending font files to third parties, and Adobe Fonts Terms do not allow copying or moving the files. Adobe exposes no immutable page revision or content hash in the retrieved page; retrieval timestamp and metadata are the available source binding.
+- **INFERRED, repository gate:** Project contract and Issue #70 acceptance criteria require written authorization before packaging exact production Adobe/Solstice files. Adobe sources provide a licensing boundary only; their applicability to unknown production files remains unverified. **UNVERIFIED_EXTERNAL_FACT:** The sources do not identify exact production files, grant this repository a license, or replace written owner/foundry authorization. The checked-in Lora/Poppins-derived placeholder files remain governed by their separate OFL evidence above.
+
+The research record is [`.agents/runs/issue-70-production-font-licensing-research-20261023.md`](../.agents/runs/issue-70-production-font-licensing-research-20261023.md). No production font files changed. Final Adobe/Solstice file availability, authorization scope, and redistribution permission remain **UNVERIFIED_EXTERNAL_FACT**.
+
 ### File inventory and embedded metadata
 
 Weights are embedded OS/2 weight classes; names and versions come from the TTF
