@@ -44,7 +44,7 @@ Out of scope: Production font replacement, font substitution, runtime download, 
 | Stage 1 pinned-runtime font tests (unavailable) | `python3.11 -m unittest chameleon.tests.renderer.test_font_provenance -v` | `NOT RUN` (exit `N/A`) | Host has no `python3.11`; exact Stage 1 image also requires Python `3.11.11` and `skia-python 132.0b11` |
 | Integration smoke | `make docker-build && make docker-test` | `NOT RUN` (exit `N/A`) | Documentation-only change; no runtime input changed |
 | Artifact inspection | `find chameleon/output -maxdepth 1 -type f -print` | `NOT RUN` (exit `N/A`) | No runtime command ran; stale, partial, and published files were not inspected |
-| Native amd64 qualification | GitHub Actions CI run `40023970612`, job `120655882987`, `.github/workflows/ci.yml`, ref `fix/issue-70-production-font-authorization` @ `2d9faf1bc8a50d9c41700449a6ddefa188104830` | `PASS` (workflow conclusion `success`; exit `N/A`) | Clean-cache amd64 rebuild, offline smoke, repeated/clean-cache artifact hashes, native imports, and `ldd` closure completed |
+| Native amd64 qualification | GitHub Actions CI run `40023970612`, job `120655882987`, `.github/workflows/ci.yml`; PR head `2d9faf1bc8a50d9c41700449a6ddefa188104830`, merge ref `3fdf2878d784872aae319d22a29251c3eca8eea3` | `PASS` (workflow conclusion `success`; exit `N/A`) | Clean-cache amd64 rebuild, offline smoke, repeated/clean-cache artifact hashes, native imports, and `ldd` closure completed |
 
 ## Public source observations
 
