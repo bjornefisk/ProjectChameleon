@@ -27,6 +27,26 @@ native qualification from arm64-host emulation.
    test failure-path cleanup, repeat artifacts, and compare clean-cache hashes.
 8. Record residual organizer-controlled limits as unverified.
 
+## Pending owner decision
+
+Native amd64 build, offline samples, SBOM, clean-cache parity, repeated hashes,
+imports, and library closure now pass. The remaining acceptance gate is a
+reviewed lock strategy. Do not change dependency or packaging inputs until
+`@bjornefisk` approves one.
+
+Recommended path:
+
+1. Freeze a Debian snapshot and install exact apt versions from that snapshot.
+2. Record the resolved apt package list and archive hashes.
+3. Generate a Python 3.11 `linux/amd64` wheelhouse with hashes for every
+   transitive wheel, including an immutable hash for the pinned renderer source.
+4. Build and run the image offline from those locked inputs.
+5. Record the decision, tradeoffs, closure, and resulting image evidence through
+   the required ADR and dependency-evidence path.
+
+An alternative strategy requires the same owner review and complete closure
+evidence. This proposal is not an accepted dependency decision.
+
 ## Acceptance criteria
 
 - Base image, apt, Python, renderer, native-library, font, and asset inputs are
