@@ -10,7 +10,7 @@ shipped Level 1 and Level 2 sample tasks and then checks the *published* files:
 * the published bytes do not depend on the process hash seed; and
 * on every platform with persisted evidence, the JSON and PNG SHA-256 values
   equal the pins in ``fixtures/engine_artifact_hashes.json``, which are bound to
-  the task, schema, asset, font, renderer, and dependency provenance.
+  task, schema, asset, font, renderer, Python 3.11, and direct dependency provenance.
 
 Observed platform behavior (see the evidence record for the commands):
 
@@ -19,8 +19,9 @@ Observed platform behavior (see the evidence record for the commands):
   largest fitting font size in the Level 2 headline/subhead; and
 * PNG bytes depend on the operating system and the CPU architecture.
 
-Pins are therefore keyed by ``<system>-<machine>``.  A platform without pins
-skips only the pin comparison; the hard-validity and determinism checks still run.
+Pins are keyed by ``<system>-<machine>`` and bind Python minor version 3.11.
+A platform without pins skips only the pin comparison; the hard-validity and
+determinism checks still run.
 
 To refresh pins after an *intentional* behavior change, run the runner on each
 recorded platform, copy the observed values from the failure message, and
@@ -66,6 +67,7 @@ REQUIREMENTS = CHAMELEON / "requirements.txt"
 STEMS = ("chameleon_sample_level1_warmup", "chameleon_sample_level2_core")
 HASH_SEEDS = ("0", "4242")
 OFFICIAL_PLATFORM = "linux-x86_64"
+CANONICAL_PYTHON_MINOR = "3.11"
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -196,6 +198,12 @@ class EngineArtifactEvidenceTests(unittest.TestCase):
     def test_persisted_pins_bind_current_task_schema_asset_font_and_dependency_inputs(self):
         bound = self.manifest["bound_inputs"]
         refresh = "inputs changed: refresh engine_artifact_hashes.json on every recorded platform"
+        self.assertEqual(bound["python_minor_version"], CANONICAL_PYTHON_MINOR, refresh)
+        self.assertEqual(
+            f"{sys.version_info.major}.{sys.version_info.minor}",
+            CANONICAL_PYTHON_MINOR,
+            "engine PNG hashes are bound to the project's Python 3.11 baseline",
+        )
 
         direct_url = json.loads(distribution("cr-renderer").read_text("direct_url.json"))
         self.assertEqual(bound["renderer_commit"], direct_url["vcs_info"]["commit_id"], refresh)
@@ -226,6 +234,11 @@ class EngineArtifactEvidenceTests(unittest.TestCase):
                 self.assertRegex(pins[stem][kind], SHA256_PATTERN, f"{stem}.{kind}")
 
     def test_artifact_hashes_match_the_persisted_pins_for_this_platform(self):
+        self.assertEqual(
+            f"{sys.version_info.major}.{sys.version_info.minor}",
+            CANONICAL_PYTHON_MINOR,
+            "engine PNG hashes are bound to the project's Python 3.11 baseline",
+        )
         key = _platform_key()
         platforms = self.manifest["platforms"]
         if key not in platforms:

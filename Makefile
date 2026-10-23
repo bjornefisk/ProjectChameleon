@@ -6,6 +6,7 @@ ROOT_DIR := $(shell pwd)
 VENV_DIR := $(ROOT_DIR)/.venv
 PYTHON := $(VENV_DIR)/bin/python
 PIP := $(VENV_DIR)/bin/pip
+PYTHON_BOOTSTRAP ?= python3.11
 
 .PHONY: help setup verify install-hooks preflight test run agent-check inspect synthetic docker-build docker-test clean
 
@@ -26,16 +27,17 @@ help:
 
 setup:
 	@if [ ! -d "$(VENV_DIR)" ]; then \
-		echo "Creating virtual environment using $${PYTHON_BOOTSTRAP:-python3}..."; \
-		$${PYTHON_BOOTSTRAP:-python3} -m venv $(VENV_DIR); \
+		echo "Creating virtual environment using $(PYTHON_BOOTSTRAP)..."; \
+		$(PYTHON_BOOTSTRAP) -m venv $(VENV_DIR); \
 	fi
+	@$(PYTHON) -c 'import sys; actual = sys.version_info[:2]; actual == (3, 11) or sys.exit(f"Project setup requires Python 3.11; got {sys.version.split()[0]}. Use a fresh VENV_DIR with PYTHON_BOOTSTRAP=python3.11.")'
 	@echo "Installing dependencies from chameleon/requirements.txt..."
 	@$(PIP) install --upgrade pip
 	@$(PIP) install -r chameleon/requirements.txt
 	@echo "Environment setup complete."
 
 verify:
-	@$${PYTHON_BOOTSTRAP:-python3} scripts/verify_repository.py
+	@$(PYTHON_BOOTSTRAP) scripts/verify_repository.py
 
 install-hooks:
 	@mkdir -p .git/hooks
@@ -43,10 +45,11 @@ install-hooks:
 	@echo "Installed .githooks/pre-commit"
 
 preflight:
-	@$${PYTHON_BOOTSTRAP:-python3} scripts/verify_repository.py --require-engine
+	@$(PYTHON_BOOTSTRAP) scripts/verify_repository.py --require-engine
 
 test:
 	@echo "Running unit tests..."
+	@$(PYTHON) -c 'import sys; actual = sys.version_info[:2]; actual == (3, 11) or sys.exit(f"make test requires Python 3.11 for persisted PNG goldens; got {sys.version.split()[0]}")'
 	@cd chameleon && $(PYTHON) -m unittest discover -s tests -t . -p 'test_*.py' -v
 	@$(PYTHON) -m unittest scripts.test_review_pr -v
 	@$(PYTHON) -m unittest scripts.test_qualify_runtime -v

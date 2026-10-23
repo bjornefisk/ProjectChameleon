@@ -3,6 +3,7 @@
   "purpose": "Persisted engine-level artifact evidence for issue #23 / F-07: SHA-256 of the committed JSON/PNG pair that `python -m engine.main` publishes for the shipped Level 1 and Level 2 sample tasks. Hashes are regression pins bound to the inputs below; they are not a Stage 1 wire field, a ranking input, or an organizer qualification result.",
   "bound_inputs": {
     "renderer_commit": "a17e1fb9a732959dd6c21ae168d5ee09d74bd64f",
+    "python_minor_version": "3.11",
     "dependencies": {
       "Pillow": "11.1.0",
       "skia-python": "132.0b11"
@@ -17,7 +18,7 @@
   },
   "platforms": {
     "linux-x86_64": {
-      "observed_on": "Local linux/amd64 Docker run with the pinned renderer after source-role emphasis variants; native amd64 qualification for this revision remains unverified.",
+      "observed_on": "GitHub Actions native x86_64 run 39711973748, job 119605163538, on PR #65 head 33f6fd9; Ubuntu 24.04, Python 3.11.17, Pillow 11.1.0, and skia-python 132.0b11. Renderer commit and font-tree SHA-256 are recorded in bound_inputs. This is a native Linux x86_64 artifact reference, not universal PNG parity or organizer qualification.",
       "artifacts": {
         "chameleon_sample_level1_warmup": {
           "json_sha256": "7b93fdfd44ad8e669c00aeae3a8e96931f85a761a60e67cc31d2bb02b10853b9",
@@ -43,7 +44,7 @@
       }
     },
     "darwin-arm64": {
-      "observed_on": "Local macOS arm64 run with the repository .venv after source-role emphasis variants; repeated runs and different PYTHONHASHSEED values were byte-identical. Level 2 JSON differs from Linux because Skia glyph advances are fractional on macOS and hinted integers on Linux, which changes the largest fitting text font size.",
+      "observed_on": "Originally recorded on local macOS arm64 without a complete interpreter/dependency record; revalidated for issue #68 with Python 3.11.14, Pillow 11.1.0, skia-python 132.0b11, renderer a17e1fb9a732959dd6c21ae168d5ee09d74bd64f, and font tree SHA-256 c9b22d1fe1dcccea9035bd23fd5fb0ac3aec1cd3ad1b3b6e68eb06d76e8dc0fa. Repeated runs and hash seeds were byte-identical. Level 2 JSON differs from Linux because Skia glyph advances are fractional on macOS and hinted integers on Linux, affecting the largest fitting text font size.",
       "artifacts": {
         "chameleon_sample_level1_warmup": {
           "json_sha256": "7b93fdfd44ad8e669c00aeae3a8e96931f85a761a60e67cc31d2bb02b10853b9",

@@ -6,6 +6,30 @@
 **Decision status:** The merged implementation preserves bounded four-topology search, at most twelve source-derived candidates, renderer-gated hard validation, fixed-point ranking, deterministic output, and typed fail-closed behavior. Accepted ADR-010 through ADR-012 reconcile only quantized common group transforms, the absence of a numeric readability floor, and the renderer-measured transient glyph inset against the source challenge PDF. Local success and native CI do not establish organizer qualification; cross-platform parity and organizer-held-out scoring remain unverified.
 **Ticket 06 authority:** User-requested GitHub issue #13; owner @bjornefisk; partner reviewer @gabegaines24. Implementation branch `feat/ticket-06-column-pivot-level2` merged as PR #14. The Issue #61 branch was based on main commit `c5b1159` before PR #65 merged the fix into main.
 
+## Issue #68 PNG-golden environment and platform evidence
+
+The 2026-10-22 run record reports `make test PYTHON=/tmp/chameleon-pinned-venv/bin/python` at 273/275 in a Python 3.12 Darwin arm64 environment with `skia-python 132.0b11`. The two persisted PNG checks were `right_negative_spacing` and `chameleon_sample_level1_warmup`. The separate root `.venv` result was 272/275 with `skia-python 144.0.post2`, not the pinned 132.0b11. The historical report does not preserve a full `pip freeze`, the Python 3.12 patch version, or the generated hashes from those failing tests; the exact cause of those old failures cannot be attributed to Python alone. Those reported failures remain evidence; no failure was downgraded and no expected hash bytes were refreshed.
+
+**Disposition:** persisted renderer and engine evidence is bound to Python 3.11, the pinned renderer revision, Pillow, Skia, font tree, and task/assets. `make setup` defaults to Python 3.11 and rejects a mismatched virtualenv; `make test` fails fast outside Python 3.11. The renderer corpus selects hashes by normalized `<os>-<machine>` where a fixture has platform-specific outputs and fails when a platform lacks a recorded value. Engine artifacts use the same full platform key. Linux x86_64 is the native CI reference; Darwin arm64 is separately recorded. PNG byte parity across platforms is not claimed.
+
+The evidence inputs are renderer commit `a17e1fb9a732959dd6c21ae168d5ee09d74bd64f`, Pillow `11.1.0`, `skia-python 132.0b11`, and font-tree SHA-256 `c9b22d1fe1dcccea9035bd23fd5fb0ac3aec1cd3ad1b3b6e68eb06d76e8dc0fa`. Local validation used a fresh Python `3.11.14` Darwin arm64 environment. Native comparison used GitHub Actions run `39711973748`, job `119605163538`, PR #65 head `33f6fd9`, Ubuntu 24.04 x86_64, Python `3.11.17`, Pillow `11.1.0`, and Skia `132.0b11`. That native run predates this issue branch; it establishes the existing x86_64 golden outputs, while the PR's required checks exercise the updated key selection and runtime guards.
+
+| Artifact case | Darwin arm64, Python 3.11.14 | Native Linux x86_64, Python 3.11.17 |
+| --- | --- | --- |
+| Renderer `right_negative_spacing` PNG SHA-256 | `5a058be8d999a72a2bb9e34af980623687ede662f4c3378a15c92d6cab9855c9` | `a012510371b5b9aa20a5a750bae407d6b96381cfd03f767aad1b555f1ce7aa39` |
+| Level 1 engine PNG SHA-256 | `f8d171f1fc9866acef85f587039c86f372ce0a2d1d48f8bc3dd20fbe98bf8c00` | `172d23ca87020478d24568a603ba6f9deaf272629b59d73608789aca9789a85c` |
+
+**Verification:**
+- `make setup VENV_DIR=/tmp/chameleon-issue68-canonical-2026-10-22 PYTHON_BOOTSTRAP=python3.11` — created a fresh Python `3.11.14` environment with Pillow `11.1.0` and Skia `132.0b11`.
+- `make test PYTHON=/tmp/chameleon-issue68-canonical-2026-10-22/bin/python` — 275 repository tests, 47 review-script tests, and 3 runtime-qualification tests passed (325 total). This includes the renderer corpus hash test and engine artifact hash test; both formerly failing cases pass on the documented Python 3.11 runtime.
+- `make test PYTHON=/opt/homebrew/bin/python3.12` — rejected before running tests with `make test requires Python 3.11 for persisted PNG goldens; got 3.12.12`.
+- `make verify` and `make preflight` — passed.
+- `PYTHONPATH=/Users/charliefurlow/Desktop/ProjectChameleon/chameleon /tmp/chameleon-issue68-canonical-2026-10-22/bin/python -m engine.main` from an isolated workspace containing a copy of `input/` and a `brand_kit/` symlink — exit 0; all three samples returned `SUCCESS` and published JSON, PNG, and commit markers.
+- `docker buildx build --platform linux/amd64 --load -t chameleon-issue68 .` — succeeded with the Dockerfile constant-platform warning.
+- `docker run --rm --network none --platform linux/amd64 -v /Users/charliefurlow/Desktop/ProjectChameleon/chameleon/input:/app/input:ro -v /var/folders/q7/pr1pl8w14gq68h60cvvmd1540000gn/T/chameleon-issue68-docker-output-zzy4vf_h:/app/output chameleon-issue68` — exit 0; all three samples returned `SUCCESS` with JSON/PNG/commit markers. The output mount was a temporary directory. This is amd64 emulation on a Darwin arm64 host, not native qualification. The fontconfig warning was non-fatal.
+
+The original Python 3.12 output bytes were not retained, so that historical same-platform difference cannot be reconstructed from the run record. The current Python 3.11 fixtures pass, the platform-dependent PNG differences are explicitly recorded, and hard artifact/contract checks remain mandatory.
+
 ## Issue #61 public Level 3 acceptance
 
 The public fixture now returns `SUCCESS` and publishes exactly one JSON/PNG pair. The integration regression invokes the real `engine.main.main()` twice in isolated input/output directories, validates the serialized response through the hard contract, verifies PNG decoding and 728×90 dimensions, asserts all 17 source records/IDs and integer mutable fields are preserved, and checks both artifact hashes are identical across runs. A separate runner regression retains genuine `INCOMPLETE_SEARCH`, a nonzero exit, and no artifact pair.
