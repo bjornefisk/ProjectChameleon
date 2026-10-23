@@ -99,6 +99,81 @@ The exact local font files, metadata, source-face tables, license copies, and
 sample codepoints were inspected on 2026-10-22. Final Adobe/Solstice production
 font availability and authorization remain **UNVERIFIED_EXTERNAL_FACT**.
 Release manager must obtain written production-font direction before release.
+## Issue #71 clean-build dependency provenance
+
+`PR-74-build-provenance-inventory`. The source-input hashes were collected at
+source revision `2548c82`; the latest evidence record was committed in
+`86c9218`. The records bind repository inputs; native CI evidence is recorded
+below.
+
+### Current release-candidate input inventory
+
+| Input | Observed value | Evidence boundary |
+| --- | --- | --- |
+| Base image | `python:3.11.11-slim-bookworm@sha256:081075da77b2b55c23c088251026fb69a7b2bf92471e491ff5fd75c192fd38e5` | Manifest digest is pinned; native amd64 image identity and SBOM are recorded below. |
+| Apt/build packages | `git`, `libgl1`, `libegl1`, `libglib2.0-0`, `fontconfig` | Names are declared in `chameleon/Dockerfile`; apt versions are unpinned. |
+| Python runtime | Python `3.11.11` base image; CI selects Python `3.11` | Native CI observed Python `3.11.11`; complete wheel closure remains unresolved. |
+| Direct Python requirements | Pillow `11.1.0`; datasets `3.2.0`; pydantic `2.10.6`; skia-python `132.0b11`; jsonschema `4.23.0` | Direct versions are pinned; no complete hash-locked wheelhouse is committed. |
+| Renderer | `cr-renderer` commit `a17e1fb9a732959dd6c21ae168d5ee09d74bd64f` | VCS revision is immutable; native import and library closure remain run evidence. |
+| Source inputs | Dockerfile `735b1d7f102874045c9f35afaa98d9dd439eb2b4e8d1a7ef6a2da5953cad39b2`; requirements `432fc158c299c37e15b52e0464401df62f72d786aa7af6e4086fc7de73209a1b`; schema `d084eb524b7b0e683c9a31a63706ea4101ee0e3cd4a9a3b8218a59975fa55e41` | Hashes bind this inventory to the checked-out source revision. |
+| Native-library path | Skia and Pillow are checked with offline imports and `ldd` in `.github/workflows/ci.yml` | Native CI run `39988562284` passed imports and `ldd` with no `not found`; local emulation remains supplemental. |
+
+Packaged runtime assets were hashed with the repository paths:
+
+```text
+chameleon/brand_kit/assets/solstice_bg_gradient.png  7ebf18d2a0d4b487cdf30578e4d6123e59e81502d78e55087768bfc5a465faeb
+chameleon/brand_kit/assets/solstice_bottle.png       a9bea75d9592cee51bd1ee56e043662091326c612fc8c208eee3872c216aa053
+chameleon/brand_kit/assets/solstice_logo_lockup.png   3a443c106090e7b043d85d553280e464b313d893baebafe6765fd3df1022f049
+chameleon/brand_kit/fonts/SolsticeSans-BoldItalic.ttf e47af214406befc181508cf7ff87b774a955a670f7a54d8563a9757d45b2167d
+chameleon/brand_kit/fonts/SolsticeSans-Bold.ttf       609a215925701021b97578c71702bfc492882556ce05602b670aaa74a32a1156
+chameleon/brand_kit/fonts/SolsticeSans-Italic.ttf     848a0433face0f273e313e4fdb3497a764f3c96b3b6670dffcc3cc38dcc83f2a
+chameleon/brand_kit/fonts/SolsticeSans-Regular.ttf    4500567b25fc1af2983cee01c1e57e01a0108b8b3844c182936d14c7dec7f69c
+chameleon/brand_kit/fonts/SolsticeSerif-Bold.ttf      837d42cc1b336364b69714c73288a0ec7ceded41c137d5f62943df5f0745551a
+chameleon/brand_kit/fonts/SolsticeSerif-Italic.ttf    07526ca6ef70e5a7853abcdd614aeb62cdb958ed0cabc0f771f85094b4c67ccf
+chameleon/brand_kit/fonts/SolsticeSerif-Regular.ttf   b7eb2a832ae91824a7c670469f4a4e0c4910a3ceedc1d31aad07ea2bc336d2a7
+```
+
+**OBSERVED:** The inventory was generated with `shasum -a 256` for source
+files and sorted `find` output for packaged assets and fonts. Runtime network
+remains disabled by `HF_HUB_OFFLINE=1`, `HF_HUB_DISABLE_TELEMETRY=1`, and the
+CI `docker run --network none` path.
+
+### Native amd64 CI qualification evidence
+
+**OBSERVED, 2026-10-23:** Required GitHub Actions run
+[39988562284](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39988562284),
+job `120534271651`, passed for PR #74. The workflow tested merge ref
+`3d7cd77926a5da744fa3cc70133c7c453cdd92c4`, which includes branch head
+`f8953ee058205601a4eaa78f57cc68b6e3db58df`.
+
+- Native platform: Linux `x86_64`, Python `3.11.11`.
+- Image: `sha256:c77cd521c2b8424d1100186d97ae179d2a04fd48062f2cfcd6f8eaac890426b3`,
+  `linux/amd64`, `896530714` bytes.
+- SBOM: non-empty SPDX output from pinned Syft `v1.42.3`, SHA-256
+  `364bb078cf090a0004ee1b281602cc5ef9e65a1363b378d4ba34d3b9cd47914d`.
+- Offline native smoke: all three samples returned `SUCCESS`; JSON, PNG, and
+  commit-marker files were present.
+- Repeated and clean-cache artifact hashes matched.
+- Runtime: return code `0`, elapsed `17.614067901` seconds, user CPU
+  `17.136705` seconds, system CPU `0.465883` seconds, maximum RSS `313644 KiB`,
+  peak `3` procfs threads, and `2` available CPUs.
+- Native `cr_renderer`/`skia` imports and Skia/Pillow `ldd` closure passed with
+  no `not found` entries.
+
+The run establishes native amd64 evidence for this candidate, not organizer
+qualification. Apt-version closure, complete wheelhouse hashes,
+cross-platform parity, and the reviewed package-lock decision remain open.
+
+Native sample artifacts were:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Level 1 JSON | `7b93fdfd44ad8e669c00aeae3a8e96931f85a761a60e67cc31d2bb02b10853b9` |
+| Level 1 PNG | `172d23ca87020478d24568a603ba6f9deaf272629b59d73608789aca9789a85c` |
+| Level 2 JSON | `3e26ef9e95df3f9b9f3fc9fa8149382962081531936e5f01480f5161e3b5f8f6` |
+| Level 2 PNG | `bf24e67125529d96b65df1f049d3f4b11cd0fcc9e05a2c7a765a60c3e5952f99` |
+| Level 3 JSON | `10c7b96bea147205da2ba24030f1b2d8970e46f83f76bccc67c9f6798b955fdd` |
+| Level 3 PNG | `1cbe6edde1ee854439dda7e3eb1061a61964a1d4116bda0fc1fd9e90629fe6ff` |
 
 ## Unverified or intentionally deferred
 
@@ -107,6 +182,14 @@ Release manager must obtain written production-font direction before release.
 - **UNVERIFIED:** The successful run is native-amd64 evidence for the pinned image and current runner, not a complete organizer qualification. Cross-platform hash parity is not established. The workflow compares repeated and clean-cache runs of the same native `linux/amd64` image; the 2026-10-19 arm64-host emulation evidence remains supplemental and is not a native-amd64 or cross-platform parity claim.
 - **OBSERVED, supplemental, 2026-10-19:** Local arm64-host emulation produced expected Level 1/2 success and Level 3 `INCOMPLETE_SEARCH`, resolved Skia/Pillow `ldd` closure, and matching repeated/clean-cache hashes; it is not native-amd64 qualification.
 - **OBSERVED, supplemental, 2026-10-19:** Final local loaded image provenance was a `linux/amd64` image with ID `sha256:178c0feecdfb3100fc5266d663d438ac655743b1a7cac744a79bbe4857050390`, size `303795243` bytes, and Syft JSON SBOM SHA-256 `da40711f9edc5635c51f10ac6e730bb19c4151a415ea9dbb3b7e67bf18039844`; this remains arm64-host evidence.
-- **UNVERIFIED_EXTERNAL_FACT:** Apt package versions and a complete hash-locked transitive wheelhouse remain unverified; source: the Dockerfile's unpinned apt install and direct requirements at commit `7f39a3e`; impact: clean-cache builds do not prove byte-identical dependency resolution; disposition: retain the direct pins and do not claim full packaging closure.
+- **UNVERIFIED_EXTERNAL_FACT, source-input revision `2548c82`:** Apt package versions
+  and a complete hash-locked transitive wheelhouse remain unverified. The
+  Dockerfile declares `git`, `libgl1`, `libegl1`, `libglib2.0-0`, and
+  `fontconfig` without apt versions. The direct requirements are pinned, but
+  pip still resolves a complete wheel set at build time. Impact: clean-cache
+  builds do not prove byte-identical dependency resolution. Disposition:
+  approve a lock strategy through normal dependency review before changing
+  dependency or packaging inputs.
 - **UNVERIFIED_EXTERNAL_FACT:** Final Adobe/Solstice production font availability remains unverified; source: final-stage Adobe font entitlement and production brand files are not present in the repository; impact: this evidence covers only the exact packaged Lora/Poppins placeholders; disposition: do not infer production-font authorization or substitute fonts.
+- **UNVERIFIED_EXTERNAL_FACT:** Font embedded metadata, glyph coverage, licensing, and redistribution rights remain unverified; source: the external font/dependency records cited above; impact: release licensing and final-font parity remain open; disposition: no font substitution or licensing claim is added.
 - **UNVERIFIED_EXTERNAL_FACT:** Exact organizer CPU/RAM/disk/GPU limits, model allowlist/size, official scoring thresholds, and Adobe deployment topology remain unverified; source: `chameleon/RULES.md` and the challenge brief at repository revision `6c6bb21` (2026-10-20); impact: measurements are observations, not hard qualification ceilings; disposition: do not invent limits or add runtime gates.

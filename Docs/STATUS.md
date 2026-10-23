@@ -30,6 +30,25 @@ The evidence inputs are renderer commit `a17e1fb9a732959dd6c21ae168d5ee09d74bd64
 
 The original Python 3.12 output bytes were not retained, so that historical same-platform difference cannot be reconstructed from the run record. The current Python 3.11 fixtures pass, the platform-dependent PNG differences are explicitly recorded, and hard artifact/contract checks remain mandatory.
 
+## Issue #71 clean-build dependency provenance
+
+PR #74 records the current release-candidate input inventory at source-input
+revision `2548c82`; the latest evidence record and run-record binding are in
+`86c9218` at [`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md).
+The base image, direct Python pins, renderer commit, schema, packaged assets,
+and packaged font hashes are observed.
+
+Required native amd64 CI run `39988562284` passed on the PR merge ref. It
+verified the linux/amd64 image, non-empty SBOM, clean-cache build, offline
+three-sample success, repeated and clean-cache artifact hashes, native imports,
+and Skia/Pillow library closure. Apt versions, complete transitive wheel hashes,
+cross-platform parity, and release qualification remain
+`UNVERIFIED_EXTERNAL_FACT`.
+
+No dependency or Docker input changes are authorized by this inventory slice.
+The next decision is a reviewed apt/wheelhouse lock strategy and complete
+package-closure evidence.
+
 ## Issue #61 public Level 3 acceptance
 
 The public fixture now returns `SUCCESS` and publishes exactly one JSON/PNG pair. The integration regression invokes the real `engine.main.main()` twice in isolated input/output directories, validates the serialized response through the hard contract, verifies PNG decoding and 728×90 dimensions, asserts all 17 source records/IDs and integer mutable fields are preserved, and checks both artifact hashes are identical across runs. A separate runner regression retains genuine `INCOMPLETE_SEARCH`, a nonzero exit, and no artifact pair.
