@@ -39,7 +39,7 @@ run-record binding in `46449de`, at
 The base image, direct Python pins, renderer commit, schema, packaged assets,
 and packaged font hashes are observed.
 
-Required native amd64 CI run `39981979377` passed on the PR merge ref. It
+Required native amd64 CI run `39988562284` passed on the PR merge ref. It
 verified the linux/amd64 image, non-empty SBOM, clean-cache build, offline
 three-sample success, repeated and clean-cache artifact hashes, native imports,
 and Skia/Pillow library closure. Apt versions, complete transitive wheel hashes,

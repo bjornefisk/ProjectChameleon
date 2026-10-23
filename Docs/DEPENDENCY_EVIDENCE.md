@@ -115,7 +115,7 @@ The records bind repository inputs; native CI evidence is recorded below.
 | Direct Python requirements | Pillow `11.1.0`; datasets `3.2.0`; pydantic `2.10.6`; skia-python `132.0b11`; jsonschema `4.23.0` | Direct versions are pinned; no complete hash-locked wheelhouse is committed. |
 | Renderer | `cr-renderer` commit `a17e1fb9a732959dd6c21ae168d5ee09d74bd64f` | VCS revision is immutable; native import and library closure remain run evidence. |
 | Source inputs | Dockerfile `735b1d7f102874045c9f35afaa98d9dd439eb2b4e8d1a7ef6a2da5953cad39b2`; requirements `432fc158c299c37e15b52e0464401df62f72d786aa7af6e4086fc7de73209a1b`; schema `d084eb524b7b0e683c9a31a63706ea4101ee0e3cd4a9a3b8218a59975fa55e41` | Hashes bind this inventory to the checked-out source revision. |
-| Native-library path | Skia and Pillow are checked with offline imports and `ldd` in `.github/workflows/ci.yml` | Native CI run `39981979377` passed imports and `ldd` with no `not found`; local emulation remains supplemental. |
+| Native-library path | Skia and Pillow are checked with offline imports and `ldd` in `.github/workflows/ci.yml` | Native CI run `39988562284` passed imports and `ldd` with no `not found`; local emulation remains supplemental. |
 
 Packaged runtime assets were hashed with the repository paths:
 
@@ -140,21 +140,22 @@ CI `docker run --network none` path.
 ### Native amd64 CI qualification evidence
 
 **OBSERVED, 2026-10-23:** Required GitHub Actions run
-[39981979377](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39981979377),
-job `120511316262`, passed for PR #74. The workflow tested merge ref
-`cc4670e5cd2c02d5f766d15f54f7f99cbb2a762f`, which includes branch head
-`779f4fc37790bd7e939cfc8bb95c1be365e315a1`.
+[39988562284](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39988562284),
+job `120534271651`, passed for PR #74. The workflow tested merge ref
+`3d7cd77926a5da744fa3cc70133c7c453cdd92c4`, which includes branch head
+`f8953ee058205601a4eaa78f57cc68b6e3db58df`.
 
 - Native platform: Linux `x86_64`, Python `3.11.11`.
-- Image: `sha256:2a128ecda7a70ce599ea48566c5512dae1b389bffc7d50b43aecdb82fec43572`,
-  `linux/amd64`, `896530824` bytes.
+- Image: `sha256:c77cd521c2b8424d1100186d97ae179d2a04fd48062f2cfcd6f8eaac890426b3`,
+  `linux/amd64`, `896530714` bytes.
 - SBOM: non-empty SPDX output from pinned Syft `v1.42.3`, SHA-256
-  `81efac5640b2592ad798f90565866d54196295a4ace251cccc2ffd6ec454c9aa`.
+  `364bb078cf090a0004ee1b281602cc5ef9e65a1363b378d4ba34d3b9cd47914d`.
 - Offline native smoke: all three samples returned `SUCCESS`; JSON, PNG, and
   commit-marker files were present.
 - Repeated and clean-cache artifact hashes matched.
-- Runtime: return code `0`, elapsed `17.95671395200003` seconds, maximum RSS
-  `314092 KiB`, peak `3` procfs threads, and `2` available CPUs.
+- Runtime: return code `0`, elapsed `17.614067901` seconds, user CPU
+  `17.136705` seconds, system CPU `0.465883` seconds, maximum RSS `313644 KiB`,
+  peak `3` procfs threads, and `2` available CPUs.
 - Native `cr_renderer`/`skia` imports and Skia/Pillow `ldd` closure passed with
   no `not found` entries.
 
