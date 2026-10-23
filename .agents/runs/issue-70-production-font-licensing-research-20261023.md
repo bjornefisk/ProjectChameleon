@@ -6,14 +6,14 @@ owner/role: @gabegaines24 / repository maintainer
 workflow/gate: Issue #70 release and research evidence
 started/updated: 2026-10-23T19:27:08Z / 2026-10-23
 branch: fix/issue-70-production-font-authorization
-source revision: 5c3fe42
-worktree state: clean before record normalization
+source revision: 438f53e (source state used for the documented focused checks; later record-only metadata follows)
+worktree state: clean before record metadata update
 
 Goal/acceptance: Add authoritative licensing-boundary evidence without changing packaged fonts; keep production authorization blocked until exact-file permission exists.
 
 Authority and ADR impact: PROJECT_CONTRACT.md §§6 and 9; ADR-004; ADR-008; Issue #70. No contract, schema, dependency, font, or runtime behavior changes.
 
-Environment/platform/versions/network mode: Darwin arm64 host; project .venv; FontTools/Skia provenance checks; web retrieval used only for public source research; Stage 1 runtime network boundary unchanged.
+Environment/platform/versions/network mode: Darwin arm64 host; `.venv` Python `3.14.0`; `skia-python 144.0.post2`; `fontTools` is not installed in this environment; the focused loader test uses Skia, while the separate 2026-10-22 owner inspection used FontTools `4.61.0`; web retrieval used only for public source research; Stage 1 runtime network boundary unchanged.
 
 Inputs/fixtures/seeds: Checked-in placeholder TTF files, license files, Docs/font_provenance_manifest.json, Adobe Fonts licensing pages; no hidden inputs or font archives.
 
@@ -46,7 +46,7 @@ Out of scope: Production font replacement, font substitution, runtime download, 
 - **OBSERVED:** Adobe Fonts [Font licensing FAQs](https://helpx.adobe.com/fonts/web/font-licensing/font-licensing.html) was retrieved on 2026-10-23. The page metadata reports `meta-lastModifiedDate: 2026-07-20`; the body says `Last updated on Mar 27, 2026`. Inspected sections: “Fonts added from Adobe Fonts,” the paragraphs on copying or moving font files, server installation, and custom licenses.
 - **OBSERVED:** Adobe Fonts [Packaging font files](https://helpx.adobe.com/fonts/web/getting-and-using-fonts/package-font-files.html) was retrieved on 2026-10-23. The page metadata reports `meta-lastModifiedDate: 2026-07-20`; the body says `Last updated on Nov 12, 2025`. Inspected section: “Font licensing requirements.”
 - **OBSERVED:** Adobe states that license terms vary by EULA, Adobe Fonts Terms do not allow copying or moving files, and server installation or customer-created content requires an appropriate license from the foundry or an authorized reseller.
-- **OBSERVED:** Dated owner/organizer request posted to Issue #70 at https://github.com/bjornefisk/ProjectChameleon/issues/70#issuecomment-6373288154. It requests exact production file identifiers, packaging authorization, redistribution scope, and disclosure permission. No authoritative response is recorded yet.
+- **OBSERVED:** Dated owner/organizer request was posted by `@gabegaines24` on 2026-10-23 at `19:42:10Z` to Issue #70: https://github.com/bjornefisk/ProjectChameleon/issues/70#issuecomment-6373288154. It requests exact production file identifiers, packaging authorization, redistribution scope, and disclosure permission. No authoritative response is recorded as of this retrieval.
 
 ## Artifacts
 
