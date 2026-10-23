@@ -103,14 +103,13 @@ Release manager must obtain written production-font direction before release.
 
 `PR-74-build-provenance-inventory`. The source-input hashes were collected at
 source revision `2548c82`; the evidence record was committed in `fb0b5d7`.
-The later run-record binding commit is `46449de`. These records bind repository
-inputs without claiming native-amd64 qualification.
+The records bind repository inputs; native CI evidence is recorded below.
 
 ### Current release-candidate input inventory
 
 | Input | Observed value | Evidence boundary |
 | --- | --- | --- |
-| Base image | `python:3.11.11-slim-bookworm@sha256:081075da77b2b55c23c088251026fb69a7b2bf92471e491ff5fd75c192fd38e5` | Manifest digest is pinned; amd64 child digest requires candidate qualification. |
+| Base image | `python:3.11.11-slim-bookworm@sha256:081075da77b2b55c23c088251026fb69a7b2bf92471e491ff5fd75c192fd38e5` | Manifest digest is pinned; native amd64 image identity and SBOM are recorded below. |
 | Apt/build packages | `git`, `libgl1`, `libegl1`, `libglib2.0-0`, `fontconfig` | Names are declared in `chameleon/Dockerfile`; apt versions are unpinned. |
 | Python runtime | Python `3.11.11` base image; CI selects Python `3.11` | Native CI observed Python `3.11.11`; complete wheel closure remains unresolved. |
 | Direct Python requirements | Pillow `11.1.0`; datasets `3.2.0`; pydantic `2.10.6`; skia-python `132.0b11`; jsonschema `4.23.0` | Direct versions are pinned; no complete hash-locked wheelhouse is committed. |
