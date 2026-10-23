@@ -24,9 +24,9 @@ This proposal records a reviewable strategy. It is not an accepted dependency de
 Use one release-candidate lock set with these boundaries:
 
 1. Keep the existing immutable Python base-image manifest and qualify the selected `linux/amd64` child digest.
-2. Select one timestamped Debian snapshot for the base-image suite and security archive. Record the snapshot URLs, suite, exact package versions, Release-file verification, downloaded `.deb` SHA-256 values, and the `dpkg-query` result.
-3. Build a Python 3.11 `linux/amd64` wheelhouse containing every direct and transitive distribution required by `requirements.txt`. Record a SHA-256 for every wheel or source artifact and install with all requirements pinned and hash-checked.
-4. Package the pinned `cr-renderer` revision as an immutable local artifact with a recorded digest, rather than resolving a moving VCS or index result during the release build.
+2. Select one timestamped Debian snapshot for the base-image suite and security archive. Record the snapshot URLs, suite, exact package versions, Release/InRelease signature verification, downloaded `.deb` SHA-256 values, and the `dpkg-query` result. For snapshots whose metadata is older than its `Valid-Until` window, set `check-valid-until=no` only on the recorded snapshot source while retaining signature and archive-hash verification.
+3. Build a Python 3.11 `linux/amd64` wheelhouse containing every direct and transitive distribution required by `requirements.txt`. Prefer hashed wheels for every dependency and install with pinned requirements, `--require-hashes`, and `--only-binary=:all:`. If a compatible wheel does not exist, lock the source archive, build requirements, toolchain, generated wheel, and every resulting hash as one explicit exception; a source-archive hash alone is not closure.
+4. Package the pinned `cr-renderer` revision as an immutable local artifact rather than resolving a VCS or index result during the release build. Record a manifest mapping the upstream commit SHA to the artifact SHA-256 and installed provenance evidence, including `direct_url.json` or its documented equivalent.
 5. Make the release build consume only the recorded base image, Debian archives, local wheelhouse, renderer artifact, and repository sources. Runtime remains `--network none`.
 6. Record `pip inspect`/`pip freeze`, `dpkg-query`, native-library `ldd` closure, SBOM digest, packaged asset/font hashes, image digest, sample JSON/PNG/marker hashes, and failure-path evidence.
 7. Repeat the build and sample run on native `linux/amd64` with clean caches. Compare the complete recorded input and output hashes. Keep Apple Silicon emulation supplemental.
@@ -94,9 +94,9 @@ This proposal changes none of those inputs and adds no schema field, runtime dep
 
 ## Required verification before acceptance
 
-1. Record owner approval and the selected Debian snapshot, suite, exact apt versions, and archive hashes.
-2. Generate the complete Python 3.11 `linux/amd64` wheelhouse and verify every direct and transitive requirement with hash checking.
-3. Record the immutable renderer artifact digest and prove imports from the local artifact.
+1. Record owner approval and the selected Debian snapshot, suite, exact apt versions, archive hashes, Release/InRelease signature state, and the recorded `Valid-Until` handling.
+2. Generate the complete Python 3.11 `linux/amd64` wheelhouse. Verify every direct and transitive requirement with pinned hashes and `--require-hashes --only-binary=:all:`, or document the complete source-build exception with build-input and generated-wheel hashes.
+3. Record the immutable renderer artifact manifest mapping the pinned commit SHA, artifact SHA-256, and installed provenance evidence; prove imports from the local artifact.
 4. Build from clean cache on native `linux/amd64`; capture image digest, SBOM, package closure, native-library closure, and all input hashes.
 5. Run all three samples with `--network none`; verify complete JSON/PNG/commit-marker pairs, repeated hashes, and clean-cache hashes.
 6. Exercise a failure path and verify that no partial artifact pair remains.
