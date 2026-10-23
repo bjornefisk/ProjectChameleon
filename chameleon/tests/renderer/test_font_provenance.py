@@ -56,6 +56,14 @@ class FontLoaderProvenanceTests(unittest.TestCase):
             with self.assertRaises(MissingFontError):
                 load_brand_font_manager(str(temporary_fonts))
 
+    def test_supports_bold_italic_exact_face(self):
+        manager = load_brand_font_manager(str(FONT_DIR))
+
+        self.assertEqual(
+            lookup_exact_font(manager, "Solstice Sans", "bold", "bolditalic"),
+            (FONT_DIR / "SolsticeSans-BoldItalic.ttf").read_bytes(),
+        )
+
     def test_checked_samples_have_glyphs_for_exact_faces(self):
         codepoints = {}
         input_directory = PROJECT_ROOT / "chameleon" / "input"
@@ -65,11 +73,14 @@ class FontLoaderProvenanceTests(unittest.TestCase):
                 if element["type"] != "text":
                     continue
                 weight = "bold" if element.get("font_weight") == "bold" else "regular"
+                is_italic = element.get("font_style") == "italic"
                 style = (
-                    "bold"
-                    if weight == "bold" and element.get("font_style") != "italic"
+                    "bolditalic"
+                    if weight == "bold" and is_italic
                     else "italic"
-                    if element.get("font_style") == "italic"
+                    if is_italic
+                    else "bold"
+                    if weight == "bold"
                     else "regular"
                 )
                 face = (element["font_family"], weight, style)
