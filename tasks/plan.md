@@ -15,6 +15,23 @@ plan and evidence boundary.
 - [Issue #70 — packaged font provenance](https://github.com/bjornefisk/ProjectChameleon/issues/70)
 - [Issue #71 — clean-build dependency provenance](https://github.com/bjornefisk/ProjectChameleon/issues/71)
 
+## PR lifecycle
+
+Each issue gets one short-lived branch and one open pull request:
+
+1. Branch from updated `main` with `fix/issue-<N>-<slug>`.
+2. Open a draft PR immediately and keep its scope limited to issue `#N`.
+3. Use `Refs #N` in the PR body while work is in progress. Do not auto-close
+   the issue before acceptance evidence exists.
+4. Convert the PR to ready, pass required `Verify and test`, and obtain review.
+5. After acceptance evidence is recorded, close issue `#N`, then squash-merge
+   its PR into `main`.
+6. Confirm `main` contains the merge, then delete the feature branch.
+
+Repository setting `delete_branch_on_merge` is enabled. Direct pushes to
+protected `main` remain out of scope; required checks and review still gate
+merges. No issue may have a second open PR for the same fix.
+
 ## Current baseline
 
 - PR #73 commit `150288e` contains placeholder-font provenance evidence, a
