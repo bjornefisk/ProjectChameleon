@@ -49,12 +49,14 @@ Recommended. Debian documents snapshot archives as historical package states tha
 
 ## Evidence sources
 
-- Debian snapshot archive: https://snapshot.debian.org/
-  - Retrieved 2026-10-23. The archive documents timestamped historical Debian states and apt source entries for those snapshots.
-- pip secure installs: https://pip.pypa.io/en/stable/topics/secure-installs/
-  - Retrieved 2026-10-23. pip documents `--require-hashes`, pinned requirements, and hashes for every dependency.
-- Project dependency evidence: `Docs/DEPENDENCY_EVIDENCE.md`
-- Runtime contract: `Docs/PROJECT_CONTRACT.md` §9 and ADR-004
+- **OBSERVED, Debian Project, snapshot.debian.org, retrieved 2026-10-23:** https://snapshot.debian.org/
+  - Inspected “Usage” and the timestamped archive-source examples. The page documents historical Debian states and apt source entries for those snapshots.
+  - Scope: apt archive selection and historical package availability. It does not select this project's timestamp or exact package versions.
+- **OBSERVED, Python Packaging Authority, pip documentation v26.2.2, Secure installs, retrieved 2026-10-23:** https://pip.pypa.io/en/stable/topics/secure-installs/
+  - Inspected “Hash-checking Mode,” “Additional restrictions,” and “Forcing Hash-checking mode.” pip documents `--require-hashes`, pinned requirements, and hashes for every direct and transitive dependency.
+  - Scope: pip distribution verification. It does not lock Debian packages or authorize a new project build tool.
+- **OBSERVED, project evidence:** `Docs/DEPENDENCY_EVIDENCE.md` records the current pins, native CI run, and unresolved package closure.
+- **NORMATIVE:** `Docs/PROJECT_CONTRACT.md` §9 and ADR-004 require the pinned offline `linux/amd64` runtime and prohibit unapproved dependency/runtime expansion.
 
 ## Consequences
 
@@ -64,6 +66,51 @@ Recommended. Debian documents snapshot archives as historical package states tha
 - Native amd64, cross-platform parity, official scoring, and organizer resource limits remain separate evidence gates.
 - No package, Dockerfile, requirements, schema, runtime, or public API change is authorized by this proposal.
 
+## Security, dependency, and data impact
+
+- Hash-checked artifacts reduce accidental or remote distribution drift, but hashes do not prove that a package is safe or that its license permits redistribution.
+- The proposed wheelhouse and apt archive records contain public package artifacts only. Do not store credentials, private indexes, hidden task inputs, or confidential organizer results.
+- The build must fail on missing or mismatched hashes rather than resolving an unrecorded alternative.
+- Runtime network access remains disabled. Build-time retrieval must be replaced by recorded local inputs before the final offline qualification run.
+
+## Migration and rollback
+
+- Keep the current direct-pin image as the baseline until the owner approves the strategy and a new candidate passes all checks.
+- Implement lock inputs in an isolated change. Do not overwrite the current requirements or Dockerfile until the candidate's package and artifact evidence is complete.
+- Roll back by reverting the approved lock-input commit and retaining the previous baseline image. A hash mismatch, unavailable snapshot, failed native build, or artifact drift blocks promotion; it does not justify weakening the lock.
+- No schema, wire-format, or public API migration is required.
+
+## Affected files and callers
+
+Potential implementation files after approval:
+
+- `chameleon/Dockerfile`
+- `chameleon/requirements.txt` or a new checked-in hash-locked requirements artifact
+- a checked-in wheelhouse manifest and renderer artifact record
+- `.github/workflows/ci.yml`
+- `Docs/DEPENDENCY_EVIDENCE.md`, `Docs/STATUS.md`, and a run record
+
+This proposal changes none of those inputs and adds no schema field, runtime dependency, model, solver, or public API.
+
+## Required verification before acceptance
+
+1. Record owner approval and the selected Debian snapshot, suite, exact apt versions, and archive hashes.
+2. Generate the complete Python 3.11 `linux/amd64` wheelhouse and verify every direct and transitive requirement with hash checking.
+3. Record the immutable renderer artifact digest and prove imports from the local artifact.
+4. Build from clean cache on native `linux/amd64`; capture image digest, SBOM, package closure, native-library closure, and all input hashes.
+5. Run all three samples with `--network none`; verify complete JSON/PNG/commit-marker pairs, repeated hashes, and clean-cache hashes.
+6. Exercise a failure path and verify that no partial artifact pair remains.
+7. Record organizer-controlled limits as unverified unless an authoritative source supplies them.
+
+These checks are not run by this proposal. Existing native CI evidence covers the current direct-pin image, not an approved lock candidate.
+
+## Open external facts
+
+- Owner approval of this strategy and exact lock inputs.
+- Availability and retention policy for the selected Debian snapshot and all wheelhouse artifacts.
+- Native amd64 qualification for the resulting locked image.
+- Cross-platform artifact parity, official scoring, and organizer resource limits.
+
 ## Approval gate
 
-`@bjornefisk` must approve the strategy and any exact lock inputs before implementation. Until approval, issue #71 remains open and the current direct-pin image remains the release-candidate baseline with its documented limitations.
+`@bjornefisk` must approve the strategy and any exact lock inputs before implementation. Until approval, Issue #71 remains open and the current direct-pin image remains the release-candidate baseline with its documented limitations.

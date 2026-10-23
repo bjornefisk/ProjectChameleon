@@ -168,9 +168,9 @@ cross-platform parity, and the reviewed package-lock decision remain open.
 
 ADR-013 (`Docs/DECISIONS/ADR-013-reproducible-package-lock-strategy.md`) records a proposed, not accepted, lock path for Issue #71. It recommends a timestamped Debian snapshot with exact apt package versions, a complete Python 3.11 `linux/amd64` wheelhouse with SHA-256 hashes for every transitive distribution, and an immutable local artifact for the pinned renderer revision.
 
-- **OBSERVED, Debian snapshot archive retrieved 2026-10-23:** [snapshot.debian.org](https://snapshot.debian.org/) documents timestamped historical Debian states that can be used as apt repositories.
-- **OBSERVED, pip secure-install guidance retrieved 2026-10-23:** [Secure installs](https://pip.pypa.io/en/stable/topics/secure-installs/) documents `--require-hashes`, pinned requirements, and hashes for every direct and transitive dependency.
-- **DECISION STATUS:** No exact apt versions, snapshot timestamp, wheelhouse, Dockerfile change, requirements change, or runtime change is authorized. `@bjornefisk` must approve the strategy and exact lock inputs before implementation.
+- **OBSERVED, Debian Project retrieved 2026-10-23:** [snapshot.debian.org](https://snapshot.debian.org/) was inspected at “Usage” and its timestamped archive-source examples. It documents historical Debian states and apt source entries for those snapshots. Scope: archive selection and package availability; it does not select this project's timestamp or versions.
+- **OBSERVED, Python Packaging Authority pip documentation v26.2.2 retrieved 2026-10-23:** [Secure installs](https://pip.pypa.io/en/stable/topics/secure-installs/) was inspected at “Hash-checking Mode,” “Additional restrictions,” and “Forcing Hash-checking mode.” It documents `--require-hashes`, pinned requirements, and hashes for all direct and transitive dependencies. Scope: pip distributions; it does not lock Debian packages.
+- **UNVERIFIED_EXTERNAL_FACT:** Owner approval, exact lock inputs, snapshot retention, wheelhouse availability, and native qualification for a locked candidate remain unresolved. The proposed strategy and approval request are recorded in [`.agents/runs/issue-71-package-lock-strategy-20261023.md`](../.agents/runs/issue-71-package-lock-strategy-20261023.md) and Issue #71 [comment](https://github.com/bjornefisk/ProjectChameleon/issues/71#issuecomment-6373327459).
 
 The proposal narrows the remaining acceptance decision; it does not close Issue #71 or claim complete package closure.
 
