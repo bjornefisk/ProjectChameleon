@@ -43,16 +43,16 @@ Out of scope: Inventing thresholds or scores, publishing hidden tasks, tuning to
 | Governance check | `python3 scripts/verify_repository.py` | `PASS` (exit `0`) | Repository governance and implementation wiring consistent |
 | Available-runtime verification | `make verify PYTHON_BOOTSTRAP=.venv/bin/python` | `PASS` (exit `0`) | Font manifest and repository governance passed |
 | Issue state | `gh issue view 69 --json state,updatedAt,url` | `PASS` (exit `0`) | `OPEN`; updated `2026-10-23T21:43:55Z` |
-| Public comment audit | `gh api 'repos/bjornefisk/ProjectChameleon/issues/69/comments?per_page=100' --jq '.[] | {id,created_at,updated_at,body,user:.user.login}'` | `PASS` (exit `0`) | Three public maintainer comments; request `6368953819`, latest blocker `6375344513`; no organizer response or score |
+| Public comment audit | `gh api 'repos/bjornefisk/ProjectChameleon/issues/69/comments?per_page=100' --jq '.[] | {id,created_at,updated_at,body,user:.user.login}'` | `PASS` (exit `0`) | Three public maintainer comments; request `6368953819`, latest blocker `6375344513`; no public organizer response or score recorded as of `2026-10-24T01:49:21Z` |
 | Product integration smoke | `make docker-build && make docker-test` | `NOT RUN` (exit `N/A`) | Documentation-only blocker record; no product input changed |
 | Artifact inspection | `find chameleon/output -maxdepth 1 -type f -print` | `NOT RUN` (exit `N/A`) | No runtime command ran; stale, partial, and published files were not inspected |
-| Official scoring execution | Organizer-authorized scorer/protocol | `NOT RUN` (exit `N/A`) | No authoritative protocol, access, target catalogue, or result is available |
+| Official scoring execution | Organizer-authorized scorer/protocol | `NOT RUN` (exit `N/A`) | No authoritative protocol, access, target catalogue, or result is publicly recorded in the repository or Issue #69 at retrieval |
 
 ## Public source observations
 
 - **OBSERVED:** Issue #69 body states that the official scorer/protocol, thresholds, complete target catalogue, and official result are not recorded. It requires an authoritative response or a dated denial.
 - **OBSERVED:** Public request comment `6368953819` was created by `@gabegaines24` on 2026-10-23 at `15:52:56Z`: https://github.com/bjornefisk/ProjectChameleon/issues/69#issuecomment-6368953819. It requests evaluator revision, Level 1/2/3 target coverage, rubric, thresholds, hardware/runtime constraints, failure semantics, result format, and disclosure permission.
-- **OBSERVED:** Public blocker comment `6375344513` was created by `@gabegaines24` on 2026-10-23 at `21:43:54Z`: https://github.com/bjornefisk/ProjectChameleon/issues/69#issuecomment-6375344513. It records that official evidence remains unavailable and makes no qualification claim.
+- **OBSERVED:** Public blocker comment `6375344513` was created by `@gabegaines24` on 2026-10-23 at `21:43:54Z`: https://github.com/bjornefisk/ProjectChameleon/issues/69#issuecomment-6375344513. It records that no official evidence is publicly available in the issue and makes no qualification claim.
 - **OBSERVED:** The seven-case local evaluator and public fixtures are repository evidence only. `Docs/STATUS.md` and `Docs/DEPENDENCY_EVIDENCE.md` keep local results separate from organizer-held-out scoring.
 
 ## Artifacts
