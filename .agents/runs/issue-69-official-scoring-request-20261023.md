@@ -5,11 +5,11 @@ run_id: issue-69-official-scoring-request-20261023
 owner/role: @gabegaines24 / issue manager
 workflow/gate: Issue #69 organizer scoring evidence
 started/updated: 2026-10-24T01:49:21Z / 2026-10-24
-branch/ref: fix/issue-69-official-scoring-evidence @ f6f6d9c2e451805a3008a0560be0fb6ef1767f2f
-source revision: f6f6d9c2e451805a3008a0560be0fb6ef1767f2f
-evidence capture revision: f6f6d9c2e451805a3008a0560be0fb6ef1767f2f
-worktree state: clean at evidence capture; this final record update binds checks run at the preceding substantive revision
-
+branch/ref: fix/issue-69-official-scoring-evidence @ b9ba72eddf1cbbe31fd45719a5a02469363104c5
+source revision: f6f6d9c2e451805a3008a0560be0fb6ef1767f2f (substantive documentation revision)
+evidence capture revision: b9ba72eddf1cbbe31fd45719a5a02469363104c5 (record-only parent; checks rerun at `2026-10-24T12:31:56Z`)
+record-only scope: `b9ba72eddf1cbbe31fd45719a5a02469363104c5` and this final metadata update; no product/runtime input changes
+worktree state: clean at evidence capture; this final record update is documentation-only
 Goal/acceptance: Record an authoritative scoring protocol and result if available; otherwise preserve the external blocker without claiming qualification.
 
 Risk/data classification: High qualification risk because official scoring details and results may be organizer-controlled or non-public. Public issue metadata only; no hidden inputs, credentials, private results, or personal data stored.
@@ -40,6 +40,7 @@ Out of scope: Inventing thresholds or scores, publishing hidden tasks, tuning to
 | Branch setup | `git switch -c fix/issue-69-official-scoring-evidence` | `PASS` (exit `0`) | Branch created from synchronized `main` |
 | Base source snapshot | `git rev-parse HEAD` | `PASS` (exit `0`) | Branch created from main at `8d81655f5c8e49081e17f18276f791cc5b4c5e95` |
 | Evidence revision snapshot | `git rev-parse f6f6d9c` | `PASS` (exit `0`) | `f6f6d9c2e451805a3008a0560be0fb6ef1767f2f`; verification checks were rerun at this substantive revision |
+| Final record verification | `date -u +%Y-%m-%dT%H:%M:%SZ && git rev-parse HEAD && git diff --check && python3 scripts/verify_repository.py && make verify PYTHON_BOOTSTRAP=.venv/bin/python` | `PASS` (exit `0`) | `2026-10-24T12:31:56Z`; HEAD `b9ba72eddf1cbbe31fd45719a5a02469363104c5`; governance and available-runtime checks passed |
 | Source check | `git diff --check` | `PASS` (exit `0`) | No whitespace errors before this update |
 | Governance check | `python3 scripts/verify_repository.py` | `PASS` (exit `0`) | Repository governance and implementation wiring consistent |
 | Available-runtime verification | `make verify PYTHON_BOOTSTRAP=.venv/bin/python` | `PASS` (exit `0`) | Font manifest and repository governance passed |
@@ -55,7 +56,7 @@ Out of scope: Inventing thresholds or scores, publishing hidden tasks, tuning to
 
 ## Public source observations
 
-- **OBSERVED:** Issue #69 body and URL were retrieved with `gh issue view 69 --json body,state,updatedAt,url` at `2026-10-24T02:06:08Z`. The body states that official scorer/protocol, thresholds, complete target catalogue, and official result are not recorded, and requires an authoritative response or a dated denial.
+- **OBSERVED:** Issue #69 body and URL were retrieved with `gh issue view 69 --json body,state,updatedAt,url` at `2026-10-24T02:06:08Z`. The body states that official scorer/protocol, thresholds, complete target catalogue, and official result are not recorded. Its acceptance permits recording a dated request and impact when access or results remain unavailable; it does not require a dated denial.
 - **OBSERVED:** Public request comment `6368953819` was created and last updated by `@gabegaines24` on 2026-10-23 at `15:52:56Z`; comment audit retrieved it at `2026-10-24T01:49:21Z`: https://github.com/bjornefisk/ProjectChameleon/issues/69#issuecomment-6368953819. It requests evaluator revision, Level 1/2/3 target coverage, rubric, thresholds, hardware/runtime constraints, failure semantics, result format, and disclosure permission.
 - **OBSERVED:** Public blocker comment `6375344513` was created and last updated by `@gabegaines24` on 2026-10-23 at `21:43:54Z`; comment audit retrieved it at `2026-10-24T01:49:21Z`: https://github.com/bjornefisk/ProjectChameleon/issues/69#issuecomment-6375344513. It records that no official evidence is publicly available in the issue and makes no qualification claim.
 - **OBSERVED:** The seven-case local evaluator and public fixtures are repository evidence only. `Docs/STATUS.md` and `Docs/DEPENDENCY_EVIDENCE.md` keep local results separate from organizer-held-out scoring.
@@ -64,8 +65,8 @@ Out of scope: Inventing thresholds or scores, publishing hidden tasks, tuning to
 
 - Published product files: none created by this documentation-only slice; publication state was not inspected.
 - Evidence record: this file.
-- Issue evidence: public request and blocker comment links above.
-- Changed files/resources: `.agents/runs/issue-69-official-scoring-request-20261023.md`, `Docs/STATUS.md`, public Issue #69 request/comment metadata.
+- Issue evidence inputs: public request and blocker comment metadata; these pre-existing GitHub comments were not changed by this PR.
+- Changed repository files: `.agents/runs/issue-69-official-scoring-request-20261023.md`, `Docs/STATUS.md`.
 - Product/runtime inputs changed: none.
 - Hidden inputs or confidential results: none requested, stored, or published.
 - Stale or partial runtime artifacts: not inspected; no runtime command created output.
