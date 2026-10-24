@@ -5,9 +5,9 @@ run_id: issue-69-official-scoring-request-20261023
 owner/role: @gabegaines24 / issue manager
 workflow/gate: Issue #69 organizer scoring evidence
 started/updated: 2026-10-24T01:49:21Z / 2026-10-24
-branch/ref: fix/issue-69-official-scoring-evidence @ 9848cf4fc5df8da20827ec40b85386641b6001ff
-source revision: 9848cf4fc5df8da20827ec40b85386641b6001ff
-evidence capture revision: 9848cf4fc5df8da20827ec40b85386641b6001ff
+branch/ref: fix/issue-69-official-scoring-evidence @ f6f6d9c2e451805a3008a0560be0fb6ef1767f2f
+source revision: f6f6d9c2e451805a3008a0560be0fb6ef1767f2f
+evidence capture revision: f6f6d9c2e451805a3008a0560be0fb6ef1767f2f
 worktree state: clean at evidence capture; this final record update binds checks run at the preceding substantive revision
 
 Goal/acceptance: Record an authoritative scoring protocol and result if available; otherwise preserve the external blocker without claiming qualification.
