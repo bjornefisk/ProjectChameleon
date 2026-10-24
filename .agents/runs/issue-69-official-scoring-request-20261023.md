@@ -38,7 +38,8 @@ Out of scope: Inventing thresholds or scores, publishing hidden tasks, tuning to
 |---|---|---|---|
 | Date snapshot | `date -u +%Y-%m-%dT%H:%M:%SZ` | `PASS` (exit `0`) | `2026-10-24T01:49:21Z` |
 | Branch setup | `git switch -c fix/issue-69-official-scoring-evidence` | `PASS` (exit `0`) | Branch created from synchronized `main` |
-| Source snapshot | `git rev-parse HEAD` | `PASS` (exit `0`) | `8d81655f5c8e49081e17f18276f791cc5b4c5e95` |
+| Base source snapshot | `git rev-parse HEAD` | `PASS` (exit `0`) | Branch created from main at `8d81655f5c8e49081e17f18276f791cc5b4c5e95` |
+| Evidence revision snapshot | `git rev-parse f6f6d9c` | `PASS` (exit `0`) | `f6f6d9c2e451805a3008a0560be0fb6ef1767f2f`; verification checks were rerun at this substantive revision |
 | Source check | `git diff --check` | `PASS` (exit `0`) | No whitespace errors before this update |
 | Governance check | `python3 scripts/verify_repository.py` | `PASS` (exit `0`) | Repository governance and implementation wiring consistent |
 | Available-runtime verification | `make verify PYTHON_BOOTSTRAP=.venv/bin/python` | `PASS` (exit `0`) | Font manifest and repository governance passed |
