@@ -6,6 +6,14 @@
 **Decision status:** The merged implementation preserves bounded four-topology search, at most twelve source-derived candidates, renderer-gated hard validation, fixed-point ranking, deterministic output, and typed fail-closed behavior. Accepted ADR-010 through ADR-012 reconcile only quantized common group transforms, the absence of a numeric readability floor, and the renderer-measured transient glyph inset against the source challenge PDF. Local success and native CI do not establish organizer qualification; cross-platform parity and organizer-held-out scoring remain unverified.
 **Ticket 06 authority:** User-requested GitHub issue #13; owner @bjornefisk; partner reviewer @gabegaines24. Implementation branch `feat/ticket-06-column-pivot-level2` merged as PR #14. The Issue #61 branch was based on main commit `c5b1159` before PR #65 merged the fix into main.
 
+## Issue #69 official scoring evidence
+
+The official evaluator revision, Level 1/2/3 target coverage, rubric, thresholds, hardware/runtime limits, failure semantics, result format, disclosure permission, and official result remain **UNVERIFIED_EXTERNAL_FACT**. The seven-case local evaluator and public fixtures are not organizer-held-out scoring.
+
+The dated organizer request is [Issue #69 comment 6368953819](https://github.com/bjornefisk/ProjectChameleon/issues/69#issuecomment-6368953819), created 2026-10-23 at 15:52:56Z. The latest blocker record is [comment 6375344513](https://github.com/bjornefisk/ProjectChameleon/issues/69#issuecomment-6375344513), created 2026-10-23 at 21:43:54Z. No authoritative protocol, result, or dated denial is recorded. Keep Issue #69 open; do not claim qualification from local results.
+
+The reproducible request audit is [`.agents/runs/issue-69-official-scoring-request-20261023.md`](../.agents/runs/issue-69-official-scoring-request-20261023.md).
+
 ## Issue #68 PNG-golden environment and platform evidence
 
 The 2026-10-22 run record reports `make test PYTHON=/tmp/chameleon-pinned-venv/bin/python` at 273/275 in a Python 3.12 Darwin arm64 environment with `skia-python 132.0b11`. The two persisted PNG checks were `right_negative_spacing` and `chameleon_sample_level1_warmup`. The separate root `.venv` result was 272/275 with `skia-python 144.0.post2`, not the pinned 132.0b11. The historical report does not preserve a full `pip freeze`, the Python 3.12 patch version, or the generated hashes from those failing tests; the exact cause of those old failures cannot be attributed to Python alone. Those reported failures remain evidence; no failure was downgraded and no expected hash bytes were refreshed.
