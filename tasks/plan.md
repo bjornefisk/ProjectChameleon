@@ -21,11 +21,12 @@ Each issue gets one short-lived branch and one open pull request:
 
 1. Branch from updated `main` with `fix/issue-<N>-<slug>`.
 2. Open a draft PR immediately and keep its scope limited to issue `#N`.
-3. Use `Refs #N` in the PR body while work is in progress. Do not auto-close
-   the issue before acceptance evidence exists.
-4. Convert the PR to ready, pass required `Verify and test`, and obtain review.
-5. After acceptance evidence is recorded, close issue `#N`, then squash-merge
-   its PR into `main`.
+3. Use `Refs #N` in the PR body while work is in progress. Keep the issue open;
+   change to `Closes #N` only when the PR is ready for review/merge.
+4. Convert the PR to ready after acceptance evidence exists, required
+   `Verify and test` passes, and review is obtained.
+5. Squash-merge the accepted PR into `main`; GitHub closes the PR and linked
+   issue through `Closes #N`.
 6. Confirm `main` contains the merge, then delete the feature branch.
 
 Repository setting `delete_branch_on_merge` is enabled. Direct pushes to
@@ -44,9 +45,11 @@ merges. No issue may have a second open PR for the same fix.
 - ADR-013 accepts the Debian snapshot, complete Python wheelhouse, and
   source-bound renderer artifact strategy. The Issue #71 owner authorized it in
   the direct task instruction; the earlier public comment was only a request.
-- The issue branch implements the lock set and provenance workflow. Its native
-  amd64 CI qualification and independent review must be recorded before #71
-  closes; local arm64-host emulation remains supplemental.
+- Native run `40227253405` passed the first candidate but did not retain its
+  SPDX SBOM. Follow-up commit `a2b8543` enables workflow-artifact upload;
+  updated run `40228417003` passed on candidate `a2b8543` with its SPDX-2.3
+  artifact inspected. Human maintainer review and the final current PR-head
+  check remain merge gates; local arm64-host emulation is supplemental.
 - Official scorer protocol, thresholds, target catalogue, and official results
   remain unavailable.
 

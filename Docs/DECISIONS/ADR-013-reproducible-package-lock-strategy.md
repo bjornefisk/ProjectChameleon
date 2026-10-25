@@ -11,7 +11,7 @@ Accepted
 - Proposer: repository maintainer
 - Issue: #71
 - Approval authority: the issue owner directly instructed the agent to complete Issue #71, apply required changes, test them, open a PR, and merge it. This is approval in the current task, not a claim that an earlier public Issue comment approved the strategy.
-- Review: independent repository-maintainer review and native candidate qualification are required before Issue #71 closure; record the evidence in its PR and run record.
+- Review: updated-head native run `40228417003` passed on candidate `a2b8543`; its uploaded SPDX-2.3 artifact was inspected and its SHA-256 matched the workflow digest. Verify the current PR-head required check and repository-maintainer review before merge; neither is superseded by this candidate run.
 - Supersedes: the packaging-input detail in ADR-004 that pointed to direct pins in `requirements.txt`. The `linux/amd64`, Python 3.11, CPU-only, and offline-runtime boundaries are unchanged.
 
 ## Context
@@ -31,7 +31,7 @@ The issue owner authorized completion of this bounded packaging work in the dire
 5. Bind the renderer source repository and commit to the exact source archive and wheel in `renderer-artifact.json`. Build the pure-Python wheel with the locked backend and `SOURCE_DATE_EPOCH`; the two independently observed builds produced the same SHA-256. Install only that local wheel with `--no-index --no-deps`, then verify PEP 610 `direct_url.json`'s archive hash against the manifest. Do not install from VCS or resolve a renderer index release.
 6. The Docker build consumes the pinned base image, the exclusive signed apt snapshot, the committed lock files, and the generated verified wheelhouse. Python installation uses `--no-index`, `--require-hashes`, `--only-binary=:all:`, and an empty pip cache. The image records its package locks, apt closure, `pip inspect`, and `pip freeze` under `/app/provenance/`. Runtime execution remains `--network none`; no model, solver, schema, or public API scope changes.
 7. Preserve each third-party license and notice in its package's installed distribution metadata/files or Debian `/usr/share/doc/<package>/copyright`. Verify the renderer's Apache-2.0 license, every wheel's license metadata/notice file, and the apt package notices. The SBOM and exact package closure are separate from this license review; hashes alone do not establish license compatibility.
-8. Qualify the exact candidate on native x86_64 GitHub Actions with a clean-cache amd64 build, SBOM, package/native-library closure, offline samples and failure path, repeated/clean-cache artifact hashes, and provenance. Apple Silicon emulation is supplemental. Do not infer organizer limits or release qualification from these build checks.
+8. Qualify the exact candidate on native x86_64 GitHub Actions with a clean-cache amd64 build, a non-empty SPDX JSON SBOM uploaded as a workflow artifact with its SHA-256 recorded, package/native-library closure, offline samples and failure path, repeated/clean-cache artifact hashes, and provenance. Apple Silicon emulation is supplemental. Do not infer organizer limits or release qualification from these build checks.
 
 ## Alternatives considered
 

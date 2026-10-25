@@ -36,15 +36,17 @@ implementation is in this branch; the direct task instruction is the owner
 approval. The earlier public Issue comment requested approval and is not
 misrepresented as granting it.
 
-Local verification has passed repository wiring, the corrected Python 3.11
-setup path, a locked amd64 image build, three offline sample successes, and a
-malformed-input failure with no output artifacts. The Docker run was
-linux/amd64 emulation on Darwin arm64. It is supplemental only.
+Local verification has passed repository wiring, the required software preflight,
+the corrected Python 3.11 setup path, a locked amd64 image build, three offline
+sample successes, and a malformed-input failure with no output artifacts. The
+Docker run was linux/amd64 emulation on Darwin arm64 and remains supplemental.
 
-Native GitHub Actions `linux/amd64` clean-build qualification, SBOM, package
-and native-library closure, repeated/clean-cache artifact hashes, and
-independent review remain required before closure. Do not claim the lock
-candidate is qualified until those results are recorded.
+Native GitHub Actions run `40227253405` passed the first candidate's build/runtime
+and package-closure checks, but its generated SPDX SBOM was not retained.
+Follow-up run `40228417003` passed `Verify and test` on candidate `a2b8543`
+and uploaded an inspected SPDX-2.3 workflow artifact. Repository-maintainer
+review and the final PR-head check remain merge gates; broad organizer
+qualification is still unverified.
 
 ## Acceptance criteria
 
@@ -75,7 +77,8 @@ candidate is qualified until those results are recorded.
 
 ## PR lifecycle
 
-Use `Refs #71` while this PR is in progress. Convert to ready only after the
-approved lock strategy and qualification evidence exist. Close Issue #71 after
-acceptance evidence, then squash-merge into `main`; delete this branch after
-merge.
+Use `Refs #71` while the PR is a draft or otherwise in progress. Mark it ready
+and switch to `Closes #71` only after the native SBOM-artifact qualification,
+repository-maintainer review, and final PR-head check pass. Squash-merge into
+`main`; GitHub then closes the PR and Issue #71. Do not close the issue before
+merge; delete the branch after merge.
