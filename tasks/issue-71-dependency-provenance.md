@@ -44,9 +44,9 @@ Docker run was linux/amd64 emulation on Darwin arm64 and remains supplemental.
 Native GitHub Actions run `40227253405` passed the first candidate's build/runtime
 and package-closure checks, but its generated SPDX SBOM was not retained.
 Follow-up run `40228417003` passed `Verify and test` on candidate `a2b8543`
-and uploaded an inspected SPDX-2.3 workflow artifact. Repository-maintainer
-review and the final PR-head check remain merge gates; broad organizer
-qualification is still unverified.
+and uploaded an inspected SPDX-2.3 workflow artifact. PR-head run `40229964417`
+also passed on `b004f609c70440a510ceae645b8ff5de66afb071` and retained its
+SBOM artifact. GitHub's [runner-image migration notice #14748](https://github.com/actions/runner-images/issues/14748) announced the `ubuntu-latest` transition to Ubuntu 26; the workflow is pinned to `ubuntu-24.04`. The pinned head's required check and repository-maintainer review remain merge gates.
 
 ## Acceptance criteria
 
@@ -79,6 +79,7 @@ qualification is still unverified.
 
 Use `Refs #71` while the PR is a draft or otherwise in progress. Mark it ready
 and switch to `Closes #71` only after the native SBOM-artifact qualification,
-repository-maintainer review, and final PR-head check pass. Squash-merge into
-`main`; GitHub then closes the PR and Issue #71. Do not close the issue before
-merge; delete the branch after merge.
+the required check on the `ubuntu-24.04` runner-pinned head, and
+repository-maintainer review pass. Squash-merge into `main`; GitHub then closes
+the PR and Issue #71. Do not close the issue before merge; delete the branch
+after merge.
