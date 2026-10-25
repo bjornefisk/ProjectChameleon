@@ -10,21 +10,22 @@ This file applies source-driven development only to external libraries, platform
 
 | Topic | Detected state | Source-backed fact | Decision/pin | Required conformance test |
 | --- | --- | --- | --- | --- |
-| `cr-renderer` source | The old requirement installed the moving default branch. The observed `main` SHA is `a17e1fb9a732959dd6c21ae168d5ee09d74bd64f`; upstream package metadata says version `0.1.0`, Python `>=3.10`. | [commit API](https://api.github.com/repos/CyberAgentAILab/cr-renderer/commits/main), [commit](https://github.com/CyberAgentAILab/cr-renderer/commit/a17e1fb9a732959dd6c21ae168d5ee09d74bd64f), [pyproject](https://raw.githubusercontent.com/CyberAgentAILab/cr-renderer/a17e1fb9a732959dd6c21ae168d5ee09d74f/pyproject.toml) | Pin the immutable SHA in `requirements.txt`. Treat future upgrades as a renderer ADR. | Clean amd64 install; record VCS direct URL and render a fixed PNG fixture. |
+| `cr-renderer` source | The pinned upstream commit is `a17e1fb9a732959dd6c21ae168d5ee09d74bd64f`; upstream metadata records version `0.1.0`, Python `>=3.10`, and Apache-2.0. | [commit API](https://api.github.com/repos/CyberAgentAILab/cr-renderer/commits/a17e1fb9a732959dd6c21ae168d5ee09d74bd64f), [commit](https://github.com/CyberAgentAILab/cr-renderer/commit/a17e1fb9a732959dd6c21ae168d5ee09d74bd64f), [pyproject](https://raw.githubusercontent.com/CyberAgentAILab/cr-renderer/a17e1fb9a732959dd6c21ae168d5ee09d74f/pyproject.toml) | `renderer-artifact.json` binds the verified source archive SHA-256, deterministic local wheel SHA-256, and PEP 610 installed provenance. Treat future upgrades as a renderer ADR. | Build and import the local wheel on amd64; require its installed archive hash to match the manifest and render the golden fixtures. |
 | Upstream renderer geometry | `CrelloV5Renderer` translates absolute `left/top`, rotates around the local center in degrees, draws images into the destination rectangle, and downsizes to `max_size`. | [renderer.py](https://raw.githubusercontent.com/CyberAgentAILab/cr-renderer/a17e1fb9a732959dd6c21ae168d5ee09d74f/src/cr_renderer/renderer.py) | Contract against the pinned source plus the local adapter. Do not assume intrinsic contain/cover or automatic wrapping in upstream. | Non-square image, 90°/non-right-angle rotation, alpha, canvas scaling, and deterministic PNG tests. |
 | Upstream text | `lineMap` supplies line ranges; absent map becomes one line. Line origins use `line_index * fontSize * lineHeight`; glyph advances include letter spacing; alignment is applied inside width. `wordBreak` is not used by the render path. | [schema.py](https://raw.githubusercontent.com/CyberAgentAILab/cr-renderer/a17e1fb9a732959dd6c21ae168d5ee09d74bd64f/src/cr_renderer/schema.py), [text_utils.py](https://raw.githubusercontent.com/CyberAgentAILab/cr-renderer/a17e1fb9a732959dd6c21ae168d5ee09d74f/src/cr_renderer/text_utils.py) | Keep public Chameleon text unchanged; the adapter owns deterministic line-map generation. | Explicit two-line map, missing map, all alignments, spacing, style maps, and glyph-bound tests. |
 | Local text adapter | The wrapper measures effective style spans, preserves code-point `[start,end)` runs, intersects UAX #29 clusters with UAX #14 opportunities, enforces explicit line/height limits, and rejects malformed or unbreakable text. | `chameleon/renderer/converter/wrap.py`, `convert.py`, `unicode_data.py` | Keep adapter behavior aligned with ADR-008 and the pinned renderer. | Boundary/style/spacing/height, Unicode property, non-breaking class, malformed-input, and glyph-bound tests. |
 | Unicode text properties | The adapter's grapheme, Indic conjunct, line-break, general-category, and East Asian width decisions use generated Unicode 17.0.0 tables from the official UCD files. | [GraphemeBreakProperty.txt](https://www.unicode.org/Public/17.0.0/ucd/auxiliary/GraphemeBreakProperty.txt), [emoji-data.txt](https://www.unicode.org/Public/17.0.0/ucd/emoji/emoji-data.txt), [DerivedCoreProperties.txt](https://www.unicode.org/Public/17.0.0/ucd/DerivedCoreProperties.txt), [LineBreak.txt](https://www.unicode.org/Public/17.0.0/ucd/LineBreak.txt), [UnicodeData.txt](https://www.unicode.org/Public/17.0.0/ucd/UnicodeData.txt), [EastAsianWidth.txt](https://www.unicode.org/Public/17.0.0/ucd/EastAsianWidth.txt) | Keep tables versioned with the adapter; upgrade only with renderer conformance evidence. | UAX #29 cluster cases, UAX #14 GL/WJ/BA/punctuation cases, and repeated deterministic wrapping. |
-| Renderer transitives | The selected upstream `uv.lock` recorded `datasets 3.2.0`, `pydantic 2.10.6`, `skia-python 132.0b11`, `Pillow 11.1.0`, and `numpy 2.2.2`; upstream project metadata supplies lower bounds only. | [upstream pyproject](https://raw.githubusercontent.com/CyberAgentAILab/cr-renderer/a17e1fb9a732959dd6c21ae168d5ee09d74bd64f/pyproject.toml), [upstream lock](https://raw.githubusercontent.com/CyberAgentAILab/cr-renderer/a17e1fb9a732959dd6c21ae168d5ee09d74f/uv.lock) | Pin the compatibility baseline directly in `requirements.txt`; a full hash-locked wheelhouse remains follow-up work. | Fresh amd64 build, `pip freeze`, imports for every used symbol, local font load, and sample render. |
+| Renderer transitives | The selected upstream `uv.lock` records `datasets 3.2.0`, `pydantic 2.10.6`, `skia-python 132.0b11`, `Pillow 11.1.0`, and `numpy 2.2.2`; project metadata alone gives lower bounds. | [upstream pyproject](https://raw.githubusercontent.com/CyberAgentAILab/cr-renderer/a17e1fb9a732959dd6c21ae168d5ee09d74bd64f/pyproject.toml), [upstream lock](https://raw.githubusercontent.com/CyberAgentAILab/cr-renderer/a17e1fb9a732959dd6c21ae168d5ee09d74f/uv.lock) | Keep direct constraints in `requirements.in`; `requirements.lock` hash-locks the complete runtime closure. `renderer-build.lock` hash-locks the PEP 517 build environment. | Prepare the target wheelhouse, record `pip freeze`/`pip inspect`, verify imports, local font loads, sample render, and clean-cache native amd64 evidence. |
 | Pillow | The prior requirement was `Pillow>=10.0`. Official support lists Python 3.11 for Pillow 10, 11, and 12. | [Pillow Python support](https://pillow.readthedocs.io/en/stable/installation/python-support.html) | Pin `Pillow==11.1.0` for parity with the selected renderer lock. | Decode all packaged assets; exercise RGBA conversion, LANCZOS contain/cover/fill, shape rasterization, placeholder, and PNG round-trip. |
 | Skia Python binding | Skia was transitive and lower-bounded at `>=120.0b5`; the selected lock recorded `132.0b11`. | [skia-python 132.0b11](https://pypi.org/project/skia-python/132.0b11/), [Skia download/build](https://skia.org/docs/user/download/) | Pin `skia-python==132.0b11`; verify native libraries in the target image. | Import Skia, create a CPU surface, load each TTF, render text/image/rotation, encode PNG. |
-| PNG golden runtime | Official image uses Python 3.11.11; native CI selects Python 3.11; persisted renderer and engine hashes bind Python 3.11, renderer revision, Pillow, Skia, and fonts. | [`chameleon/Dockerfile`](../chameleon/Dockerfile), [CI workflow](../.github/workflows/ci.yml), [`requirements.txt`](../chameleon/requirements.txt), [golden fixtures](../chameleon/tests/fixtures/) | Local setup defaults to `python3.11`; `make test` rejects another minor. PNG hashes remain per-OS/machine evidence, not universal parity. | Run renderer and engine hash cases in each recorded environment; preserve contract/artifact checks and fail on environment or hash drift. |
+| PNG golden runtime | The official image uses Python 3.11.11; persisted renderer and engine hashes bind Python 3.11, renderer revision, Pillow, Skia, and fonts. | [`chameleon/Dockerfile`](../chameleon/Dockerfile), [CI workflow](../.github/workflows/ci.yml), [`requirements.lock`](../chameleon/requirements.lock), [golden fixtures](../chameleon/tests/fixtures/) | Local setup defaults to `python3.11`; `make test` rejects another minor. PNG hashes remain per-OS/machine evidence, not universal parity. | Run renderer and engine hash cases in each recorded environment; preserve contract/artifact checks and fail on environment or hash drift. |
 | Datasets/Pydantic | Both were transitive and lower-bounded by `cr-renderer`; the selected lock recorded `datasets==3.2.0` and `pydantic==2.10.6`. | [cr-renderer pyproject](https://raw.githubusercontent.com/CyberAgentAILab/cr-renderer/a17e1fb9a732959dd6c21ae168d5ee09d74bd64f/pyproject.toml) and lock above | Pin the selected versions because the adapter uses `datasets` feature types and upstream Pydantic models. | Import `CrelloV5Renderer`, exercise the feature stub, and render with an empty and non-empty element list. |
 | JSON Schema validator | No validator dependency existed in the starter. | [jsonschema Draft 2020-12 docs](https://python-jsonschema.readthedocs.io/en/stable/validate/) | Pin `jsonschema==4.23.0` for contract tests using `Draft202012Validator`. | Validate the schema itself, all sample sources, empty design, and negative structural cases. |
 | Python JSON numeric ingress | `json.load` passes the original numeric token text to `parse_int` and `parse_float`; the default float path creates binary floats, and `parse_constant` handles non-standard `NaN`/`Infinity` tokens. | [Python 3.11 `json` documentation](https://docs.python.org/3.11/library/json.html#json.load) | Use `parse_int=int`, `parse_float=Decimal`, and a rejecting `parse_constant` hook before validation and geometry. | Runner-seam cases for finite decimal, exponent, integer, and non-finite-constant inputs; serialize mutable geometry/font-size values as finite integers while retaining only contract-approved immutable values. |
 | OR-Tools CP-SAT | Absent from requirements, imports, and code; present only in proposed architecture. | [CP-SAT guide](https://developers.google.com/optimization/cp/cp_solver), [Python API](https://or-tools.github.io/docs/pdoc/ortools/sat/python/cp_model.html), [release metadata](https://pypi.org/pypi/ortools/9.15.6755/json) | Do not add it during ratification. If selected later, pin a release and test integer intervals, status paths, allowed overlaps, and rotated post-validation. | Tiny deterministic model plus solver-status and geometry-validator checks. |
 | Docker platform | The starter forced `linux/amd64` but used a mutable base tag. Docker documents `--platform` selection and QEMU emulation for non-native builds; a `docker-container` Buildx builder does not automatically load its result into the local image store. | [Docker multi-platform builds](https://docs.docker.com/build/building/multi-platform/), [base-image pinning](https://docs.docker.com/build/building/best-practices/#pin-base-image-versions), [Buildx `--load`](https://docs.docker.com/reference/cli/docker/buildx/build/#load) | Keep a single amd64 scoring artifact. Pin `python:3.11.11-slim-bookworm` to the observed OCI index digest in `Dockerfile`; use `--load` for the local build-then-run smoke path; qualify the amd64 child digest during build. | Buildx amd64 build on Apple Silicon and native amd64; inspect `uname -m`, Python patch, wheel architecture, and sample PNG. |
-| Python base image | `python:3.11-slim` was mutable. Docker Hub reports `3.11.11-slim-bookworm` manifest digest `sha256:081075da77b2b55c23c088251026fb69a7b2bf92471e491ff5fd75c192fd38e5` and an amd64 child digest `sha256:a8e0a3090316aed0b11037aac613aef32fb1747dcc1dcb5c0f6c727a0113a07f`. | [Docker Hub image metadata](https://hub.docker.com/v2/repositories/library/python/tags/3.11.11-slim-bookworm) | Pin the manifest digest with an explicit `linux/amd64` target. Apt package versions are still not locked. | Record image digest/SBOM, Python version, native imports, and a clean rebuild result. |
+| Python base image | `python:3.11.11-slim-bookworm@sha256:081075da77b2b55c23c088251026fb69a7b2bf92471e491ff5fd75c192fd38e5`; amd64 child `sha256:a8e0a3090316aed0b11037aac613aef32fb1747dcc1dcb5c0f6c727a0113a07f`. | [Docker Hub image metadata](https://hub.docker.com/v2/repositories/library/python/tags/3.11.11-slim-bookworm) | Pin the manifest digest and explicit `linux/amd64` target; `renderer-artifact.json` also records the child digest and Python `3.11.11`. | Record image digest/SBOM, Python version, native imports, and clean rebuild result. |
+| Debian package closure | The image replaces inherited sources with timestamped Bookworm and Bookworm Security snapshots, installs four exact roots, and adds 54 exact packages without upgrades. | `chameleon/apt/sources.list`, `packages.lock`, `packages.sha256`, and `snapshot-evidence.json` record source URLs, signed InRelease hashes, exact versions, archive hashes, keyring, and Valid-Until handling. | Verify apt signatures, exact archive hashes, complete `dpkg-query` closure, and copyright notices for the installed packages. | Rebuild on native amd64; compare locked package closure, archive hashes, notices, SBOM, and `ldd` output. |
 | SBOM generation | The GitHub runner does not provide `docker sbom`; CI uses the pinned `anchore/sbom-action` commit `e22c389904149dbc22b58101806040fa8d37a610`, which embeds Syft `v1.42.3`, to scan the locally loaded image and emit SPDX JSON. | [sbom-action README](https://github.com/anchore/sbom-action/blob/e22c389904149dbc22b58101806040fa8d37a610/README.md), [action metadata](https://raw.githubusercontent.com/anchore/sbom-action/e22c389904149dbc22b58101806040fa8d37a610/action.yml), [pinned commit](https://github.com/anchore/sbom-action/commit/e22c389904149dbc22b58101806040fa8d37a610) | Pin the action commit and Syft version; keep artifact upload and dependency submission disabled for qualification. | Native amd64 workflow emits and hashes a non-empty SPDX JSON image SBOM without runtime network access. |
 | Runtime qualification harness | `scripts/qualify_runtime.py` records child wall time, CPU time, maximum RSS with units, Linux peak observed child-thread count from `/proc/<pid>/status`, return code, and platform metadata; it atomically writes the JSON report. CI runs it inside the pinned image with `--network none`, records image size and packaged asset/font hashes, checks native-library `ldd` closure, validates the report and artifact set, and compares repeated and clean-cache sample artifact hashes. | Repository script and `.github/workflows/ci.yml` | Record observations without converting organizer-controlled resource limits into hard runtime gates. | Native amd64 CI run; report schema and expected statuses; repeat hashes; clean-cache image run; image-size, CPU, RSS, thread, latency, asset/font, and native-library logs. |
 | Font loading | The project scans local TTF/OTF files and injects bytes into private `FontManager._fonts`; upstream default construction can download font data. | [upstream fonts.py](https://raw.githubusercontent.com/CyberAgentAILab/cr-renderer/a17e1fb9a732959dd6c21ae168d5ee09d74bd64f/src/cr_renderer/fonts.py) | Keep fonts in the image and use explicit local loading. Treat private-manager integration as revision-sensitive. | Hash every declared font, verify family/weight/style lookup, unknown-face failure behavior, and glyph advances. |
@@ -152,24 +153,39 @@ font availability and authorization remain **UNVERIFIED_EXTERNAL_FACT**.
 Release manager must obtain written production-font direction before release.
 ## Issue #71 clean-build dependency provenance
 
-`PR-74-build-provenance-inventory`. The source-input hashes were collected at
-source revision `2548c82`; the latest evidence record was committed in
-`86c9218`. The records bind repository inputs; native CI evidence is recorded
-below.
+**Decision and approval:** Accepted ADR-013 records the Debian snapshot,
+hash-locked Python runtime/build wheelhouse, and source-bound local renderer
+strategy. The issue owner authorized implementation in the direct task
+instruction dated 2026-10-25. Issue comment
+[6373327459](https://github.com/bjornefisk/ProjectChameleon/issues/71#issuecomment-6373327459)
+requested approval; it did not grant it.
 
-### Current release-candidate input inventory
+### Candidate build-input inventory
 
-| Input | Observed value | Evidence boundary |
-| --- | --- | --- |
-| Base image | `python:3.11.11-slim-bookworm@sha256:081075da77b2b55c23c088251026fb69a7b2bf92471e491ff5fd75c192fd38e5` | Manifest digest is pinned; native amd64 image identity and SBOM are recorded below. |
-| Apt/build packages | `git`, `libgl1`, `libegl1`, `libglib2.0-0`, `fontconfig` | Names are declared in `chameleon/Dockerfile`; apt versions are unpinned. |
-| Python runtime | Python `3.11.11` base image; CI selects Python `3.11` | Native CI observed Python `3.11.11`; complete wheel closure remains unresolved. |
-| Direct Python requirements | Pillow `11.1.0`; datasets `3.2.0`; pydantic `2.10.6`; skia-python `132.0b11`; jsonschema `4.23.0` | Direct versions are pinned; no complete hash-locked wheelhouse is committed. |
-| Renderer | `cr-renderer` commit `a17e1fb9a732959dd6c21ae168d5ee09d74bd64f` | VCS revision is immutable; native import and library closure remain run evidence. |
-| Source inputs | Dockerfile `735b1d7f102874045c9f35afaa98d9dd439eb2b4e8d1a7ef6a2da5953cad39b2`; requirements `432fc158c299c37e15b52e0464401df62f72d786aa7af6e4086fc7de73209a1b`; schema `d084eb524b7b0e683c9a31a63706ea4101ee0e3cd4a9a3b8218a59975fa55e41` | Hashes bind this inventory to the checked-out source revision. |
-| Native-library path | Skia and Pillow are checked with offline imports and `ldd` in `.github/workflows/ci.yml` | Native CI run `39988562284` passed imports and `ldd` with no `not found`; local emulation remains supplemental. |
+| Input | Exact candidate evidence |
+| --- | --- |
+| Base image | `python:3.11.11-slim-bookworm@sha256:081075da77b2b55c23c088251026fb69a7b2bf92471e491ff5fd75c192fd38e5`; `linux/amd64` child `sha256:a8e0a3090316aed0b11037aac613aef32fb1747dcc1dcb5c0f6c727a0113a07f`; Python `3.11.11`. |
+| Debian sources | Bookworm snapshot `https://snapshot.debian.org/archive/debian/20261025T143754Z/`; Bookworm Security snapshot `https://snapshot.debian.org/archive/debian-security/20261025T035125Z/`. Their signed InRelease SHA-256 values are `77737fa4b34f2693e982cc9ee35736816c35a7778fc2d326cc1bbf5b301fe1aa` and `5fdc0144562abd46f45083b48e1776898e234d93bbf6395b8147a53279d731db`. APT signature verification passed with the base image's `debian-archive-keyring=2023.3+deb12u1`. |
+| Debian packages | Exact runtime roots: `libgl1=1.6.0-1`, `libegl1=1.6.0-1`, `libglib2.0-0=2.74.6-2+deb12u9`, and `fontconfig=2.14.1-4`. `apt/packages.lock` contains the 54-package new closure; `apt/packages.sha256` hashes all 54 downloaded archives. Build evidence reports 0 upgrades and compares the complete installed `dpkg-query` output. |
+| Python runtime | `requirements.in` supplies 41 exact constraints. `requirements.lock` is 1,405 lines and SHA-256 `0386cc02d31ef271ed3ae68d8fc544727a273c8bf9dcb734dc309b87b3ac5b5f`; all selected distributions and wheels are hash-locked. |
+| Renderer build | `renderer-build.lock` is 28 lines and SHA-256 `e4b17a17cd56763c0a8c5491cebd1136aa4dbb1645861b2141443f28df0ff6cf`; Hatchling and its PEP 517 closure are installed from the same local wheelhouse. |
+| Renderer artifact | Upstream `cr-renderer` commit `a17e1fb9a732959dd6c21ae168d5ee09d74bd64f` has a verified GitHub signature and Apache-2.0 license. The source archive SHA-256 is `18e8bdf0c22d43516829c4a7028b4eb5953f8dc2359ad3fd50054384a2b6ef71` (116,458 bytes). The local wheel is `cr_renderer-0.1.0-py3-none-any.whl`, 15,950 bytes, SHA-256 `92b4005c5777d305151321760cfb32e0c8e91a7041ac74fabe630bcc2e06fda9`. Two independent `linux/amd64` builds using the current `packaging==24.2` build lock produced this same hash. |
+| Generated wheelhouse | 46 wheels. `.wheelhouse/manifest.json` SHA-256 `5cf515d60e773784b601d71de099e29943ab9e4e513b064a29824103179f3728`; it records every wheel filename, size, SHA-256, and lock/manifest/base-image input digest. It is generated and ignored, not committed. |
+| Schema and product inputs | Schema SHA-256 `d084eb524b7b0e683c9a31a63706ea4101ee0e3cd4a9a3b8218a59975fa55e41`. Dockerfile SHA-256 `50d7eb17777cf74777c151cc9c1b46b5905a7eb101c1bf2f68cfee46c93ca5ec`. Full lock-input fingerprints are in the adjacent manifests. |
+| Native libraries | The four apt roots and their 54-package closure are exact; native imports and `ldd` closure are required in `.github/workflows/ci.yml`. The local arm64-host emulation is supplemental. |
 
-Packaged runtime assets were hashed with the repository paths:
+The selected `check-valid-until=no` setting is limited to the immutable
+security-snapshot source; APT signature verification and each `.deb` hash
+check remain enabled. The Docker build checks all installed Debian packages
+for a non-empty `/usr/share/doc/<package>/copyright`; the 159-package local
+image closure had no missing notice files. The wheelhouse review found license
+or notice files in all 46 wheels, including the renderer. The observed
+license families include MIT/X11, BSD, Apache-2.0 (including LLVM exception),
+MPL-2.0, PSF-2.0, Unlicense, and LGPL/GPL terms carried in Debian copyright
+files. This records package notices and license metadata; it is not a legal
+opinion or a claim that hashes alone establish license compatibility.
+
+Packaged runtime assets and fonts:
 
 ```text
 chameleon/brand_kit/assets/solstice_bg_gradient.png  7ebf18d2a0d4b487cdf30578e4d6123e59e81502d78e55087768bfc5a465faeb
@@ -184,74 +200,66 @@ chameleon/brand_kit/fonts/SolsticeSerif-Italic.ttf    07526ca6ef70e5a7853abcdd61
 chameleon/brand_kit/fonts/SolsticeSerif-Regular.ttf   b7eb2a832ae91824a7c670469f4a4e0c4910a3ceedc1d31aad07ea2bc336d2a7
 ```
 
-**OBSERVED:** The inventory was generated with `shasum -a 256` for source
-files and sorted `find` output for packaged assets and fonts. Runtime network
-remains disabled by `HF_HUB_OFFLINE=1`, `HF_HUB_DISABLE_TELEMETRY=1`, and the
-CI `docker run --network none` path.
+### Local verification (supplemental Darwin arm64)
 
-### Native amd64 CI qualification evidence
+- `make setup VENV_DIR=/tmp/chameleon-issue71-setup-fixed.JxX4Ms/venv PYTHON_BOOTSTRAP=python3.11` — created Python `3.11.14`; locked Pillow `11.1.0`, Skia `132.0b11`, and the local `cr-renderer 0.1.0` wheel imported from the venv.
+- `make verify PYTHON_BOOTSTRAP=python3.11` — passed.
+- `make test PYTHON=/tmp/chameleon-issue71-setup-fixed.JxX4Ms/venv/bin/python` — 280 repository tests, 48 review-capsule tests, 3 runtime-qualification tests, 1 dependency-preparation regression, and 3 font-provenance tests passed (335 total). The first setup smoke exposed that `Path.resolve()` followed the venv's Python symlink and installed outside the venv; the helper now preserves the requested interpreter path and a regression test covers it.
+- `make prepare-dependencies PYTHON_BOOTSTRAP=python3.11` — verified the existing 46-wheel manifest against current lock inputs and hashes.
+- `docker buildx build --platform linux/amd64 --load -t chameleon-issue71-candidate chameleon/` — passed after checking all 159 installed-package copyright files. Docker emitted its non-blocking `FromPlatformFlagConstDisallowed` warning. Loaded image ID `sha256:d266651ef2e013c0b46bea441624469fe3cd05640cc900895211b61c8648b263`, size `352840969` bytes.
+- Local supplemental Docker smoke used isolated temporary input/output mounts; its ad hoc command line was not retained. All three samples returned `SUCCESS` and published JSON, PNG, and commit markers. The nine artifact hashes are recorded below. This was amd64 emulation on Darwin arm64, not native qualification.
+- A malformed JSON input returned exit `1`, status `MALFORMED_INPUT`, and left the isolated output directory empty.
+- An independent `linux/amd64` offline renderer rebuild installed `renderer-build.lock` from the local wheelhouse and reproduced the manifest wheel hash and size. Its ad hoc command line was not retained; the native CI build remains the qualification gate.
 
-**OBSERVED, 2026-10-23:** Required GitHub Actions run
-[39988562284](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39988562284),
-job `120534271651`, passed for PR #74. The workflow tested merge ref
-`3d7cd77926a5da744fa3cc70133c7c453cdd92c4`, which includes branch head
-`f8953ee058205601a4eaa78f57cc68b6e3db58df`.
+### Native amd64 qualification
 
-- Native platform: Linux `x86_64`, Python `3.11.11`.
-- Image: `sha256:c77cd521c2b8424d1100186d97ae179d2a04fd48062f2cfcd6f8eaac890426b3`,
-  `linux/amd64`, `896530714` bytes.
-- SBOM: non-empty SPDX output from pinned Syft `v1.42.3`, SHA-256
-  `364bb078cf090a0004ee1b281602cc5ef9e65a1363b378d4ba34d3b9cd47914d`.
-- Offline native smoke: all three samples returned `SUCCESS`; JSON, PNG, and
-  commit-marker files were present.
-- Repeated and clean-cache artifact hashes matched.
-- Runtime: return code `0`, elapsed `17.614067901` seconds, user CPU
-  `17.136705` seconds, system CPU `0.465883` seconds, maximum RSS `313644 KiB`,
-  peak `3` procfs threads, and `2` available CPUs.
-- Native `cr_renderer`/`skia` imports and Skia/Pillow `ldd` closure passed with
-  no `not found` entries.
+The former native run `39988562284` qualified the direct-pin candidate only;
+it is historical and does not qualify these locks. The current candidate still
+requires native x86_64 GitHub Actions evidence: clean-cache Buildx image,
+non-empty SPDX SBOM, complete package/native-library closure, all three
+`--network none` samples, failure-no-pair behavior, repeated and clean-cache
+artifact hashes, and independent review. No native qualification or release
+qualification is claimed from local arm64-host emulation.
 
-The run establishes native amd64 evidence for this candidate, not organizer
-qualification. Apt-version closure, complete wheelhouse hashes,
-cross-platform parity, and the reviewed package-lock decision remain open.
+The run record is [`.agents/runs/issue-71-clean-build-dependency-provenance-20261025.md`](../.agents/runs/issue-71-clean-build-dependency-provenance-20261025.md).
 
-### Proposed package-lock strategy
+### Accepted lock strategy
 
-ADR-013 (`Docs/DECISIONS/ADR-013-reproducible-package-lock-strategy.md`) records a proposed, not accepted, lock path for Issue #71. It recommends a timestamped Debian snapshot with exact apt package versions, a complete Python 3.11 `linux/amd64` wheelhouse with SHA-256 hashes for every transitive distribution, and an immutable local artifact for the pinned renderer revision.
+ADR-013 records the accepted durable decision. **OBSERVED, Debian Project,
+retrieved 2026-10-25:** [snapshot.debian.org](https://snapshot.debian.org/)
+documents historical archive sources; the selected URLs, signatures, hashes,
+and expiry handling are pinned in the repository evidence files.
+**OBSERVED, Python Packaging Authority pip source at tag `26.2.2`** (tag object
+`147fd2284a1f3222683b4176269658a47a72de95`, target commit
+`b3b696fe2122f2339d782517559bfade2cb6b879`, retrieved 2026-10-23):
+[secure installs](https://raw.githubusercontent.com/pypa/pip/b3b696fe2122f2339d782517559bfade2cb6b879/docs/html/topics/secure-installs.md)
+documents `--require-hashes`, `--only-binary=:all:`, and local `--no-deps`
+installation. The selected strategy is recorded in ADR-013; the earlier Issue
+comment 6373327459 is not approval evidence.
 
-- **OBSERVED, Debian Project retrieved 2026-10-23:** [snapshot.debian.org](https://snapshot.debian.org/) was inspected at “Usage” and its timestamped archive-source examples. It documents historical Debian states and apt source entries for those snapshots. The landing page exposes no immutable revision or publication date; the release candidate must capture selected snapshot content and hashes. Scope: archive selection and package availability; it does not select this project's timestamp or versions.
-- **OBSERVED, Python Packaging Authority pip source at tag `26.2.2` (tag object `147fd2284a1f3222683b4176269658a47a72de95`, target commit `b3b696fe2122f2339d782517559bfade2cb6b879`), retrieved 2026-10-23:** [Secure installs](https://raw.githubusercontent.com/pypa/pip/b3b696fe2122f2339d782517559bfade2cb6b879/docs/html/topics/secure-installs.md) was inspected at “Hash-checking Mode,” “Additional restrictions,” “Forcing Hash-checking mode,” and local project installation guidance. It documents `--require-hashes`, pinned requirements, `--only-binary=:all:`, and `--no-deps`. Scope: pip distributions; it does not lock Debian packages.
-- **UNVERIFIED_EXTERNAL_FACT:** Owner approval, exact lock inputs, snapshot retention, wheelhouse availability, and native qualification for a locked candidate remain unresolved. **OBSERVED:** GitHub publisher `bjornefisk/ProjectChameleon`, Issue #71 comment `6373327459`, created and retrieved 2026-10-23 at `19:44:28Z`: https://github.com/bjornefisk/ProjectChameleon/issues/71#issuecomment-6373327459. The inspected comment records a strategy-approval request only; it does not record approval, exact lock inputs, or qualification.
+### Local sample artifact hashes
 
-The proposal narrows the remaining acceptance decision; it does not close Issue #71 or claim complete package closure.
-
-### Native sample artifacts
-Native sample artifacts were:
+These outputs were generated by the local supplemental emulation run above:
 
 | Artifact | SHA-256 |
 | --- | --- |
 | Level 1 JSON | `7b93fdfd44ad8e669c00aeae3a8e96931f85a761a60e67cc31d2bb02b10853b9` |
 | Level 1 PNG | `172d23ca87020478d24568a603ba6f9deaf272629b59d73608789aca9789a85c` |
+| Level 1 commit marker | `cf3a261e6a5ba4ee827063897f290776db60dd890e662a73dfc36d8d3998cd34` |
 | Level 2 JSON | `3e26ef9e95df3f9b9f3fc9fa8149382962081531936e5f01480f5161e3b5f8f6` |
 | Level 2 PNG | `bf24e67125529d96b65df1f049d3f4b11cd0fcc9e05a2c7a765a60c3e5952f99` |
+| Level 2 commit marker | `62c8f1c6de62c79209900086b64139308e60bf2f5919496998a6d8a5c40002ce` |
 | Level 3 JSON | `10c7b96bea147205da2ba24030f1b2d8970e46f83f76bccc67c9f6798b955fdd` |
 | Level 3 PNG | `1cbe6edde1ee854439dda7e3eb1061a61964a1d4116bda0fc1fd9e90629fe6ff` |
+| Level 3 commit marker | `19fe9a7e1d34d8188da678cc9d4e5cb3e2bf96a929efde1f6a9d4452a592b625` |
 
 ## Unverified or intentionally deferred
 
 - **OBSERVED, 2026-10-20, commit `6c6bb21`:** GitHub Actions run [39353319577](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39353319577) stopped at `docker sbom chameleon-stage1 --format syft-json --output ...` because the runner provided no `docker sbom` command; native runtime, reproducibility, and closure steps were not reached. Disposition: use the pinned `anchore/sbom-action`/Syft path and rerun the workflow.
 - **OBSERVED, 2026-10-20, commit `7f39a3e`:** GitHub Actions run [39481028806](https://github.com/bjornefisk/ProjectChameleon/actions/runs/39481028806), job `118829322922`, completed the native `linux/amd64` qualification path. The loaded image was `linux/amd64`, ID `sha256:6c555cecec045651bcadc3d5f28215ff9a5b9dd9257e367e3fe5e26975642d4b`, size `886388964` bytes; the SPDX SBOM generated by pinned Syft `v1.42.3` was non-empty with SHA-256 `944833771af7e92d0bae7da85fe4924c54175ac1e2027c9dd3407b75acb9a0fc`. The offline (`--network none`) runtime report measured `13.690699821` seconds wall time, `13.256694` user and `0.51691` system CPU seconds, `307076 KiB` maximum RSS, peak `3` Linux threads from procfs, and `2` available CPUs on Python `3.11.11`/`x86_64`; return code `1` was expected because the mixed sample batch keeps Level 3 fail-closed as `INCOMPLETE_SEARCH` while Level 1/2 returned `SUCCESS` pairs. The native library `ldd` checks and offline `cr_renderer`/Skia imports passed with no `not found` dependencies. Repeated native and clean-cache runs passed artifact/symlink checks and produced the same committed sample hashes: Level 1 JSON `237a8a9eeeeae02ab954bf820fc0294b2501890097c390b3bb6c0c148d2744ba`, Level 1 PNG `71e0be9ea2ae55ab860100fed77ce870e1f531da8f74df05adb67414cf27cea0`, Level 2 JSON `3e26ef9e95df3f9b9f3fc9fa8149382962081531936e5f01480f5161e3b5f8f6`, and Level 2 PNG `bf24e67125529d96b65df1f049d3f4b11cd0fcc9e05a2c7a765a60c3e5952f99`. The packaged local assets were hashed as `solstice_bg_gradient.png=7ebf18d2a0d4b487cdf30578e4d6123e59e81502d78e55087768bfc5a465faeb`, `solstice_bottle.png=a9bea75d9592cee51bd1ee56e043662091326c612fc8c208eee3872c216aa053`, and `solstice_logo_lockup.png=3a443c106090e7b043d85d553280e464b313d893baebafe6765fd3df1022f049`; all seven packaged Solstice TTF hashes were recorded in the run log, proving local image/font loading without a runtime download.
-- **UNVERIFIED:** The successful run is native-amd64 evidence for the pinned image and current runner, not a complete organizer qualification. Cross-platform hash parity is not established. The workflow compares repeated and clean-cache runs of the same native `linux/amd64` image; the 2026-10-19 arm64-host emulation evidence remains supplemental and is not a native-amd64 or cross-platform parity claim.
+- **OBSERVED, historical direct-pin candidate:** Native-amd64 run `39481028806` is evidence for that pinned image only; it is not qualification for Issue #71's locked candidate or organizer qualification. Cross-platform hash parity is not established. The 2026-10-19 arm64-host emulation evidence remains supplemental.
 - **OBSERVED, supplemental, 2026-10-19:** Local arm64-host emulation produced expected Level 1/2 success and Level 3 `INCOMPLETE_SEARCH`, resolved Skia/Pillow `ldd` closure, and matching repeated/clean-cache hashes; it is not native-amd64 qualification.
 - **OBSERVED, supplemental, 2026-10-19:** Final local loaded image provenance was a `linux/amd64` image with ID `sha256:178c0feecdfb3100fc5266d663d438ac655743b1a7cac744a79bbe4857050390`, size `303795243` bytes, and Syft JSON SBOM SHA-256 `da40711f9edc5635c51f10ac6e730bb19c4151a415ea9dbb3b7e67bf18039844`; this remains arm64-host evidence.
-- **UNVERIFIED_EXTERNAL_FACT, source-input revision `2548c82`:** Apt package versions
-  and a complete hash-locked transitive wheelhouse remain unverified. The
-  Dockerfile declares `git`, `libgl1`, `libegl1`, `libglib2.0-0`, and
-  `fontconfig` without apt versions. The direct requirements are pinned, but
-  pip still resolves a complete wheel set at build time. Impact: clean-cache
-  builds do not prove byte-identical dependency resolution. Disposition:
-  approve a lock strategy through normal dependency review before changing
-  dependency or packaging inputs.
 - **UNVERIFIED_EXTERNAL_FACT:** Final Adobe/Solstice production font availability remains unverified; source: final-stage Adobe font entitlement and production brand files are not present in the repository; impact: this evidence covers only the exact packaged Lora/Poppins placeholders; disposition: do not infer production-font authorization or substitute fonts.
 - **UNVERIFIED_EXTERNAL_FACT:** Font embedded metadata, glyph coverage, licensing, and redistribution rights remain unverified; source: the external font/dependency records cited above; impact: release licensing and final-font parity remain open; disposition: no font substitution or licensing claim is added.
 - **UNVERIFIED_EXTERNAL_FACT:** Exact organizer CPU/RAM/disk/GPU limits, model allowlist/size, official scoring thresholds, and Adobe deployment topology remain unverified; source: `chameleon/RULES.md` and the challenge brief at repository revision `6c6bb21` (2026-10-20); impact: measurements are observations, not hard qualification ceilings; disposition: do not invent limits or add runtime gates.

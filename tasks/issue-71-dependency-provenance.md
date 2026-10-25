@@ -6,8 +6,9 @@ Make one release candidate's build inputs traceable and qualify the offline
 `linux/amd64` image through a clean native path. Preserve the existing Stage 1
 runtime boundary and fail-closed publication behavior.
 
-This draft PR establishes the issue-specific work branch. It does not claim
-native qualification from arm64-host emulation.
+This work branch implements Issue #71 after the owner authorized the bounded
+package-lock strategy in the direct task instruction. Local Darwin arm64
+smokes are supplemental and do not establish native qualification.
 
 ## Ordered slices
 
@@ -27,25 +28,23 @@ native qualification from arm64-host emulation.
    test failure-path cleanup, repeat artifacts, and compare clean-cache hashes.
 8. Record residual organizer-controlled limits as unverified.
 
-## Pending owner decision
+## Accepted lock strategy and qualification status
 
-Native amd64 build, offline samples, SBOM, clean-cache parity, repeated hashes,
-imports, and library closure now pass. The remaining acceptance gate is a
-reviewed lock strategy. Do not change dependency or packaging inputs until
-`@bjornefisk` approves one.
+ADR-013 records the accepted Debian snapshot and exact apt closure, hash-locked
+Python runtime/build requirements, and source-bound local renderer wheel. The
+implementation is in this branch; the direct task instruction is the owner
+approval. The earlier public Issue comment requested approval and is not
+misrepresented as granting it.
 
-Recommended path:
+Local verification has passed repository wiring, the corrected Python 3.11
+setup path, a locked amd64 image build, three offline sample successes, and a
+malformed-input failure with no output artifacts. The Docker run was
+linux/amd64 emulation on Darwin arm64. It is supplemental only.
 
-1. Freeze a Debian snapshot and install exact apt versions from that snapshot.
-2. Record the resolved apt package list and archive hashes.
-3. Generate a Python 3.11 `linux/amd64` wheelhouse with hashes for every
-   transitive wheel, including an immutable hash for the pinned renderer source.
-4. Build and run the image offline from those locked inputs.
-5. Record the decision, tradeoffs, closure, and resulting image evidence through
-   the required ADR and dependency-evidence path.
-
-An alternative strategy requires the same owner review and complete closure
-evidence. This proposal is not an accepted dependency decision.
+Native GitHub Actions `linux/amd64` clean-build qualification, SBOM, package
+and native-library closure, repeated/clean-cache artifact hashes, and
+independent review remain required before closure. Do not claim the lock
+candidate is qualified until those results are recorded.
 
 ## Acceptance criteria
 
@@ -68,8 +67,8 @@ evidence. This proposal is not an accepted dependency decision.
 
 ## Dependencies and non-goals
 
-- Native amd64 CI/build capacity and an owner-approved lock strategy are
-  required.
+- Native amd64 CI and independent repository-maintainer review remain required.
+- The package-lock strategy has owner authorization in the direct task instruction and is ratified by ADR-013.
 - Do not invent CPU, RAM, time, or scoring limits.
 - Do not add model, CP-SAT, OR-Tools, or runtime network dependencies.
 - Do not treat a warning-only check or emulated run as release qualification.

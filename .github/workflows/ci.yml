@@ -31,10 +31,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m venv .venv
-          .venv/bin/python -m pip install --upgrade pip
-          .venv/bin/pip install -r chameleon/requirements.txt
-
+          make setup PYTHON_BOOTSTRAP=python3.11
       - name: Verify repository
         run: make verify
 
@@ -55,6 +52,37 @@ jobs:
 
       - name: Verify Docker image architecture
         run: test "$(docker inspect chameleon-stage1 --format '{{.Os}}/{{.Architecture}}')" = "linux/amd64"
+      - name: Record locked package provenance
+        run: |
+          docker run --rm --network none --entrypoint sh chameleon-stage1 -c '
+            set -eu
+            for path in \
+              /app/provenance/apt-snapshot-evidence.json \
+              /app/provenance/apt-packages.lock \
+              /app/provenance/apt-packages.sha256 \
+              /app/provenance/dpkg-query.txt \
+              /app/provenance/python-requirements.lock \
+              /app/provenance/renderer-build.lock \
+              /app/provenance/renderer-artifact.json \
+              /app/provenance/wheelhouse-manifest.json \
+              /app/provenance/pip-inspect.json \
+              /app/provenance/pip-freeze.txt; do
+              test -s "$path"
+            done
+            printf "apt package closure:\n"
+            cat /app/provenance/dpkg-query.txt
+            printf "installed Python distributions:\n"
+            cat /app/provenance/pip-freeze.txt
+            printf "provenance_sha256:\n"
+            sha256sum /app/provenance/apt-snapshot-evidence.json \
+              /app/provenance/apt-packages.lock /app/provenance/apt-packages.sha256 \
+              /app/provenance/dpkg-query.txt \
+              /app/provenance/python-requirements.lock \
+              /app/provenance/renderer-build.lock \
+              /app/provenance/renderer-artifact.json \
+              /app/provenance/wheelhouse-manifest.json \
+              /app/provenance/pip-inspect.json /app/provenance/pip-freeze.txt
+          '
 
       - name: Record Docker image provenance
         run: |
@@ -120,6 +148,25 @@ jobs:
             test -f "$path"
           done
           test -z "$(find chameleon/output -maxdepth 1 -type l -print -quit)"
+      - name: Verify failed task publishes no artifact pair
+        shell: bash
+        run: |
+          set -o pipefail
+          failure_root="$(mktemp -d "$RUNNER_TEMP/chameleon-failure.XXXXXX")"
+          failure_input="$failure_root/input"
+          failure_output="$failure_root/output"
+          mkdir -p "$failure_input" "$failure_output"
+          printf '{' > "$failure_input/malformed.json"
+          set +e
+          docker run --rm --network none \
+            -v "$failure_input:/app/input:ro" \
+            -v "$failure_output:/app/output" \
+            chameleon-stage1 2>&1 | tee "$failure_root/failure.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          test "$status" -ne 0
+          grep -F "[malformed.json] status=MALFORMED_INPUT" "$failure_root/failure.log"
+          test -z "$(find "$failure_output" -mindepth 1 -maxdepth 1 -print -quit)"
       - name: Record native runtime measurements
         shell: bash
         run: |

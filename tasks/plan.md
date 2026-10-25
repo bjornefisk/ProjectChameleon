@@ -38,12 +38,15 @@ merges. No issue may have a second open PR for the same fix.
   checked-in font/license manifest, fail-closed face validation, and regression
   tests.
 - Final Adobe/Solstice production-font authorization remains unverified.
-- `chameleon/Dockerfile` pins the base image, and
-  `chameleon/requirements.txt` pins direct Python dependencies.
-- Apt package versions and a complete hash-locked transitive wheelhouse remain
-  unresolved.
-- The repository has a native-amd64 CI path, but current branch evidence must
-  be rerun and recorded for the candidate being qualified.
+- `chameleon/Dockerfile` pins the Python base image and installs exact apt
+  snapshot packages; `requirements.in` and hash-locked requirements/build locks
+  define the Python closure.
+- ADR-013 accepts the Debian snapshot, complete Python wheelhouse, and
+  source-bound renderer artifact strategy. The Issue #71 owner authorized it in
+  the direct task instruction; the earlier public comment was only a request.
+- The issue branch implements the lock set and provenance workflow. Its native
+  amd64 CI qualification and independent review must be recorded before #71
+  closes; local arm64-host emulation remains supplemental.
 - Official scorer protocol, thresholds, target catalogue, and official results
   remain unavailable.
 
@@ -53,7 +56,7 @@ merges. No issue may have a second open PR for the same fix.
 flowchart TD
     A[Request official scorer protocol] --> D[Freeze release candidate]
     B[Obtain production font authorization] --> D
-    C[Approve dependency lock strategy] --> D
+    C[Implement accepted dependency lock strategy] --> D[Freeze release candidate]
     D --> E[Run native amd64 clean-build qualification]
     D --> F[Run authorized official scoring]
     E --> G[Update evidence and close #71]
@@ -70,7 +73,7 @@ Tasks live in GitHub Issues. The plan index preserves execution order:
 
 - [ ] #69: request and record official scoring protocol or an explicit denial.
 - [ ] #70: obtain production-font authorization and complete final font evidence.
-- [ ] #71: approve dependency-lock strategy and complete native-amd64 build evidence.
+- [ ] #71: complete native amd64 qualification and independent review for the accepted dependency locks.
 - [ ] Checkpoint: freeze one release candidate after #70 and #71 evidence gates.
 - [ ] Checkpoint: run authorized scoring for #69, or preserve its blocked state.
 - [ ] Checkpoint: update `Docs/STATUS.md` and `Docs/DEPENDENCY_EVIDENCE.md`.
@@ -149,17 +152,17 @@ intended for release.
 
 **Steps:**
 
-1. Freeze the candidate commit and inventory base image, apt packages, Python
-   dependencies, renderer revision, native libraries, fonts, and assets.
-2. Choose and document the package-lock strategy: apt snapshot/version locks,
-   complete hash-locked wheelhouse, or an explicitly approved alternative.
-   Record this durable choice through the required ADR/change-control path.
-3. Implement only the approved dependency changes. Preserve offline runtime and
-   the no-model/no-CP-SAT boundary.
+1. Freeze the candidate commit and inventory the base image, exact apt closure,
+   Python runtime/build wheels, renderer artifact, native libraries, fonts, and
+   assets.
+2. Implement the accepted ADR-013 strategy: signed Debian snapshots and exact
+   package archive hashes; hash-locked runtime/build wheels; source-bound local
+   renderer wheel; no build-time dependency resolution outside those inputs.
+3. Keep runtime offline and preserve the no-model/no-CP-SAT boundary.
 4. Build with clean cache on native `linux/amd64`; capture image digest, SBOM,
-   package closure, and input hashes.
-5. Run `--network none` samples, failure-path publication checks, repeated
-   artifacts, and clean-cache artifact comparisons.
+   package closure, licenses/notices, and input hashes.
+5. Run all three `--network none` samples, failure-path publication checks,
+   repeated artifacts, and clean-cache artifact comparisons.
 6. Record platform, Python, renderer, image, SBOM, artifact, and exit-status
    evidence. Keep arm64-host emulation supplemental.
 
@@ -178,9 +181,11 @@ intended for release.
   workflow in `.github/workflows/ci.yml`.
 - Review `.agents/runs/` evidence before closing the issue.
 
-**Likely paths:** `chameleon/Dockerfile`, `chameleon/requirements.txt`,
+**Likely paths:** `chameleon/Dockerfile`, `chameleon/requirements.in`,
+`chameleon/requirements.lock`, `chameleon/renderer-build.lock`,
+`chameleon/renderer-artifact.json`, `chameleon/apt/`, `scripts/`,
 `.github/workflows/ci.yml`, `Docs/DEPENDENCY_EVIDENCE.md`, `Docs/STATUS.md`,
-`.agents/runs/`, and an ADR if the lock strategy changes.
+`.agents/runs/`, and ADR-013.
 
 ## Phase 2: candidate checkpoint
 

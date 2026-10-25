@@ -55,7 +55,7 @@ The decisions above remain authoritative. The current tree implements the bounde
 ## Affected files/schema fields
 
 - `chameleon/chameleon_design_schema_v0.9.json`
-- `chameleon/requirements.txt`
+- `chameleon/requirements.in`, `chameleon/requirements.lock`, and `chameleon/renderer-artifact.json` bind the Python compatibility baseline and renderer artifact.
 - `chameleon/renderer/converter/convert.py`, `wrap.py`, `assets.py`, `shapes.py`, and `brand_fonts.py`
 - `rotation`, `x`, `y`, `width`, `height`, `font_size`, `max_lines`, `style_runs`, `line_height`, `letter_spacing`, `fit`, and shape fields
 

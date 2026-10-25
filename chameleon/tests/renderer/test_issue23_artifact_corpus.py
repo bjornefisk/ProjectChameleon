@@ -40,6 +40,7 @@ ROOT = PROJECT_ROOT / "chameleon"
 ASSETS = ROOT / "brand_kit" / "assets"
 FONTS = ROOT / "brand_kit" / "fonts"
 CORPUS = ROOT / "tests" / "fixtures" / "renderer_artifact_hashes.json"
+RENDERER_ARTIFACT = ROOT / "renderer-artifact.json"
 PINNED_RENDERER_SHA = "a17e1fb9a732959dd6c21ae168d5ee09d74bd64f"
 CANONICAL_PYTHON_MINOR = "3.11"
 
@@ -206,8 +207,15 @@ class RendererArtifactCorpusTests(unittest.TestCase):
         for distribution_name, expected_version in self.manifest["dependencies"].items():
             self.assertEqual(expected_version, version(distribution_name), distribution_name)
         self.assertEqual(self.manifest["font_tree_sha256"], _font_tree_digest())
+        renderer = json.loads(RENDERER_ARTIFACT.read_text(encoding="utf-8"))
         direct_url = json.loads(distribution("cr-renderer").read_text("direct_url.json"))
-        self.assertEqual(direct_url["vcs_info"]["commit_id"], PINNED_RENDERER_SHA)
+        archive_info = direct_url.get("archive_info", {})
+        wheel_sha256 = archive_info.get("hashes", {}).get("sha256")
+        if wheel_sha256 is None:
+            wheel_sha256 = archive_info.get("hash", "").removeprefix("sha256=")
+        self.assertEqual(renderer["source"]["commit"], PINNED_RENDERER_SHA)
+        self.assertEqual(renderer["wheel"]["version"], version("cr-renderer"))
+        self.assertEqual(renderer["wheel"]["sha256"], wheel_sha256)
         self.assertEqual(
             self.manifest["asset_sha256"],
             hashlib.sha256((ASSETS / "solstice_bottle.png").read_bytes()).hexdigest(),

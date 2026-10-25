@@ -10,12 +10,9 @@ __pycache__/
 .venv/
 venv/
 
-# cr-renderer is a separate, external open-source project
-# (https://github.com/CyberAgentAILab/cr-renderer), pulled in locally for
-# reference/dev and installed by the engines via
-# `pip install git+https://github.com/CyberAgentAILab/cr-renderer` — not
-# vendored into this repo.
-/cr-renderer/
+# Generated linux/amd64 wheelhouse; prepared from the checked-in hash locks.
+.wheelhouse/
+.wheelhouse.tmp-*/
 
 # Generated run artifacts
 output/*

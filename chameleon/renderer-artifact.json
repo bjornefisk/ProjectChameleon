@@ -1,0 +1,35 @@
+{
+  "source": {
+    "repository": "https://github.com/CyberAgentAILab/cr-renderer",
+    "commit": "a17e1fb9a732959dd6c21ae168d5ee09d74bd64f",
+    "commit_date": "2025-01-24T07:47:37Z",
+    "github_signature_verified": true,
+    "commit_api": "https://api.github.com/repos/CyberAgentAILab/cr-renderer/commits/a17e1fb9a732959dd6c21ae168d5ee09d74bd64f",
+    "archive_url": "https://github.com/CyberAgentAILab/cr-renderer/archive/a17e1fb9a732959dd6c21ae168d5ee09d74bd64f.tar.gz",
+    "archive_sha256": "18e8bdf0c22d43516829c4a7028b4eb5953f8dc2359ad3fd50054384a2b6ef71",
+    "archive_size_bytes": 116458,
+    "license": "Apache-2.0",
+    "license_url": "https://raw.githubusercontent.com/CyberAgentAILab/cr-renderer/a17e1fb9a732959dd6c21ae168d5ee09d74bd64f/LICENSE"
+  },
+  "build": {
+    "base_image": "python:3.11.11-slim-bookworm@sha256:081075da77b2b55c23c088251026fb69a7b2bf92471e491ff5fd75c192fd38e5",
+    "amd64_child_manifest_sha256": "a8e0a3090316aed0b11037aac613aef32fb1747dcc1dcb5c0f6c727a0113a07f",
+    "platform": "linux/amd64",
+    "python": "3.11.11",
+    "source_date_epoch": 1737704857,
+    "backend": "hatchling==1.27.0",
+    "build_requirements_lock": "renderer-build.lock",
+    "build_requirements_sha256": "e4b17a17cd56763c0a8c5491cebd1136aa4dbb1645861b2141443f28df0ff6cf",
+    "command": "python -m pip wheel --no-deps --no-build-isolation --no-cache-dir --no-index",
+    "repeat_builds": 2,
+    "repeated_wheel_sha256_match": true
+  },
+  "wheel": {
+    "distribution": "cr-renderer",
+    "version": "0.1.0",
+    "filename": "cr_renderer-0.1.0-py3-none-any.whl",
+    "sha256": "92b4005c5777d305151321760cfb32e0c8e91a7041ac74fabe630bcc2e06fda9",
+    "size_bytes": 15950,
+    "installed_provenance": "PEP 610 direct_url.json archive_info.hashes.sha256 must equal this wheel SHA-256; this manifest maps the wheel to the source commit."
+  }
+}

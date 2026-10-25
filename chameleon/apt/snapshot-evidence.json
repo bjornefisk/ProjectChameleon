@@ -1,0 +1,40 @@
+{
+  "format": 1,
+  "selected": "2026-10-25",
+  "sources_file": "sources.list",
+  "sources_file_sha256": "b51c2936f0c77adc53a119f98dd62116b8a5db4d207b7d553ecc1886596a81f4",
+  "archives": [
+    {
+      "url": "https://snapshot.debian.org/archive/debian/20261025T143754Z/",
+      "suite": "bookworm",
+      "component": "main",
+      "inrelease_sha256": "77737fa4b34f2693e982cc9ee35736816c35a7778fc2d326cc1bbf5b301fe1aa",
+      "signature_verification": "APT apt-secure verification passed using the pinned base image's debian-archive-keyring 2023.3+deb12u1",
+      "valid_until": null
+    },
+    {
+      "url": "https://snapshot.debian.org/archive/debian-security/20261025T035125Z/",
+      "suite": "bookworm-security",
+      "component": "main",
+      "inrelease_sha256": "5fdc0144562abd46f45083b48e1776898e234d93bbf6395b8147a53279d731db",
+      "signature_verification": "APT apt-secure verification passed using the pinned base image's debian-archive-keyring 2023.3+deb12u1",
+      "valid_until": "2026-11-01T03:50:50Z",
+      "valid_until_handling": "check-valid-until=no is limited to this immutable snapshot source so builds remain reproducible after expiry; archive signature verification and each downloaded .deb SHA-256 check remain enabled"
+    }
+  ],
+  "apt_roots": {
+    "fontconfig": "2.14.1-4",
+    "libegl1": "1.6.0-1",
+    "libgl1": "1.6.0-1",
+    "libglib2.0-0": "2.74.6-2+deb12u9"
+  },
+  "package_lock": "packages.lock",
+  "package_lock_sha256": "1c03026a0dcda31a13de1c999060fbc95609a9ce1cae98abb49091bbd6229438",
+  "package_archive_hashes": "packages.sha256",
+  "package_archive_hashes_sha256": "01e538143bd5110b845e72f00fcb2c0cee05237c0929d0d10917155773e2ade9",
+  "resolved_closure": {
+    "new_packages": 54,
+    "upgrades": 0,
+    "copyright_notices_present": 54
+  }
+}

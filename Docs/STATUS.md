@@ -1,6 +1,6 @@
 # Project Chameleon status
 
-**Date:** 2026-10-22
+**Date:** 2026-10-25
 
 **Phase:** Gate 1 is cleared. Tickets 01-08 are implemented within their accepted bounded scopes. Issue #61's PDF-grounded fix produces the public 1080×1350 → 728×90 sample as one hard-valid JSON/PNG pair in repeated local runs. PR #65 merged the fix as `6dbbc0a3eaba3090997ad9731a4026677dc6978c`, and Issue #61 closed automatically. Required native x86_64 `Verify and test` run 39711973748 passed on PR head `33f6fd9`; the owner waived partner review and no partner approval is recorded. No official organizer score, cross-platform parity, or release qualification is claimed.
 **Decision status:** The merged implementation preserves bounded four-topology search, at most twelve source-derived candidates, renderer-gated hard validation, fixed-point ranking, deterministic output, and typed fail-closed behavior. Accepted ADR-010 through ADR-012 reconcile only quantized common group transforms, the absence of a numeric readability floor, and the renderer-measured transient glyph inset against the source challenge PDF. Local success and native CI do not establish organizer qualification; cross-platform parity and organizer-held-out scoring remain unverified.
@@ -40,22 +40,24 @@ The original Python 3.12 output bytes were not retained, so that historical same
 
 ## Issue #71 clean-build dependency provenance
 
-PR #74 records the current release-candidate input inventory at source-input
-revision `2548c82`; the latest evidence record and run-record binding are in
-`86c9218` at [`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md).
-The base image, direct Python pins, renderer commit, schema, packaged assets,
-and packaged font hashes are observed.
+ADR-013 accepts exact Debian snapshot and package-archive locks, a complete
+hash-locked Python runtime/build wheel set, and a source-bound local renderer
+wheel. The issue owner authorized the strategy in the direct task instruction;
+the earlier public Issue comment requested approval and is not represented as
+approval.
 
-Required native amd64 CI run `39988562284` passed on the PR merge ref. It
-verified the linux/amd64 image, non-empty SBOM, clean-cache build, offline
-three-sample success, repeated and clean-cache artifact hashes, native imports,
-and Skia/Pillow library closure. Apt versions, complete transitive wheel hashes,
-cross-platform parity, and release qualification remain
-`UNVERIFIED_EXTERNAL_FACT`.
+This branch replaces the former direct-pin build path and migrates developer,
+Docker, CI, and review-tool callers. The prior native run `39988562284` belongs
+to the direct-pin candidate and is historical, not qualification evidence for
+these locks.
 
-No dependency or Docker input changes are authorized by this inventory slice.
-The next decision is a reviewed apt/wheelhouse lock strategy and complete
-package-closure evidence.
+Native x86_64 clean-build qualification, SBOM, full package/native-library
+closure, all three offline samples, failure-no-pair behavior, repeated and
+clean-cache artifact hashes, and independent review must be recorded from this
+branch's required GitHub Actions run before Issue #71 closes. Local
+Darwin-arm64 build/runtime checks are supplemental. Cross-platform parity,
+organizer-held-out scoring, organizer resource limits, and release
+qualification remain unverified.
 
 ## Issue #61 public Level 3 acceptance
 
@@ -255,7 +257,7 @@ Ticket 07 product work is implemented on `feat/ticket-07-horizontal-ribbon-level
 
 These are contract artifacts, not solver or renderer implementation:
 
-- `chameleon/requirements.txt` pins the initial external compatibility baseline.
+- `chameleon/requirements.in` and `chameleon/requirements.lock`, the locked renderer build requirements and source-to-wheel manifest, and `chameleon/apt/` record the external runtime/build dependency baseline.
 - `chameleon/Dockerfile` records the intended Python 3.11.11 Bookworm amd64 image and offline environment defaults.
 - `chameleon/chameleon_design_schema_v0.9.json` is no longer provisional, accepts empty designs, and records structural ranges/defaults.
 - Contract fixtures live under `chameleon/tests/fixtures/contract/`.

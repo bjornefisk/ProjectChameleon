@@ -114,6 +114,10 @@ CONTRACT_SOURCES = (
     "Docs/DECISIONS/ADR-007-numeric-and-geometry-semantics.md",
     "Docs/DECISIONS/ADR-008-typography-and-renderer-edge-semantics.md",
     "Docs/DECISIONS/ADR-009-initial-search-strategy.md",
+    "Docs/DECISIONS/ADR-010-quantized-rigid-groups.md",
+    "Docs/DECISIONS/ADR-011-no-numeric-readable-font-floor.md",
+    "Docs/DECISIONS/ADR-012-render-text-inside-declared-bounds.md",
+    "Docs/DECISIONS/ADR-013-reproducible-package-lock-strategy.md",
     "Docs/FINAL_ARCHITECTURE.md",
     "chameleon/chameleon_design_schema_v0.9.json",
     "chameleon/RULES.md",
@@ -431,11 +435,27 @@ def changed_contract_sources(changed_files: Iterable[str]) -> list[str]:
                 "skills/chameleon-contract/SKILL.md",
             ]
         )
-    if "chameleon/Dockerfile" in changed or "chameleon/requirements.txt" in changed:
+    dependency_inputs = {
+        "chameleon/Dockerfile",
+        "chameleon/requirements.in",
+        "chameleon/requirements.lock",
+        "chameleon/renderer-build.in",
+        "chameleon/renderer-build.lock",
+        "chameleon/renderer-artifact.json",
+        "chameleon/apt/sources.list",
+        "chameleon/apt/packages.lock",
+        "chameleon/apt/packages.sha256",
+        "chameleon/apt/snapshot-evidence.json",
+        "scripts/prepare_dependency_inputs.py",
+    }
+    if changed.intersection(dependency_inputs):
         sources.extend(
             [
                 "Docs/PROJECT_CONTRACT.md §9",
                 "Docs/DECISIONS/ADR-004-stage-1-runtime.md",
+                "Docs/DECISIONS/ADR-013-reproducible-package-lock-strategy.md",
+                "Docs/DEPENDENCY_EVIDENCE.md",
+                "Docs/STATUS.md",
             ]
         )
     return list(dict.fromkeys(sources))

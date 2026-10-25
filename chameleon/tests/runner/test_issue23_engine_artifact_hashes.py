@@ -62,7 +62,7 @@ INPUT_DIR = CHAMELEON / "input"
 ASSETS = CHAMELEON / "brand_kit" / "assets"
 FONTS = CHAMELEON / "brand_kit" / "fonts"
 SCHEMA = CHAMELEON / "chameleon_design_schema_v0.9.json"
-REQUIREMENTS = CHAMELEON / "requirements.txt"
+RENDERER_ARTIFACT = CHAMELEON / "renderer-artifact.json"
 
 STEMS = ("chameleon_sample_level1_warmup", "chameleon_sample_level2_core")
 HASH_SEEDS = ("0", "4242")
@@ -205,11 +205,15 @@ class EngineArtifactEvidenceTests(unittest.TestCase):
             "engine PNG hashes are bound to the project's Python 3.11 baseline",
         )
 
+        renderer = json.loads(RENDERER_ARTIFACT.read_text(encoding="utf-8"))
         direct_url = json.loads(distribution("cr-renderer").read_text("direct_url.json"))
-        self.assertEqual(bound["renderer_commit"], direct_url["vcs_info"]["commit_id"], refresh)
-        self.assertIn(
-            f"@{bound['renderer_commit']}", REQUIREMENTS.read_text(encoding="utf-8"), refresh
-        )
+        archive_info = direct_url.get("archive_info", {})
+        installed_wheel_sha256 = archive_info.get("hashes", {}).get("sha256")
+        if installed_wheel_sha256 is None:
+            installed_wheel_sha256 = archive_info.get("hash", "").removeprefix("sha256=")
+        self.assertEqual(bound["renderer_commit"], renderer["source"]["commit"], refresh)
+        self.assertEqual(renderer["wheel"]["version"], version("cr-renderer"), refresh)
+        self.assertEqual(renderer["wheel"]["sha256"], installed_wheel_sha256, refresh)
         for distribution_name, expected_version in bound["dependencies"].items():
             self.assertEqual(expected_version, version(distribution_name), distribution_name)
 
