@@ -33,7 +33,7 @@ This file applies source-driven development only to external libraries, platform
 | Adobe fonts | Stage 1 uses packaged TTF bytes, not Express document fonts. | [Express font API](https://developer.adobe.com/express/add-ons/docs/references/document-sandbox/document-apis/classes/fonts), [text guide](https://developer.adobe.com/express/add-ons/docs/guides/learn/how-to/use-text) | Do not promise Stage 1/Express metric parity or silent font substitution. | Resolve exact PostScript faces in entitled/unentitled accounts before finale typography claims. |
 | Challenge hardware/model limits | Rules name Apple M5 Pro and leave CPU/RAM/disk/GPU and model allowlist/size unresolved. No model runtime or weights are in the repository. | Repository facts: `chameleon/RULES.md`; external platform docs cannot establish organizer limits. | Keep these as open external blockers; do not invent limits. | Await organizer specification, then add resource and deterministic-runtime tests. |
 
-## Issue #70 packaged-font provenance and redistribution (evidence date: 2026-10-22)
+## Issue #70 packaged-font provenance and redistribution (initial evidence: 2026-10-22; starter-kit source addendum: 2026-10-25)
 
 **Task:** Issue #70. **Verification run:** `PR-73-font-provenance-fix`. The run uses
 the local Darwin arm64 environment and pinned project font files. It is local
@@ -74,6 +74,49 @@ evidence, not native-amd64 or organizer qualification.
 - **INFERRED, repository gate:** Project contract and Issue #70 acceptance criteria require written authorization before packaging exact production Adobe/Solstice files. Adobe sources provide a licensing boundary only; their applicability to unknown production files remains unverified. **UNVERIFIED_EXTERNAL_FACT:** The sources do not identify exact production files, grant this repository a license, or replace written owner/foundry authorization. The checked-in Lora/Poppins-derived placeholder files remain governed by their separate OFL evidence above.
 
 The research record is [`.agents/runs/issue-70-production-font-licensing-research-20261023.md`](../.agents/runs/issue-70-production-font-licensing-research-20261023.md). No production font files changed. Final Adobe/Solstice file availability, authorization scope, and redistribution permission remain **UNVERIFIED_EXTERNAL_FACT**.
+
+### Starter-kit source identity (retrieved 2026-10-25)
+
+The user-provided starter repository is [`jhaaj08/chameleon` at commit
+`a44a06046b0413f0785e7203955c3822e0acbc32`](https://github.com/jhaaj08/chameleon/commit/a44a06046b0413f0785e7203955c3822e0acbc32),
+whose commit date is 2026-09-24. Its [`brand_kit/README.md` at that
+revision](https://raw.githubusercontent.com/jhaaj08/chameleon/a44a06046b0413f0785e7203955c3822e0acbc32/brand_kit/README.md)
+explicitly describes the bundled fonts as stand-ins, not final production
+brand assets, identifies them as Lora and Poppins under SIL OFL, and instructs
+replacing them with actual Adobe/Solstice fonts licensed for redistribution
+before distributing the starter to students. This is provenance for the
+placeholder files, not a production-font authorization. The GitHub API reports
+the commit as unsigned; its immutable commit ID is used here as the source
+revision, not as a publisher signature.
+
+The pinned [`brand_kit/fonts` inventory](https://api.github.com/repos/jhaaj08/chameleon/contents/brand_kit/fonts?ref=a44a06046b0413f0785e7203955c3822e0acbc32)
+contains these seven TTFs. Each GitHub Git-blob SHA-1 matches `git hash-object`
+of the corresponding packaged file in this repository, proving byte identity.
+The package SHA-256 values remain in
+[`font_provenance_manifest.json`](font_provenance_manifest.json).
+
+| Font file | Starter-kit Git-blob SHA-1 (matches packaged file) |
+| --- | --- |
+| `SolsticeSerif-Regular.ttf` | `998fd8ed2d0d3a1162634beaeb24df3eb900c4a5` |
+| `SolsticeSerif-Bold.ttf` | `8c8a27ce26b0485ece782019880654b9151b9092` |
+| `SolsticeSerif-Italic.ttf` | `4f67a9cf3f45652707734df6df3116cb43337559` |
+| `SolsticeSans-Regular.ttf` | `aa517771d2ed9157a28ee710a4c6b4b72cbf1d16` |
+| `SolsticeSans-Bold.ttf` | `2a3af3eb105d071c1779401e3d0bc4991dbc2767` |
+| `SolsticeSans-Italic.ttf` | `a13172da6966fde624b4e2a2c31d14c93ea5c2f4` |
+| `SolsticeSans-BoldItalic.ttf` | `196e6fbe8343509a490aec6a51bef15a768f0de4` |
+
+**OBSERVED, local code:** `engine.main.render_to_png()` delegates to
+`renderer.converter.convert.render_design_to_png()`. When no font directory is
+passed, the converter resolves `fonts/` beside `brand_kit/assets/` and loads
+the files locally through `load_brand_font_manager()`; this confirms the
+reported runtime path. It proves loading behavior only, not font rights.
+
+**Disposition:** The packaged placeholders have source, metadata, sample-glyph,
+and OFL evidence above. The starter repository confirms they are not the final
+Adobe/Solstice production fonts. Exact production file identities and written
+authorization for packaging/redistribution remain
+**UNVERIFIED_EXTERNAL_FACT**. Do not replace the placeholders or close Issue
+#70 based on the starter-kit path alone.
 
 ### File inventory and embedded metadata
 
