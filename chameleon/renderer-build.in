@@ -1,0 +1,3 @@
+# PEP 517 build backend for the pinned renderer. Keep packaging aligned with the runtime lock so both locks share one wheelhouse.
+hatchling==1.27.0
+packaging==24.2

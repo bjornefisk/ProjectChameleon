@@ -514,7 +514,7 @@ class ReviewCapsuleTests(unittest.TestCase):
         self.assertNotIn("Docs/AGENTS/PR_REVIEW_AGENT.md", review_pr.CONTRACT_SOURCES)
         for source in review_pr.CONTRACT_SOURCES:
             self.assertTrue((ROOT / source).is_file(), source)
-        for suffix in range(1, 10):
+        for suffix in range(1, 14):
             self.assertIn(
                 f"Docs/DECISIONS/ADR-{suffix:03d}-",
                 "\n".join(review_pr.CONTRACT_SOURCES),
@@ -532,6 +532,17 @@ class ReviewCapsuleTests(unittest.TestCase):
             ),
             [".agents/roles/reviewer.md"],
         )
+
+    def test_dependency_lock_changes_require_runtime_and_provenance_review(self):
+        sources = review_pr.changed_contract_sources(["chameleon/requirements.lock"])
+
+        self.assertIn("Docs/PROJECT_CONTRACT.md §9", sources)
+        self.assertIn("Docs/DECISIONS/ADR-004-stage-1-runtime.md", sources)
+        self.assertIn(
+            "Docs/DECISIONS/ADR-013-reproducible-package-lock-strategy.md", sources
+        )
+        self.assertIn("Docs/DEPENDENCY_EVIDENCE.md", sources)
+        self.assertIn("Docs/STATUS.md", sources)
 
     def test_write_text_preserves_diff_trailing_whitespace(self):
         with tempfile.TemporaryDirectory() as directory:

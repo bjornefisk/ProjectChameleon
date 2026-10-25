@@ -1,6 +1,6 @@
 # Project Chameleon status
 
-**Date:** 2026-10-22
+**Date:** 2026-10-25
 
 **Phase:** Gate 1 is cleared. Tickets 01-08 are implemented within their accepted bounded scopes. Issue #61's PDF-grounded fix produces the public 1080×1350 → 728×90 sample as one hard-valid JSON/PNG pair in repeated local runs. PR #65 merged the fix as `6dbbc0a3eaba3090997ad9731a4026677dc6978c`, and Issue #61 closed automatically. Required native x86_64 `Verify and test` run 39711973748 passed on PR head `33f6fd9`; the owner waived partner review and no partner approval is recorded. No official organizer score, cross-platform parity, or release qualification is claimed.
 **Decision status:** The merged implementation preserves bounded four-topology search, at most twelve source-derived candidates, renderer-gated hard validation, fixed-point ranking, deterministic output, and typed fail-closed behavior. Accepted ADR-010 through ADR-012 reconcile only quantized common group transforms, the absence of a numeric readability floor, and the renderer-measured transient glyph inset against the source challenge PDF. Local success and native CI do not establish organizer qualification; cross-platform parity and organizer-held-out scoring remain unverified.
@@ -40,22 +40,69 @@ The original Python 3.12 output bytes were not retained, so that historical same
 
 ## Issue #71 clean-build dependency provenance
 
-PR #74 records the current release-candidate input inventory at source-input
-revision `2548c82`; the latest evidence record and run-record binding are in
-`86c9218` at [`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md).
-The base image, direct Python pins, renderer commit, schema, packaged assets,
-and packaged font hashes are observed.
+ADR-013 accepts exact Debian snapshot and package-archive locks, a complete
+hash-locked Python runtime/build wheel set, and a source-bound local renderer
+wheel. The issue owner authorized the strategy in the direct task instruction;
+the earlier public Issue comment requested approval and is not represented as
+approval.
 
-Required native amd64 CI run `39988562284` passed on the PR merge ref. It
-verified the linux/amd64 image, non-empty SBOM, clean-cache build, offline
-three-sample success, repeated and clean-cache artifact hashes, native imports,
-and Skia/Pillow library closure. Apt versions, complete transitive wheel hashes,
-cross-platform parity, and release qualification remain
-`UNVERIFIED_EXTERNAL_FACT`.
+This branch replaces the former direct-pin build path and migrates developer,
+Docker, CI, and review-tool callers. The prior native run `39988562284` belongs
+to the direct-pin candidate and is historical, not qualification evidence for
+these locks.
 
-No dependency or Docker input changes are authorized by this inventory slice.
-The next decision is a reviewed apt/wheelhouse lock strategy and complete
-package-closure evidence.
+The initial native run
+[40227253405](https://github.com/bjornefisk/ProjectChameleon/actions/runs/40227253405)
+passed the first locked candidate but its workflow did not retain the SPDX SBOM.
+Updated-head run
+[40228417003](https://github.com/bjornefisk/ProjectChameleon/actions/runs/40228417003)
+passed `Verify and test` on candidate `a2b8543`
+(merge ref `27eee971346a0b5c6733053b00d91564d1d4820b`) using Ubuntu 24.04.5
+x86_64. The native `linux/amd64` image ID was
+`sha256:de27cd36d36371c5fc6b571c58849ad068f8abb36bee738ff65524a6a571bfed`,
+size `848681354` bytes. All three offline samples succeeded; malformed input
+failed closed with no output pair; repeated and clean-cache artifact hashes
+matched; native imports and `ldd` closure passed. Its uploaded SPDX-2.3 artifact
+(`12611997130`) was verified (220 packages, 4,861 relationships, SHA-256
+`28eb3be04d8bdf5233595e8b752c94f6ea4392ea43aff598503c83efa8981268`).
+
+PR-head run
+[40229964417](https://github.com/bjornefisk/ProjectChameleon/actions/runs/40229964417)
+passed `Verify and test` on `b004f609c70440a510ceae645b8ff5de66afb071`,
+Ubuntu 24.04.5 x86_64. Its `linux/amd64` image ID was
+`sha256:e4db4bc65599ba1086b391c45a9f2a6c1eda4739d3a712c7f0b27537b1257fb2`;
+all sample, failure-path, repeated/clean-cache, and native-library checks
+passed. Its SPDX-2.3 artifact (`12612674286`) has 220 packages, 4,861
+relationships, and document SHA-256
+`75f9def29db2071372d1a7e2ea92fbadea9e1b99bfab073eded669341e796da1`.
+
+Runner-pinned run
+[40232041519](https://github.com/bjornefisk/ProjectChameleon/actions/runs/40232041519)
+passed `Verify and test` on `9af20a3b1863b0ba25bcf74bb1f4f1e1d9ed63fa`,
+using Ubuntu 24.04.5 `x86_64` (`ubuntu-24.04`, runner image
+`20261012.334.1`). Its `linux/amd64` image ID was
+`sha256:61d300a1aac034a03899640cd814489e7e9c4039a49c99a96ed8442aae8e1007`.
+All three offline samples succeeded, malformed input failed closed with no
+output pair, repeated and clean-cache hashes matched, and native imports and
+`ldd` closure passed. The uploaded SPDX-2.3 artifact (`12613273548`, compressed
+size `468492` bytes) has 220 packages, 4,861 relationships, and 4,039 files.
+Its document SHA-256 is
+`dacf4aa18eb8572e3b6750fa76fc2b933ac9ec04bd689f7e17dfc9a52b8d56c0`;
+the compressed artifact digest is
+`69ca4b1ae3349f1a57f2bc65816ad40148ccc262f9f17f58e22a496ac9152923`.
+
+All three downloaded SBOMs have different document hashes, but identical
+non-container package records and all 4,039 file-name/checksum pairs. The root
+container identity and 726 generated file SPDX identifiers varied by run;
+SBOM hashes are per-build evidence, not a byte-reproducibility claim. The
+sample artifact hashes are identical across all three native runs.
+
+GitHub's [runner-image migration notice #14748](https://github.com/actions/runner-images/issues/14748) says the `ubuntu-latest` label is transitioning to Ubuntu 26 beginning October 19, 2026. CI pins `ubuntu-24.04` to keep the qualification major version explicit.
+
+PR #80 remains the delivery vehicle; verify its current maintainer review and
+branch-protection check before merge. Local Darwin-arm64 checks remain
+supplemental. Cross-platform parity, organizer-held-out scoring, organizer
+resource limits, and release qualification remain unverified.
 
 ## Issue #61 public Level 3 acceptance
 
@@ -86,13 +133,13 @@ This matrix is an audit index, not a new contract or qualification claim. `PROJE
 | **F-02** intermediate column-pivot rounding | **Fixed and locally evidenced.** | `chameleon/engine/layout/column_pivot.py` retains exact geometry through construction and applies one final half-even candidate serialization; staging reserializes only already-integral published values; `chameleon/tests/geometry/test_issue23_rounding.py`, `chameleon/tests/layout/test_level2.py`, and `chameleon/tests/layout/test_search_ranking.py` cover the boundary. Native-amd64 parity remains unverified. |
 | **F-03** exhaustion-aware failure mapping | **Fixed for bounded producers and runner; public Level 3 now succeeds locally.** | `chameleon/engine/layout/{near_isomorphic,column_pivot,horizontal_ribbon,vertical_restack,search}.py`, `chameleon/engine/resize.py`, `chameleon/engine/main.py`; tests cover typed cutoff, real incomplete-search no-publication, and the public hard-valid pair. `INCOMPLETE_SEARCH` is retained for cutoff/incomplete attempts; `INFEASIBLE_LAYOUT` requires exhausted finite search. |
 | **F-04** renderer-aware text validation | **Implemented at the authoritative hard-validation seam; platform qualification boundary remains.** | `chameleon/engine/contract.py::validate_response()` invokes the pinned converter text preflight with effective face/style-run metrics, Unicode-safe wrapping and forced-line accounting, spacing/alignment, max-lines/height, unbreakable-segment, and positioned-glyph checks. `chameleon/tests/contract/test_renderer_contract.py` calls the authoritative seam directly; layout callers pass their renderer context. Native renderer-golden/platform parity and final-font qualification remain unverified. |
-| **F-05** PNG/artifact conformance | **Implemented local hard gate; external qualification absent.** | `chameleon/engine/artifact.py`, `chameleon/engine/staging.py`, `chameleon/tests/artifact/`, `chameleon/tests/runner/`, `chameleon/tests/fixtures/artifact/`, and renderer hash fixtures cover dimensions, opacity, bounds, exact image/shape source-pixel replay, pinned-adapter reference equality, missing-asset warning provenance, and fail-closed publication. Hash/provenance and expected dimensions are local pinned-runtime evidence; soft scores, warnings, or non-empty PNGs never substitute for hard validity. |
-| **F-06** runtime/resource/reproducibility qualification | **Native-amd64 evidence recorded; full organizer qualification remains open.** | `Docs/DEPENDENCY_EVIDENCE.md` and `Docs/IMPLEMENTATION/tickets/08-qualification-evidence.md` record GitHub Actions run `39481028806` on commit `7f39a3e`: pinned `linux/amd64` image, non-empty SPDX SBOM, packaged local asset/font hashes, `13.690699821s` wall time, `307076 KiB` container maximum RSS, `3` peak threads, expected Level 1/2 success plus Level 3 `INCOMPLETE_SEARCH`, native imports/`ldd` closure, and matching repeated/clean-cache sample-output hashes. Cross-platform hash parity, apt/wheelhouse closure, organizer-controlled limits, and official scoring remain unverified.
+| **F-05** PNG/artifact conformance | **Hard gate implemented; native sample artifacts verified; broader artifact qualification remains.** | `chameleon/engine/artifact.py`, `chameleon/engine/staging.py`, `chameleon/tests/artifact/`, `chameleon/tests/runner/`, `chameleon/tests/fixtures/artifact/`, and renderer hash fixtures cover dimensions, opacity, bounds, exact image/shape source-pixel replay, pinned-adapter reference equality, missing-asset warning provenance, and fail-closed publication. Native runs `40228417003`, `40229964417`, and `40232041519` checked all three offline sample JSON/PNG/marker pairs, repeated/clean-cache hash equality, and the malformed-input no-pair path. Warning output and non-empty PNGs never substitute for hard validity. |
+| **F-06** runtime/resource/reproducibility qualification | **Native locked-candidate checks and SBOM retention passed; broader organizer qualification remains open.** | `Docs/DEPENDENCY_EVIDENCE.md` and `Docs/IMPLEMENTATION/tickets/08-qualification-evidence.md` record historical direct-pin run `39481028806`, not qualification for Issue #71. Native runs `40228417003`, `40229964417`, and `40232041519` passed with `linux/amd64` build/provenance, uploaded SBOMs, package/native closure, offline success/failure paths, and repeat/clean-cache comparisons. PR #80's current branch-protection check and maintainer review remain merge gates. Cross-platform hash parity, organizer-controlled limits, and official scoring remain unverified. |
 | **F-07** normative search/renderer test evidence | **Local bounded evidence recorded; official evaluation deferred.** | `Docs/IMPLEMENTATION/tickets/08-issue-23-evidence.md`, `Docs/IMPLEMENTATION/tickets/08-heldout-evaluation.md`, `scripts/evaluate_heldout_search.py`, `chameleon/tests/artifact/`, `chameleon/tests/layout/`, `tests/renderer/`, `tests/geometry/`, and `tests/fixtures/renderer_artifact_hashes.json`. The evidence covers rounding, variants, ranking, renderer edges, artifact provenance, hashes, and a seven-case locally authored held-out-style corpus (six `SUCCESS`, one `INCOMPLETE_SEARCH`, with stable repeated response/PNG signatures); organizer-held-out scoring remains unverified. |
 | **F-08** stale status/roadmap/dependencies | **Reconciled by this documentation update.** | This matrix, the current status/roadmap/architecture sections, Ticket 07/08 status lines, and qualification evidence distinguish implemented bounded work from pending or unverified gates. |
 | **F-09** stale traceability/ADR/README claims | **Reconciled by this documentation update.** | Contract traceability, ADR-002, ADR-008, `Docs/IMPLEMENTATION/SPEC.md`, `Docs/IMPLEMENTATION/README.md`, and `chameleon/README.md` identify historical pre-implementation wording and current local evidence without changing normative authority. |
 
-The public Level 3 sample now returns a hard-valid pair with stable repeated local signatures. The separate extreme-ratio regression remains typed `INCOMPLETE_SEARCH`, exits nonzero, and publishes no artifacts. These local results are not proof of organizer-held-out acceptance, official scoring, or native-amd64 parity for the issue branch; no merge or release is claimed here.
+The public Level 3 sample now returns a hard-valid pair with stable repeated local signatures. The separate extreme-ratio regression remains typed `INCOMPLETE_SEARCH`, exits nonzero, and publishes no artifacts. These local results do not establish organizer-held-out acceptance, official scoring, or broad cross-platform renderer parity; no organizer score or release qualification is claimed.
 
 ## Issue #20 F-04 authoritative validator verification
 
@@ -255,7 +302,7 @@ Ticket 07 product work is implemented on `feat/ticket-07-horizontal-ribbon-level
 
 These are contract artifacts, not solver or renderer implementation:
 
-- `chameleon/requirements.txt` pins the initial external compatibility baseline.
+- `chameleon/requirements.in` and `chameleon/requirements.lock`, the locked renderer build requirements and source-to-wheel manifest, and `chameleon/apt/` record the external runtime/build dependency baseline.
 - `chameleon/Dockerfile` records the intended Python 3.11.11 Bookworm amd64 image and offline environment defaults.
 - `chameleon/chameleon_design_schema_v0.9.json` is no longer provisional, accepts empty designs, and records structural ranges/defaults.
 - Contract fixtures live under `chameleon/tests/fixtures/contract/`.
@@ -269,7 +316,7 @@ The current bounded capabilities are active:
 1. **Ticket 06:** Complete and merged in PR #14; the bounded role-inference and column-pivot evidence is recorded above.
 2. **Ticket 07:** Horizontal-ribbon and vertical-restack candidates now produce the public Level 3 sample as a hard-valid pair locally. The original project-authored numeric text floor and post-rounding exact group relationship were reconciled against the source PDF through Accepted ADR-010 through ADR-012.
 3. **Ticket 08:** Four-family candidate search, source-derived variants, renderer-gated fixed-point ranking, artifact provenance, and local held-out-style evaluation are implemented; official/native qualification is pending.
-4. **Future hardening (if needed):** A project-owned hash-locked wheelhouse and apt-version locks require separate evidence and change control.
+4. **Issue #71 dependency provenance:** Accepted ADR-013 and the source-bound apt/Python/renderer locks are implemented in PR #80; native run `40228417003` passed and its SBOM artifact was verified. The current PR-head required check and repository-maintainer review are the merge gates.
 
 **Note:** `engine/main.py` warning-only self-check is not the contract validator - `engine/contract.validate_response()` is authoritative.
 

@@ -33,6 +33,7 @@ from chameleon.renderer.converter.convert import (
 ROOT = Path(__file__).parents[2]
 FONT_DIR = ROOT / "brand_kit" / "fonts"
 ASSETS_DIR = ROOT / "brand_kit" / "assets"
+RENDERER_ARTIFACT = ROOT / "renderer-artifact.json"
 
 # This seam is tied to cr-renderer commit a17e1fb9a732959dd6c21ae168d5ee09d74bd64f,
 # the immutable revision named by PROJECT_CONTRACT.md §6 and ADR-002.
@@ -91,13 +92,20 @@ class RendererGoldenTests(unittest.TestCase):
         cls.font_manager = load_brand_font_manager(str(FONT_DIR))
 
     def test_adapter_matches_independent_pinned_renderer_reference(self):
+        artifact_manifest = json.loads(RENDERER_ARTIFACT.read_text(encoding="utf-8"))
         direct_url = json.loads(
             distribution("cr-renderer").read_text("direct_url.json")
         )
+        archive_info = direct_url.get("archive_info", {})
+        wheel_sha256 = archive_info.get("hashes", {}).get("sha256")
+        if wheel_sha256 is None:
+            wheel_sha256 = archive_info.get("hash", "").removeprefix("sha256=")
+        self.assertEqual(artifact_manifest["source"]["commit"], PINNED_RENDERER_SHA)
         self.assertEqual(
-            direct_url["vcs_info"]["commit_id"],
-            PINNED_RENDERER_SHA,
+            artifact_manifest["wheel"]["version"],
+            distribution("cr-renderer").version,
         )
+        self.assertEqual(artifact_manifest["wheel"]["sha256"], wheel_sha256)
         document = {
             "canvas": {"width": 96, "height": 64},
             "elements": [
@@ -189,7 +197,7 @@ class RendererGoldenTests(unittest.TestCase):
             font_digest.update(font_path.read_bytes())
         print(
             "renderer_golden "
-            f"renderer_commit={direct_url['vcs_info']['commit_id']} "
+            f"renderer_commit={artifact_manifest['source']['commit']} "
             f"renderer_version={distribution('cr-renderer').version} "
             f"skia_version={distribution('skia-python').version} "
             f"adapter_sha256={adapter_sha256} "

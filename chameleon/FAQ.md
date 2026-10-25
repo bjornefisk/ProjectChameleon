@@ -44,11 +44,11 @@ cr-renderer is still doing the real rendering work under the hood — we convert
 
 **Q3. How do I render my output to see what it actually looks like?**
 
-Use the integrated renderer already present in `renderer/converter/`. From the repository root:
+Run from the repository root:
 
 ```
-cd chameleon
-python -m engine.main
+make setup
+make run
 ```
 
 This processes each task in `input/`, writes `<task>_output.json` and
@@ -63,7 +63,7 @@ The upstream renderer consumes explicit internal line information, rotates aroun
 
 Missing assets remain in output record. Development renderer emits labeled placeholder and warning for missing file; placeholder is renderer diagnostic output, not asset replacement in engine response.
 
-If renderer import fails, engine reports `RUNTIME_IO_FAILURE` and publishes no JSON/PNG pair. Install pinned dependencies before running `engine.main`.
+If renderer import fails, the engine reports `RUNTIME_IO_FAILURE` and publishes no JSON/PNG pair. Run `make setup` from the repository root to install the locked dependencies and verified local renderer wheel.
 
 **Q4. Where do I find the actual brand assets and fonts?**
 
@@ -84,19 +84,16 @@ One deliberate exception: the Level 3 sample's `holiday_watermark` element refer
 
 **Using it:**
 
-1. Install the pinned dependencies with Python 3.11 for the Stage 1 runtime: `pip install -r requirements.txt`.
-2. Read `../Docs/PROJECT_CONTRACT.md` before changing `engine/resize.py`; `resize(source, target_canvas)` is the public solver function, while conformance work may also touch the task orchestrator and renderer adapter. The contract—not the baseline—defines behavior.
-3. Run the starter pipeline locally: `python -m engine.main`. It processes the three sample task files and writes successful JSON/PNG pairs plus hidden commit manifests to `output/`; from the repository root, use `make inspect` rather than consuming raw JSON during execution.
-4. Use the contract fixtures and the renderer conformance plan before claiming a behavior is supported. The current `resize.py` is intentionally nonconforming uniform stretch; failure behavior is defined by `../Docs/PROJECT_CONTRACT.md` and must not be inferred from starter output.
-5. Qualify the actual Stage 1 image for Python 3.11 on `linux/amd64` with:
+1. Install the pinned dependencies and build the verified renderer wheel with `make setup` from the repository root.
+2. Read `Docs/PROJECT_CONTRACT.md` before changing `chameleon/engine/resize.py`; `resize(source, target_canvas)` is the public solver function, while conformance work may also touch the task orchestrator and renderer adapter. The contract—not the baseline—defines behavior.
+3. Run `make run` from the repository root. It processes the three sample task files and writes successful JSON/PNG pairs plus hidden commit manifests to `chameleon/output/`; use `make inspect` rather than consuming raw JSON during execution.
+4. Use the contract fixtures and renderer conformance plan before claiming a behavior is supported. The current `resize.py` is intentionally nonconforming uniform stretch; failure behavior is defined by `Docs/PROJECT_CONTRACT.md` and must not be inferred from starter output.
+5. Qualify the actual Stage 1 image for Python 3.11 on `linux/amd64` from the repository root:
    ```
-   cd chameleon
-   docker buildx build --platform linux/amd64 --load -t my-chameleon-engine .
-   docker run --rm --network none \
-     -v "$PWD/input:/app/input" -v "$PWD/output:/app/output" \
-     my-chameleon-engine
+   make docker-build
+   make docker-test
    ```
-   `--network none` is part of the Stage 1 runtime contract.
+   `make docker-build` prepares the hash-verified wheelhouse and installs only the locally prepared wheels plus the selected Debian snapshot packages. `--network none` remains part of the Stage 1 runtime contract.
 
 The Stage 1 deliverable is the autonomous engine and its run instructions. An Adobe Express viewer/add-on is a separate finale concern under `Docs/DECISIONS/ADR-005-separate-stage-1-from-finale.md`.
 

@@ -41,12 +41,17 @@ RULES.md
 
 ## Quick start (no Docker needed for iterating on `resize()`)
 
-Stage 1 targets Python 3.11 on `linux/amd64`; the local commands below are for development only.
+Stage 1 targets Python 3.11 on `linux/amd64`. The following commands set up a
+local development environment from the repository root.
 
 ```bash
-pip install -r requirements.txt
-python -m engine.main
+make setup
+make run
 ```
+
+`make setup` installs the hash-locked Python distributions and builds the
+pinned renderer wheel from its SHA-256-verified source archive; Docker is not
+required for local iteration.
 
 This processes every `*.json` file in `input/` (the 3 sample designs are
 already there — one per difficulty level). Successful tasks write an
@@ -79,11 +84,11 @@ The hidden `.<stem>_output.commit` marker is written last with both artifact has
 
 `main.py` calls `renderer/converter/convert.py`'s `render_design_to_png()`
 (the integrated converter, wrapping the pinned `cr-renderer` revision)
-to produce each task's PNG — already wired in, no setup needed. It reads
-fonts/assets from `brand_kit/` and writes a real rendered preview, not a
-placeholder. If the renderer import fails, that task reports
-`RUNTIME_IO_FAILURE` and publishes no JSON/PNG pair. Install the pinned
-dependencies from `requirements.txt` before running the engine.
+to produce each task's PNG — the adapter is integrated, and `make setup`
+installs its verified local renderer wheel. It reads fonts/assets from
+`brand_kit/` and writes a real rendered preview, not a placeholder. If the
+renderer import fails, that task reports `RUNTIME_IO_FAILURE` and publishes no
+JSON/PNG pair.
 
 Before either a solver candidate is accepted or a task pair is published, the
 engine runs `engine.artifact.validate_artifact()` on the decoded PNG and the
@@ -95,19 +100,26 @@ and readability remain separate soft-quality concerns.
 
 ## Docker (how you'll actually be run)
 
+From the repository root, prepare the locked wheelhouse and build/run the official
+image:
+
 ```bash
-docker build --platform linux/amd64 -t my-chameleon-engine .
-docker run --rm --network none \
-  -v $(pwd)/input:/app/input \
-  -v $(pwd)/output:/app/output \
-  my-chameleon-engine
+make docker-build
+make docker-test
 ```
 
+`make docker-build` prepares `.wheelhouse/` from the hash-locked Python and
+renderer-build locks, then installs only those local wheels plus the packages
+from the pinned Debian snapshot. The wheelhouse is generated, ignored by Git,
+and checked against the committed lock and artifact manifests. Add Python
+dependencies to `requirements.in`, regenerate `requirements.lock` with the
+reviewed lock procedure, and update provenance evidence; never resolve packages
+at image-build time from an unpinned index.
+
 `--network none` and Python 3.11 on `linux/amd64` match the Stage 1 runtime
-target: everything the engine needs must be installed at **build** time (add
-it to `requirements.txt`), not fetched at run time. The initial search strategy
-does not use a model; a future model would require a separate accepted
-decision and immutable offline artifacts.
+target: everything the engine needs is installed at build time, not fetched at
+runtime. The initial search strategy does not use a model; a future model would
+require a separate accepted decision and immutable offline artifacts.
 
 ## Source of truth
 

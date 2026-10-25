@@ -8,7 +8,7 @@ PYTHON := $(VENV_DIR)/bin/python
 PIP := $(VENV_DIR)/bin/pip
 PYTHON_BOOTSTRAP ?= python3.11
 
-.PHONY: help setup verify verify-fonts install-hooks preflight test run agent-check inspect synthetic docker-build docker-test clean
+.PHONY: help setup verify verify-fonts install-hooks preflight test run agent-check inspect synthetic prepare-dependencies docker-build docker-test clean
 
 help:
 	@echo "Project Chameleon Developer & Agent Commands:"
@@ -23,6 +23,7 @@ help:
 	@echo "  make synthetic    - Generate varied marketing aspect-ratio synthetic test cases"
 	@echo "  make agent-check  - Run local verification gate (not Stage 1 qualification before Gate 1)"
 	@echo "  make docker-build - Build the official linux/amd64 Docker image"
+	@echo "  make prepare-dependencies - Prepare the verified linux/amd64 Docker wheelhouse"
 	@echo "  make docker-test  - Run the Docker container offline with --network none"
 	@echo "  make clean        - Remove generated outputs, caches, and temporary files"
 
@@ -32,9 +33,8 @@ setup:
 		$(PYTHON_BOOTSTRAP) -m venv $(VENV_DIR); \
 	fi
 	@$(PYTHON) -c 'import sys; actual = sys.version_info[:2]; actual == (3, 11) or sys.exit(f"Project setup requires Python 3.11; got {sys.version.split()[0]}. Use a fresh VENV_DIR with PYTHON_BOOTSTRAP=python3.11.")'
-	@echo "Installing dependencies from chameleon/requirements.txt..."
-	@$(PIP) install --upgrade pip
-	@$(PIP) install -r chameleon/requirements.txt
+	@echo "Installing hash-locked Python dependencies and the verified local renderer wheel..."
+	@$(PYTHON_BOOTSTRAP) scripts/prepare_dependency_inputs.py --install-local-renderer --python "$(PYTHON)"
 	@echo "Environment setup complete."
 
 verify: verify-fonts
@@ -57,6 +57,7 @@ test:
 	@cd chameleon && $(PYTHON) -m unittest discover -s tests -t . -p 'test_*.py' -v
 	@$(PYTHON) -m unittest scripts.test_review_pr -v
 	@$(PYTHON) -m unittest scripts.test_qualify_runtime -v
+	@$(PYTHON) -m unittest scripts.test_prepare_dependency_inputs -v
 	@$(PYTHON) -m unittest scripts.test_font_provenance -v
 
 run:
@@ -76,7 +77,11 @@ agent-check: verify test run inspect
 	@echo "Agent-check PASSED: Local checks complete; this is not Stage 1 qualification before Gate 1."
 	@echo "=========================================="
 
-docker-build:
+prepare-dependencies:
+	@echo "Preparing hash-verified linux/amd64 wheelhouse..."
+	@$(PYTHON_BOOTSTRAP) scripts/prepare_dependency_inputs.py --prepare-wheelhouse
+
+docker-build: prepare-dependencies
 	@echo "Building linux/amd64 Docker image..."
 	@docker buildx build --platform linux/amd64 --load -t chameleon-stage1 chameleon/
 
@@ -90,6 +95,7 @@ docker-test:
 	@echo "Docker test completed."
 
 clean:
+	@rm -rf chameleon/.wheelhouse chameleon/.wheelhouse.tmp-*
 	@rm -f chameleon/output/*_output.json chameleon/output/*_output.png \
 		chameleon/output/*.tmp chameleon/output/.*_output.commit \
 		chameleon/output/.*_output.commit.tmp
@@ -99,4 +105,5 @@ clean:
 		-name '.*.stage-*' -prune -exec rm -rf {} + 2>/dev/null || true
 	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
+	@echo "Removed the generated dependency wheelhouse."
 	@echo "Cleaned generated files, markers, and caches."
