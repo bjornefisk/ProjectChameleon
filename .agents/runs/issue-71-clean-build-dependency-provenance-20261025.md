@@ -4,11 +4,11 @@
 run_id: issue-71-clean-build-dependency-provenance-20261025
 owner/role: Lead orchestrator / implementation owner
 workflow/gate: Issue #71 dependency provenance and native qualification
-started/updated: 2026-10-25 / native run `40227253405` passed without retaining its SBOM; follow-up `40228417003` and PR-head run `40229964417` passed `Verify and test` and their SPDX artifacts were verified; the current `ubuntu-24.04` runner pin still needs a passing check, and maintainer review is pending
+started/updated: 2026-10-25 / native runs `40227253405`, `40228417003`, `40229964417`, and runner-pinned run `40232041519` passed; all retained SBOM artifacts were verified; repository-maintainer review remains pending
 
 branch/ref: `fix/issue-71-clean-build-provenance` / PR [#80](https://github.com/bjornefisk/ProjectChameleon/pull/80) (opened as draft)
-source revision: latest passed candidate `b004f609c70440a510ceae645b8ff5de66afb071`; earlier candidates `a2b8543f78bd2504b8d1051621972fb7220e1bce` and `84ed3b4fac95efd208de87383fdc9009e1a48cf8`; based on main `84d8e3e00bc457dfb3714bf368700da2ff3620d`
-worktree state: `b004f609c70440a510ceae645b8ff5de66afb071` is pushed and passed run `40229964417`; the workflow's `ubuntu-24.04` pin is a local uncommitted change; PR #80 is draft and maintainer review was requested from `@gabegaines24`.
+source revision: latest passed runner-pinned candidate `9af20a3b1863b0ba25bcf74bb1f4f1e1d9ed63fa`; earlier candidates `b004f609c70440a510ceae645b8ff5de66afb071`, `a2b8543f78bd2504b8d1051621972fb7220e1bce`, and `84ed3b4fac95efd208de87383fdc9009e1a48cf8`; based on main `84d8e3e00bc457dfb3714bf368700da2ff3620d`
+worktree state: runner-pinned candidate `9af20a3` is pushed and passed run `40232041519`; PR #80 remains draft with maintainer review requested from `@gabegaines24`.
 
 Goal/acceptance: close every Issue #71 build-input provenance gap, demonstrate an offline success artifact pair and fail-closed no-pair behavior, and qualify the exact candidate on native x86_64 GitHub Actions before merge.
 
@@ -45,6 +45,7 @@ Out of scope: organizer-held-out scoring, cross-platform hash parity, production
 | Native x86_64 qualification, initial candidate | GitHub Actions run [40227253405](https://github.com/bjornefisk/ProjectChameleon/actions/runs/40227253405), job `Verify and test`; merge ref `2d1bfa45830de305560168875ca0c733615fd43d`; candidate head `84ed3b4fac95efd208de87383fdc9009e1a48cf8` | `PASS` (exit `0`) | Native run generated and hashed the SPDX SBOM but the workflow explicitly disabled artifact upload; follow-up run `40228417003` qualified the updated head and retained a verified SPDX artifact. See the updated run evidence below. |
 | Native x86_64 qualification, SBOM-retention follow-up | GitHub Actions run [40228417003](https://github.com/bjornefisk/ProjectChameleon/actions/runs/40228417003), job `Verify and test`, candidate head `a2b8543f78bd2504b8d1051621972fb7220e1bce`; merge ref `27eee971346a0b5c6733053b00d91564d1d4820b` | `PASS` (exit `0`) | Native Ubuntu 24.04.5 x86_64 job passed. The workflow SBOM artifact `chameleon-stage1-sbom.spdx.json` (`12611997130`) downloaded and parsed as SPDX-2.3, `chameleon-stage1`, 220 packages, 4,861 relationships, 3,614,257 bytes; SHA-256 `28eb3be04d8bdf5233595e8b752c94f6ea4392ea43aff598503c83efa8981268`, matching the job digest. |
 | Native x86_64 qualification, PR-head evidence | GitHub Actions run [40229964417](https://github.com/bjornefisk/ProjectChameleon/actions/runs/40229964417), job `Verify and test`, candidate head `b004f609c70440a510ceae645b8ff5de66afb071` | `PASS` (exit `0`) | Native Ubuntu 24.04.5 x86_64 run passed. The SBOM artifact `chameleon-stage1-sbom.spdx.json` (`12612674286`) parsed as SPDX-2.3, `chameleon-stage1`, 220 packages, 4,861 relationships, 3,614,257 bytes; SHA-256 `75f9def29db2071372d1a7e2ea92fbadea9e1b99bfab073eded669341e796da1`, matching the workflow log. The current runner-label pin postdates this run. |
+| Native x86_64 qualification, runner-pinned PR head | GitHub Actions run [40232041519](https://github.com/bjornefisk/ProjectChameleon/actions/runs/40232041519), job `Verify and test`, candidate head `9af20a3b1863b0ba25bcf74bb1f4f1e1d9ed63fa` | `PASS` (exit `0`) | Ubuntu 24.04.5 x86_64 (`ubuntu-24.04`, runner image `20261012.334.1`). Image ID `sha256:61d300a1aac034a03899640cd814489e7e9c4039a49c99a96ed8442aae8e1007`. SBOM artifact `12613273548` is SPDX-2.3 with 220 packages, 4,861 relationships, and 4,039 files; document SHA-256 `dacf4aa18eb8572e3b6750fa76fc2b933ac9ec04bd689f7e17dfc9a52b8d56c0`; compressed artifact digest `69ca4b1ae3349f1a57f2bc65816ad40148ccc262f9f17f58e22a496ac9152923`. |
 
 | Independent implementation/security review | Read-only `reviewer` and `security-reviewer` assessment of the candidate diff | `PASS` (no actionable findings) | Contract, acceptance, maintainability, lock/build, CI, trust-boundary, secret/data scopes reviewed; neither agent ran tests or native CI. |
 | Repository maintainer review | PR #80 review request to `@gabegaines24` | `PENDING` | Requested on the draft PR; no human review recorded yet. |
@@ -80,8 +81,18 @@ GitHub Actions run [40229964417](https://github.com/bjornefisk/ProjectChameleon/
 - All three offline samples returned `SUCCESS`; malformed input returned `MALFORMED_INPUT`, exit `1`, and no output files. The nine JSON/PNG/marker hashes matched both the sample table and run `40228417003`; repeated-run and clean-cache comparisons passed.
 - Native renderer imports and Skia/Pillow `ldd` closure passed without missing libraries. The apt, Python, renderer, wheelhouse, `pip inspect`, and `pip freeze` provenance hashes matched the values recorded under the earlier native run.
 - SBOM artifact `12612674286` is SPDX-2.3, `chameleon-stage1`, with 220 packages, 4,861 relationships, and 3,614,257 extracted bytes; SHA-256 `75f9def29db2071372d1a7e2ea92fbadea9e1b99bfab073eded669341e796da1`, matching the run log. Compared with the earlier SBOM, the 219 non-container package records and all 4,039 file-name/checksum pairs were identical; root container identity and 726 generated file SPDX identifiers differed. SBOM hashes are per-build evidence, not a claim of byte-identical output.
-- This run preceded the workflow's `ubuntu-24.04` pin. GitHub's [runner-image migration notice #14748](https://github.com/actions/runner-images/issues/14748), retrieved 2026-10-25, says `ubuntu-latest` is moving to Ubuntu 26; the pinned head still needs a required check.
+- This run emitted GitHub's `ubuntu-latest` migration warning; the runner-image [notice #14748](https://github.com/actions/runner-images/issues/14748) prompted pinning `ubuntu-24.04`. Pinned native run `40232041519` passed on the new label.
 
+
+## Runner-pinned native x86_64 qualification
+
+GitHub Actions run [40232041519](https://github.com/bjornefisk/ProjectChameleon/actions/runs/40232041519) passed `Verify and test` (exit `0`) on candidate `9af20a3b1863b0ba25bcf74bb1f4f1e1d9ed63fa`. The runner was Ubuntu 24.04.5 `x86_64`, label `ubuntu-24.04`, image version `20261012.334.1`.
+
+- The `linux/amd64` image ID was `sha256:61d300a1aac034a03899640cd814489e7e9c4039a49c99a96ed8442aae8e1007`.
+- All three offline samples returned `SUCCESS`; malformed input returned `MALFORMED_INPUT`, exit `1`, and no output files. The nine JSON/PNG/marker hashes matched `Docs/DEPENDENCY_EVIDENCE.md` and the preceding native runs. Repeated-run and clean-cache comparisons passed.
+- Native renderer imports and Skia/Pillow `ldd` closure passed without missing libraries. The apt, Python, renderer, wheelhouse, `pip inspect`, and `pip freeze` provenance hashes matched those recorded above.
+- SBOM artifact `12613273548` is SPDX-2.3 for `chameleon-stage1`, with 220 packages, 4,861 relationships, and 4,039 files. The document is 3,614,257 bytes, SHA-256 `dacf4aa18eb8572e3b6750fa76fc2b933ac9ec04bd689f7e17dfc9a52b8d56c0`; the compressed artifact digest is `69ca4b1ae3349f1a57f2bc65816ad40148ccc262f9f17f58e22a496ac9152923`.
+- Across the three downloaded SBOMs, 219 non-container package records and all 4,039 file-name/checksum pairs are identical. The root container identity and 726 generated file SPDX identifiers vary by run; SBOM hashes are per-build evidence, not a byte-reproducibility claim.
 ## Artifacts
 
 - Runtime lock: `chameleon/requirements.lock`, SHA-256 `0386cc02d31ef271ed3ae68d8fc544727a273c8bf9dcb734dc309b87b3ac5b5f`.
@@ -106,7 +117,8 @@ GitHub Actions run [40229964417](https://github.com/bjornefisk/ProjectChameleon/
 - Failure classification: initial local setup revealed a real venv-symlink bug; fixed and covered by regression test. No final verification command failed.
 - Environment side effect: the initial failed setup modified Python 3.11 user-site packages before the venv-symlink fix; prior package state is unknown, so no rollback was attempted.
 
-- Checks not complete: PR-head run `40229964417` on `b004f609c70440a510ceae645b8ff5de66afb071` passed native `Verify and test` and its SPDX artifact was verified. The current `ubuntu-24.04` runner-pin change still needs a passing required check; repository-maintainer review is also pending.
+- Checks not complete: repository-maintainer review of PR #80 is pending. Runner-pinned run `40232041519` passed on candidate `9af20a3`, and its SPDX artifact was verified. The required `Verify and test` check must be green on the latest PR head before merge.
+
 
 - Environment or platform limitation: local host is Darwin arm64; Buildx uses amd64 emulation. This does not prove native Linux/amd64 behavior.
 
@@ -118,7 +130,8 @@ GitHub Actions run [40229964417](https://github.com/bjornefisk/ProjectChameleon/
 
 ## Decision and handoff
 
-- Decision: runs `40228417003` and `40229964417` passed native x86_64 checks and their SPDX artifacts were verified. Do not merge until the updated runner-pinned PR head passes the required check and the requested maintainer review is complete.
+- Decision: native runs `40228417003`, `40229964417`, and `40232041519` passed and their SPDX artifacts were verified. Do not merge until the latest PR-head check passes and the requested maintainer review is complete.
+
 - Rollback/migration: revert the Issue #71 PR; old `requirements.txt` is removed as part of the clean cutover to reviewed lock inputs.
 - Next owner: PR maintainer/reviewer and native GitHub Actions runner.
-- Next concrete action: commit and push the runner pin and updated evidence, verify the new PR-head `Verify and test` result, and process the requested maintainer review before merging.
+- Next concrete action: commit the final evidence update, verify the resulting PR-head `Verify and test` result, and process the requested maintainer review before merging.

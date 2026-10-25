@@ -45,8 +45,10 @@ Native GitHub Actions run `40227253405` passed the first candidate's build/runti
 and package-closure checks, but its generated SPDX SBOM was not retained.
 Follow-up run `40228417003` passed `Verify and test` on candidate `a2b8543`
 and uploaded an inspected SPDX-2.3 workflow artifact. PR-head run `40229964417`
-also passed on `b004f609c70440a510ceae645b8ff5de66afb071` and retained its
-SBOM artifact. GitHub's [runner-image migration notice #14748](https://github.com/actions/runner-images/issues/14748) announced the `ubuntu-latest` transition to Ubuntu 26; the workflow is pinned to `ubuntu-24.04`. The pinned head's required check and repository-maintainer review remain merge gates.
+passed on `b004f609`; it was followed by runner-pinned run `40232041519` on
+`9af20a3b`, which passed the full native workflow and retained a verified
+SPDX-2.3 artifact. The SBOM/package closure and all three sample output hashes
+were inspected. Repository-maintainer review remains a merge gate.
 
 ## Acceptance criteria
 

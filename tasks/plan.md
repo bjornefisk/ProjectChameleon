@@ -46,12 +46,12 @@ merges. No issue may have a second open PR for the same fix.
   source-bound renderer artifact strategy. The Issue #71 owner authorized it in
   the direct task instruction; the earlier public comment was only a request.
 - Native run `40227253405` passed the first candidate but did not retain its
-  SPDX SBOM. Follow-up commit `a2b8543` enables workflow-artifact upload;
+  SPDX SBOM. Follow-up commit `a2b8543` enabled workflow-artifact upload;
   updated run `40228417003` passed and its SPDX-2.3 artifact was inspected.
-  PR-head run `40229964417` also passed on `b004f609`; its SBOM artifact was
-  verified. A GitHub `ubuntu-latest` migration warning led to pinning the
-  workflow to `ubuntu-24.04`; that head's required check and human maintainer
-  review remain merge gates. Local arm64-host emulation is supplemental.
+  PR-head run `40229964417` passed on `b004f609`. Runner-pinned native run
+  `40232041519` passed on `9af20a3`; its SPDX artifact and sample outputs were
+  verified. Human maintainer review remains a merge gate. Local arm64-host
+  emulation is supplemental.
 
 - Official scorer protocol, thresholds, target catalogue, and official results
   remain unavailable.

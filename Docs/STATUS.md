@@ -68,23 +68,41 @@ matched; native imports and `ldd` closure passed. Its uploaded SPDX-2.3 artifact
 
 PR-head run
 [40229964417](https://github.com/bjornefisk/ProjectChameleon/actions/runs/40229964417)
-also passed `Verify and test` on `b004f609c70440a510ceae645b8ff5de66afb071`,
+passed `Verify and test` on `b004f609c70440a510ceae645b8ff5de66afb071`,
 Ubuntu 24.04.5 x86_64. Its `linux/amd64` image ID was
 `sha256:e4db4bc65599ba1086b391c45a9f2a6c1eda4739d3a712c7f0b27537b1257fb2`;
 all sample, failure-path, repeated/clean-cache, and native-library checks
-passed. The uploaded SPDX-2.3 artifact (`12612674286`) has 220 packages,
-4,861 relationships, and SHA-256
+passed. Its SPDX-2.3 artifact (`12612674286`) has 220 packages, 4,861
+relationships, and document SHA-256
 `75f9def29db2071372d1a7e2ea92fbadea9e1b99bfab073eded669341e796da1`.
-The SBOM documents have different hashes; comparison found identical
-non-container package records and file names/checksums, with run-specific
-container identity and SPDX file identifiers.
-GitHub's [runner-image migration notice #14748](https://github.com/actions/runner-images/issues/14748) says the `ubuntu-latest` label is transitioning to Ubuntu 26 beginning October 19, 2026. CI is pinned to `ubuntu-24.04` to keep the qualification major version explicit; the pin's required check is still pending.
+
+Runner-pinned run
+[40232041519](https://github.com/bjornefisk/ProjectChameleon/actions/runs/40232041519)
+passed `Verify and test` on `9af20a3b1863b0ba25bcf74bb1f4f1e1d9ed63fa`,
+using Ubuntu 24.04.5 `x86_64` (`ubuntu-24.04`, runner image
+`20261012.334.1`). Its `linux/amd64` image ID was
+`sha256:61d300a1aac034a03899640cd814489e7e9c4039a49c99a96ed8442aae8e1007`.
+All three offline samples succeeded, malformed input failed closed with no
+output pair, repeated and clean-cache hashes matched, and native imports and
+`ldd` closure passed. The uploaded SPDX-2.3 artifact (`12613273548`, compressed
+size `468492` bytes) has 220 packages, 4,861 relationships, and 4,039 files.
+Its document SHA-256 is
+`dacf4aa18eb8572e3b6750fa76fc2b933ac9ec04bd689f7e17dfc9a52b8d56c0`;
+the compressed artifact digest is
+`69ca4b1ae3349f1a57f2bc65816ad40148ccc262f9f17f58e22a496ac9152923`.
+
+All three downloaded SBOMs have different document hashes, but identical
+non-container package records and all 4,039 file-name/checksum pairs. The root
+container identity and 726 generated file SPDX identifiers varied by run;
+SBOM hashes are per-build evidence, not a byte-reproducibility claim. The
+sample artifact hashes are identical across all three native runs.
+
+GitHub's [runner-image migration notice #14748](https://github.com/actions/runner-images/issues/14748) says the `ubuntu-latest` label is transitioning to Ubuntu 26 beginning October 19, 2026. CI pins `ubuntu-24.04` to keep the qualification major version explicit.
 
 PR #80 remains the delivery vehicle; verify its current maintainer review and
-the required check on the runner-pinned head before merge. Local Darwin-arm64
-checks remain supplemental.
-Cross-platform parity, organizer-held-out scoring, organizer resource limits,
-and release qualification remain unverified.
+branch-protection check before merge. Local Darwin-arm64 checks remain
+supplemental. Cross-platform parity, organizer-held-out scoring, organizer
+resource limits, and release qualification remain unverified.
 
 ## Issue #61 public Level 3 acceptance
 
@@ -115,8 +133,8 @@ This matrix is an audit index, not a new contract or qualification claim. `PROJE
 | **F-02** intermediate column-pivot rounding | **Fixed and locally evidenced.** | `chameleon/engine/layout/column_pivot.py` retains exact geometry through construction and applies one final half-even candidate serialization; staging reserializes only already-integral published values; `chameleon/tests/geometry/test_issue23_rounding.py`, `chameleon/tests/layout/test_level2.py`, and `chameleon/tests/layout/test_search_ranking.py` cover the boundary. Native-amd64 parity remains unverified. |
 | **F-03** exhaustion-aware failure mapping | **Fixed for bounded producers and runner; public Level 3 now succeeds locally.** | `chameleon/engine/layout/{near_isomorphic,column_pivot,horizontal_ribbon,vertical_restack,search}.py`, `chameleon/engine/resize.py`, `chameleon/engine/main.py`; tests cover typed cutoff, real incomplete-search no-publication, and the public hard-valid pair. `INCOMPLETE_SEARCH` is retained for cutoff/incomplete attempts; `INFEASIBLE_LAYOUT` requires exhausted finite search. |
 | **F-04** renderer-aware text validation | **Implemented at the authoritative hard-validation seam; platform qualification boundary remains.** | `chameleon/engine/contract.py::validate_response()` invokes the pinned converter text preflight with effective face/style-run metrics, Unicode-safe wrapping and forced-line accounting, spacing/alignment, max-lines/height, unbreakable-segment, and positioned-glyph checks. `chameleon/tests/contract/test_renderer_contract.py` calls the authoritative seam directly; layout callers pass their renderer context. Native renderer-golden/platform parity and final-font qualification remain unverified. |
-| **F-05** PNG/artifact conformance | **Hard gate implemented; native sample artifacts verified; broader artifact qualification remains.** | `chameleon/engine/artifact.py`, `chameleon/engine/staging.py`, `chameleon/tests/artifact/`, `chameleon/tests/runner/`, `chameleon/tests/fixtures/artifact/`, and renderer hash fixtures cover dimensions, opacity, bounds, exact image/shape source-pixel replay, pinned-adapter reference equality, missing-asset warning provenance, and fail-closed publication. Native runs `40228417003` and `40229964417` checked all three offline sample JSON/PNG/marker pairs, repeated/clean-cache hash equality, and the malformed-input no-pair path. Warning output and non-empty PNGs never substitute for hard validity. |
-| **F-06** runtime/resource/reproducibility qualification | **Native locked-candidate checks and SBOM retention passed; broader organizer qualification remains open.** | `Docs/DEPENDENCY_EVIDENCE.md` and `Docs/IMPLEMENTATION/tickets/08-qualification-evidence.md` record historical direct-pin run `39481028806`, not qualification for Issue #71. Native runs `40228417003` and `40229964417` passed on locked candidates with `linux/amd64` build/provenance, uploaded SBOMs, package/native closure, offline success/failure paths, and repeat/clean-cache comparisons. PR #80's runner-pinned required check and maintainer review remain merge gates. Cross-platform hash parity, organizer-controlled limits, and official scoring remain unverified. |
+| **F-05** PNG/artifact conformance | **Hard gate implemented; native sample artifacts verified; broader artifact qualification remains.** | `chameleon/engine/artifact.py`, `chameleon/engine/staging.py`, `chameleon/tests/artifact/`, `chameleon/tests/runner/`, `chameleon/tests/fixtures/artifact/`, and renderer hash fixtures cover dimensions, opacity, bounds, exact image/shape source-pixel replay, pinned-adapter reference equality, missing-asset warning provenance, and fail-closed publication. Native runs `40228417003`, `40229964417`, and `40232041519` checked all three offline sample JSON/PNG/marker pairs, repeated/clean-cache hash equality, and the malformed-input no-pair path. Warning output and non-empty PNGs never substitute for hard validity. |
+| **F-06** runtime/resource/reproducibility qualification | **Native locked-candidate checks and SBOM retention passed; broader organizer qualification remains open.** | `Docs/DEPENDENCY_EVIDENCE.md` and `Docs/IMPLEMENTATION/tickets/08-qualification-evidence.md` record historical direct-pin run `39481028806`, not qualification for Issue #71. Native runs `40228417003`, `40229964417`, and `40232041519` passed with `linux/amd64` build/provenance, uploaded SBOMs, package/native closure, offline success/failure paths, and repeat/clean-cache comparisons. PR #80's current branch-protection check and maintainer review remain merge gates. Cross-platform hash parity, organizer-controlled limits, and official scoring remain unverified. |
 | **F-07** normative search/renderer test evidence | **Local bounded evidence recorded; official evaluation deferred.** | `Docs/IMPLEMENTATION/tickets/08-issue-23-evidence.md`, `Docs/IMPLEMENTATION/tickets/08-heldout-evaluation.md`, `scripts/evaluate_heldout_search.py`, `chameleon/tests/artifact/`, `chameleon/tests/layout/`, `tests/renderer/`, `tests/geometry/`, and `tests/fixtures/renderer_artifact_hashes.json`. The evidence covers rounding, variants, ranking, renderer edges, artifact provenance, hashes, and a seven-case locally authored held-out-style corpus (six `SUCCESS`, one `INCOMPLETE_SEARCH`, with stable repeated response/PNG signatures); organizer-held-out scoring remains unverified. |
 | **F-08** stale status/roadmap/dependencies | **Reconciled by this documentation update.** | This matrix, the current status/roadmap/architecture sections, Ticket 07/08 status lines, and qualification evidence distinguish implemented bounded work from pending or unverified gates. |
 | **F-09** stale traceability/ADR/README claims | **Reconciled by this documentation update.** | Contract traceability, ADR-002, ADR-008, `Docs/IMPLEMENTATION/SPEC.md`, `Docs/IMPLEMENTATION/README.md`, and `chameleon/README.md` identify historical pre-implementation wording and current local evidence without changing normative authority. |
