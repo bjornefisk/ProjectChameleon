@@ -95,7 +95,8 @@ jobs:
           format: spdx-json
           output-file: ${{ runner.temp }}/chameleon-stage1.sbom.spdx.json
           syft-version: v1.42.3
-          upload-artifact: false
+          artifact-name: chameleon-stage1-sbom.spdx.json
+          upload-artifact: true
           upload-release-assets: false
           dependency-snapshot: false
       - name: Record Docker image SBOM
