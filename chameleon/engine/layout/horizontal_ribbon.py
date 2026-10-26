@@ -37,11 +37,16 @@ _GEOMETRY_FIELDS = ("x", "y", "width", "height")
 _MAX_GROUP_SCALE_REFINEMENT_STEPS = _MAX_FONT_SEARCH_PROBES
 
 
-def _fail(message: str, **details: Any) -> NoReturn:
+def _fail(
+    message: str,
+    *,
+    search_kind: str = "horizontal_ribbon",
+    **details: Any,
+) -> NoReturn:
     raise InfeasibleLayoutError(
         InfeasibleReasonCode.INCOMPLETE_SEARCH,
         message,
-        {"search_kind": "horizontal_ribbon", "search_exhausted": False, **details},
+        {"search_kind": search_kind, "search_exhausted": False, **details},
     )
 
 

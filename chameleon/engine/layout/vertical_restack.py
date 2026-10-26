@@ -57,7 +57,10 @@ def generate_vertical_restack_candidate(
     validate_source(source)
     validate_target_canvas(target_canvas)
     if not is_vertical_restack_suitable(source, target_canvas):
-        _fail("source and target proportions do not support a vertical restack")
+        _fail(
+            "source and target proportions do not support a vertical restack",
+            search_kind="vertical_restack",
+        )
     response = _build_extreme_candidate(
         source,
         target_canvas,
