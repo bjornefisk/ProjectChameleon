@@ -6,11 +6,11 @@
 
 The current implementation is not the pre-implementation plan described by several historical paragraphs below. F-01/F-02/F-03/F-04/F-07 have bounded local evidence at their authoritative seams; F-05 has local renderer/artifact seam evidence but not complete platform qualification; F-06 has native-amd64 CI observations, while cross-platform parity, full packaging closure, and broad held-out evaluation remain open. See the audit matrix and exact paths in [`STATUS.md`](STATUS.md). No warning-only check, soft score, arm64 emulation, or missing artifact is contract or qualification evidence.
 
-Decision ratification is complete, including the PDF-grounded Issue #61 changes in ADR-010 through ADR-012. The public Level 3 sample-pass behavior is implemented and merged in PR #65, and Issue #61 is closed. Do not claim official scoring, broad held-out evaluation, cross-platform parity, or complete organizer runtime qualification without corresponding evidence.
+Decision ratification is complete, including the PDF-grounded Issue #61 changes in ADR-010 through ADR-012 and the reproducible package-lock strategy in ADR-013. The public Level 3 sample-pass behavior is implemented and merged in PR #65, and Issue #61 is closed. Do not claim official scoring, broad held-out evaluation, cross-platform parity, or complete organizer runtime qualification without corresponding evidence.
 
 ### Gate 0 — Contract and evidence (complete; documentation only)
 
-- Read `PROJECT_CONTRACT.md`, ADR-001 through ADR-012, the pinned schema, and `DEPENDENCY_EVIDENCE.md`.
+- Read `PROJECT_CONTRACT.md`, ADR-001 through ADR-013, the pinned schema, and `DEPENDENCY_EVIDENCE.md`.
 - Record the accepted failure, numeric/geometry, typography, and initial-search decisions without adding wire fields or weakening hard constraints.
 - Keep every unresolved external fact visible: hidden-task feasibility and missing-output scoring, scorer thresholds, target catalogue, M5 Pro resources, model limits, final fonts/assets/licensing, native amd64 qualification, and Adobe deployment.
 - Treat the three shipped samples plus the contract fixtures as regression inputs, not as the whole hidden-test universe.

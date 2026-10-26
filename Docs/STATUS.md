@@ -1,9 +1,9 @@
 # Project Chameleon status
 
-**Date:** 2026-10-25
+**Date:** 2026-10-26
 
 **Phase:** Gate 1 is cleared. Tickets 01-08 are implemented within their accepted bounded scopes. Issue #61's PDF-grounded fix produces the public 1080×1350 → 728×90 sample as one hard-valid JSON/PNG pair in repeated local runs. PR #65 merged the fix as `6dbbc0a3eaba3090997ad9731a4026677dc6978c`, and Issue #61 closed automatically. Required native x86_64 `Verify and test` run 39711973748 passed on PR head `33f6fd9`; the owner waived partner review and no partner approval is recorded. No official organizer score, cross-platform parity, or release qualification is claimed.
-**Decision status:** The merged implementation preserves bounded four-topology search, at most twelve source-derived candidates, renderer-gated hard validation, fixed-point ranking, deterministic output, and typed fail-closed behavior. Accepted ADR-010 through ADR-012 reconcile only quantized common group transforms, the absence of a numeric readability floor, and the renderer-measured transient glyph inset against the source challenge PDF. Local success and native CI do not establish organizer qualification; cross-platform parity and organizer-held-out scoring remain unverified.
+**Decision status:** The merged implementation preserves bounded four-topology search, at most twelve source-derived candidates, renderer-gated hard validation, fixed-point ranking, deterministic output, and typed fail-closed behavior. Accepted ADR-010 through ADR-012 reconcile only quantized common group transforms, the absence of a numeric readability floor, and the renderer-measured transient glyph inset against the source challenge PDF. Accepted ADR-013 records the reproducible package-lock strategy. Local success and native CI do not establish organizer qualification; cross-platform parity and organizer-held-out scoring remain unverified.
 **Ticket 06 authority:** User-requested GitHub issue #13; owner @bjornefisk; partner reviewer @gabegaines24. Implementation branch `feat/ticket-06-column-pivot-level2` merged as PR #14. The Issue #61 branch was based on main commit `c5b1159` before PR #65 merged the fix into main.
 
 ## Issue #69 official scoring evidence
@@ -99,10 +99,10 @@ sample artifact hashes are identical across all three native runs.
 
 GitHub's [runner-image migration notice #14748](https://github.com/actions/runner-images/issues/14748) says the `ubuntu-latest` label is transitioning to Ubuntu 26 beginning October 19, 2026. CI pins `ubuntu-24.04` to keep the qualification major version explicit.
 
-PR #80 remains the delivery vehicle; verify its current maintainer review and
-branch-protection check before merge. Local Darwin-arm64 checks remain
-supplemental. Cross-platform parity, organizer-held-out scoring, organizer
-resource limits, and release qualification remain unverified.
+PR #80 is merged and Issue #71 is closed. The final required `Verify and test`
+run 40233682826 passed. Local Darwin-arm64 checks remain supplemental.
+Cross-platform parity, organizer-held-out scoring, organizer resource limits,
+and release qualification remain unverified.
 
 ## Issue #61 public Level 3 acceptance
 
@@ -134,7 +134,7 @@ This matrix is an audit index, not a new contract or qualification claim. `PROJE
 | **F-03** exhaustion-aware failure mapping | **Fixed for bounded producers and runner; public Level 3 now succeeds locally.** | `chameleon/engine/layout/{near_isomorphic,column_pivot,horizontal_ribbon,vertical_restack,search}.py`, `chameleon/engine/resize.py`, `chameleon/engine/main.py`; tests cover typed cutoff, real incomplete-search no-publication, and the public hard-valid pair. `INCOMPLETE_SEARCH` is retained for cutoff/incomplete attempts; `INFEASIBLE_LAYOUT` requires exhausted finite search. |
 | **F-04** renderer-aware text validation | **Implemented at the authoritative hard-validation seam; platform qualification boundary remains.** | `chameleon/engine/contract.py::validate_response()` invokes the pinned converter text preflight with effective face/style-run metrics, Unicode-safe wrapping and forced-line accounting, spacing/alignment, max-lines/height, unbreakable-segment, and positioned-glyph checks. `chameleon/tests/contract/test_renderer_contract.py` calls the authoritative seam directly; layout callers pass their renderer context. Native renderer-golden/platform parity and final-font qualification remain unverified. |
 | **F-05** PNG/artifact conformance | **Hard gate implemented; native sample artifacts verified; broader artifact qualification remains.** | `chameleon/engine/artifact.py`, `chameleon/engine/staging.py`, `chameleon/tests/artifact/`, `chameleon/tests/runner/`, `chameleon/tests/fixtures/artifact/`, and renderer hash fixtures cover dimensions, opacity, bounds, exact image/shape source-pixel replay, pinned-adapter reference equality, missing-asset warning provenance, and fail-closed publication. Native runs `40228417003`, `40229964417`, and `40232041519` checked all three offline sample JSON/PNG/marker pairs, repeated/clean-cache hash equality, and the malformed-input no-pair path. Warning output and non-empty PNGs never substitute for hard validity. |
-| **F-06** runtime/resource/reproducibility qualification | **Native locked-candidate checks and SBOM retention passed; broader organizer qualification remains open.** | `Docs/DEPENDENCY_EVIDENCE.md` and `Docs/IMPLEMENTATION/tickets/08-qualification-evidence.md` record historical direct-pin run `39481028806`, not qualification for Issue #71. Native runs `40228417003`, `40229964417`, and `40232041519` passed with `linux/amd64` build/provenance, uploaded SBOMs, package/native closure, offline success/failure paths, and repeat/clean-cache comparisons. PR #80's current branch-protection check and maintainer review remain merge gates. Cross-platform hash parity, organizer-controlled limits, and official scoring remain unverified. |
+| **F-06** runtime/resource/reproducibility qualification | **Native locked-candidate checks and SBOM retention passed; broader organizer qualification remains open.** | `Docs/DEPENDENCY_EVIDENCE.md` and `Docs/IMPLEMENTATION/tickets/08-qualification-evidence.md` record historical direct-pin run `39481028806`, not qualification for Issue #71. Native runs `40228417003`, `40229964417`, and `40232041519` passed with `linux/amd64` build/provenance, uploaded SBOMs, package/native closure, offline success/failure paths, and repeat/clean-cache comparisons. PR #80 merged and Issue #71 closed after required checks passed. Cross-platform hash parity, organizer-controlled limits, and official scoring remain unverified. |
 | **F-07** normative search/renderer test evidence | **Local bounded evidence recorded; official evaluation deferred.** | `Docs/IMPLEMENTATION/tickets/08-issue-23-evidence.md`, `Docs/IMPLEMENTATION/tickets/08-heldout-evaluation.md`, `scripts/evaluate_heldout_search.py`, `chameleon/tests/artifact/`, `chameleon/tests/layout/`, `tests/renderer/`, `tests/geometry/`, and `tests/fixtures/renderer_artifact_hashes.json`. The evidence covers rounding, variants, ranking, renderer edges, artifact provenance, hashes, and a seven-case locally authored held-out-style corpus (six `SUCCESS`, one `INCOMPLETE_SEARCH`, with stable repeated response/PNG signatures); organizer-held-out scoring remains unverified. |
 | **F-08** stale status/roadmap/dependencies | **Reconciled by this documentation update.** | This matrix, the current status/roadmap/architecture sections, Ticket 07/08 status lines, and qualification evidence distinguish implemented bounded work from pending or unverified gates. |
 | **F-09** stale traceability/ADR/README claims | **Reconciled by this documentation update.** | Contract traceability, ADR-002, ADR-008, `Docs/IMPLEMENTATION/SPEC.md`, `Docs/IMPLEMENTATION/README.md`, and `chameleon/README.md` identify historical pre-implementation wording and current local evidence without changing normative authority. |
@@ -194,11 +194,11 @@ The bounded Ticket 05 implementation completes Gate 1 within its accepted scope.
 
 **Ticket 05 acceptance:**
 - ✅ Bounded Level 1 near-isomorphic path implemented
-- ✅ Levels 1-2 commit valid pairs; Level 3 correctly reports `INCOMPLETE_SEARCH`
+- ✅ At the historical Ticket 05 boundary, Levels 1-2 committed valid pairs and Level 3 returned `INCOMPLETE_SEARCH`.
 - ✅ 20 layout tests, 154 total tests passing
 
 **Cutoff semantics disposition (accepted):**
-The bounded deterministic search with `INCOMPLETE_SEARCH` status satisfied Gate 1 at the historical Ticket 05 boundary. The current tree additionally contains bounded column-pivot, horizontal-ribbon, vertical-restack, candidate-variant, ranking, and exhaustion-aware paths; the public Level 3 result remains contract-correct fail-closed and is not a Gate 1 blocker.
+The bounded deterministic search with `INCOMPLETE_SEARCH` status satisfied Gate 1 at the historical Ticket 05 boundary. Tickets 06-08 later added bounded column-pivot, horizontal-ribbon, vertical-restack, candidate-variant, ranking, and exhaustion-aware paths. PR #65 resolved the public Level 3 result; other incomplete searches remain fail-closed and are not claims of infeasibility.
 
 ## PR12 transition evidence and historical review handoff
 
@@ -212,12 +212,12 @@ The bounded deterministic search with `INCOMPLETE_SEARCH` status satisfied Gate 
 - The Level 1 integration test now checks repeated render hashes; renderer goldens and broader native-library parity remain unverified.
 
 
-### Historical/open hardening notes (not Gate 1 blockers)
+### Pre-PR #65 review notes (historical; not current status)
 
-1. Level 3 currently fails closed with `INCOMPLETE_SEARCH: explicit group cannot be represented by one positive integer transform`.
+1. At the pre-PR #65 boundary, the public Level 3 sample failed closed with `INCOMPLETE_SEARCH: explicit group cannot be represented by one positive integer transform`.
 2. Ticket 06 supplies bounded column-pivot and role-inference behavior; Ticket 07 supplies horizontal-ribbon and vertical-restack families; Ticket 08 supplies bounded candidate enumeration, renderer-gated ranking, and qualification evidence. Broad held-out evaluation remains deferred.
 3. Renderer goldens and native-library parity remain unverified beyond the recorded local evidence; the arm64-host Docker run is supplemental and does not establish native-amd64 qualification.
-4. Native `x86_64` CI smoke remains historical native evidence; current local Docker observations use arm64-host emulation and are supplemental. The mixed public batch remains aggregate-nonzero because Level 3 is intentionally fail-closed.
+4. At that historical point, native `x86_64` CI smoke was earlier evidence and local Docker observations used arm64-host emulation; the mixed public batch was aggregate-nonzero because Level 3 was incomplete. PR #65 later resolved the public sample.
 5. The Docker build retains the non-blocking `FromPlatformFlagConstDisallowed` warning.
 
 
@@ -240,24 +240,24 @@ Ticket 06 implementation evidence is complete and PR #14 is merged into `main`. 
 - **Engine smoke:** `cd chameleon && ../.venv/bin/python -m engine.main` — exit 1 expected; Levels 1-2 `SUCCESS` with pairs, Level 3 `INCOMPLETE_SEARCH` with no pair; warning-only off-canvas self-check remains non-authoritative.
 - **Docker supplemental smoke:** `docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` passed with `FromPlatformFlagConstDisallowed`; offline `docker run --rm --network none ... chameleon-stage1` exited 1 as expected with Levels 1-2 pairs and Level 3 `INCOMPLETE_SEARCH`. This is arm64-host supplemental evidence, not native-amd64 qualification.
 - **Review:** Independent correctness/security review found and resolved the contract-visible relationship/resource-cap and stale-path/status findings. Pre-existing exact-ingress/style-run and unbounded schema/render resource risks remain outside this bounded fix. Partner review and merge disposition are complete.
-- **Next review:** Resolve the Ticket 07 public Level 3 sample acceptance gap through bounded implementation review or an accepted contract/fixture decision. Ticket 08 implementation and local evidence are present; its native-amd64, clean-cache, resource, and held-out qualification boundaries remain open.
+- **Current disposition:** PR #65 resolved the Ticket 07 public Level 3 acceptance gap. Ticket 08 implementation and local evidence are present; its native-amd64, clean-cache, resource, and held-out qualification boundaries remain open.
 
 
 
-## Ticket 07 implementation evidence — active review
+## Ticket 07 implementation evidence (pre-PR #65; historical)
 
-Ticket 07 product work is implemented on `feat/ticket-07-horizontal-ribbon-level3`, but the Level 3 fixture acceptance remains open. The implementation is intentionally contract-first: it keeps exact group transforms, rotated AABB checks, source-separated placement, image-ratio lattices, renderer-gated integer font search, missing-asset records, and typed fail-closed behavior. It does not claim a hard-valid output for the adversarial `1080 x 1350 -> 728 x 90` sample.
+At the pre-PR #65 boundary, Ticket 07 product work was implemented on `feat/ticket-07-horizontal-ribbon-level3`, but the public Level 3 fixture acceptance remained open. The implementation kept exact group transforms, rotated AABB checks, source-separated placement, image-ratio lattices, renderer-gated integer font search, missing-asset records, and typed fail-closed behavior; it had not produced a hard-valid output for the adversarial `1080 x 1350 -> 728 x 90` sample.
 
 - **Changed product paths:** `chameleon/engine/layout/horizontal_ribbon.py`, `chameleon/engine/layout/vertical_restack.py`, `chameleon/engine/layout/__init__.py`, `chameleon/engine/resize.py`, and `chameleon/tests/layout/test_level3.py`.
-- **Focused evidence:** `cd chameleon && ../.venv/bin/python -m unittest tests.layout.test_level3 -v` — 4 passed. Feasible synthetic horizontal and vertical candidates validate; repeated synthetic rendering produces identical PNG hashes; the public Level 3 fixture fails closed after the bounded ribbon candidates are exhausted.
+- **Historical focused evidence:** `cd chameleon && ../.venv/bin/python -m unittest tests.layout.test_level3 -v` — 4 passed. Feasible synthetic horizontal and vertical candidates validated and repeated synthetic rendering produced identical PNG hashes; the public Level 3 fixture still failed closed before PR #65.
 - **Level 2 regression:** `cd chameleon && ../.venv/bin/python -m unittest tests.layout.test_level2 -v` — 15 passed.
 - **Full evidence:** `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -v` — 174 passed.
 - **Repository checks:** `python3 scripts/verify_repository.py`, `make verify`, and changed-file `py_compile` passed; `git diff --check` passed for tracked edits.
-- **Engine smoke:** required system `python -m engine.main` could not start because that interpreter lacks `jsonschema`; the project environment `../.venv/bin/python -m engine.main` ran Levels 1-2 successfully and Level 3 as typed `INCOMPLETE_SEARCH` with no pair.
-- **Docker supplemental smoke:** `docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` passed with the existing `FromPlatformFlagConstDisallowed` warning. Offline `docker run --rm --network none ... chameleon-stage1` ran under arm64-host amd64 emulation, produced Level 1-2 pairs, and returned the expected nonzero status for the Level 3 typed failure. This is supplemental, not native-amd64 qualification.
-- **Observed public Level 3 result:** typed `INCOMPLETE_SEARCH`; no design/PNG pair. The horizontal family exhausts its finite geometry/order variants at renderer-gated text placement; column-pivot and near-isomorphic remain bounded fallbacks and also fail on the fixture's rigid groups. This is evidence of an unresolved acceptance gap, not proof that the fixture is contract-infeasible.
-- **Known review risk:** the ticket requires a valid $728 x 90$ sample output, but the current hard-valid search has not produced one. Do not mark Ticket 07 complete, claim sample-pass evidence, or promote this arm64-host work to native-amd64 qualification until the gap is resolved or superseded by an accepted contract decision.
-- **Next review question:** independently enumerate the legal integer group/image lattices and renderer-valid text boxes for the fixture before changing hard constraints. A solver change MUST remain bounded and MUST NOT shed records, rewrite copy/font attributes, substitute fonts, or relax overlap/containment rules.
+- **Historical engine smoke:** The system `python -m engine.main` could not start because that interpreter lacked `jsonschema`; the project environment `../.venv/bin/python -m engine.main` ran Levels 1-2 successfully and Level 3 as typed `INCOMPLETE_SEARCH` with no pair.
+- **Historical Docker smoke:** `docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` passed with the existing `FromPlatformFlagConstDisallowed` warning. Offline `docker run --rm --network none ... chameleon-stage1` ran under arm64-host amd64 emulation, produced Level 1-2 pairs, and returned nonzero for the then-incomplete Level 3 task. This is supplemental, not native-amd64 qualification.
+- **Pre-PR #65 public Level 3 result:** The sample returned typed `INCOMPLETE_SEARCH` and published no design/PNG pair. The horizontal family exhausted its finite geometry/order variants at renderer-gated text placement; column-pivot and near-isomorphic also failed on the fixture's rigid groups. PR #65 later resolved this public sample; the earlier result was not proof of infeasibility.
+- **Historical review risk:** At that point, the bounded hard-valid search had not produced the required 728 x 90 result. PR #65 resolved the risk without weakening hard validation or source-record invariants.
+- **Historical follow-up:** The then-open question was to enumerate legal integer group/image lattices and renderer-valid text boxes before changing hard constraints. The accepted PR #65 fix resolved the fixture while preserving bounded search and all hard constraints; it did not authorize shedding records, copy/font changes, font substitution, or relaxed overlap/containment rules.
 
 ## Ground truth now recorded
 
@@ -274,6 +274,7 @@ Ticket 07 product work is implemented on `feat/ticket-07-horizontal-ribbon-level
 - ADR-010 defines the PDF-grounded quantized common-group transform.
 - ADR-011 makes readability a renderer-validated soft objective without a universal numeric font-size floor.
 - ADR-012 requires the minimal renderer-measured transient glyph inset inside unchanged declared text bounds.
+- ADR-013 records the accepted reproducible Debian/Python/renderer package-lock strategy; Issue #71 is closed after PR #80 merged.
 - `Docs/DEPENDENCY_EVIDENCE.md` records official-source verification, detected versions, pins, risks, and conformance tests.
 - `Docs/FINAL_ARCHITECTURE.md` consolidates the ratified Stage 1 architecture and finale boundary for implementation; it is subordinate to the contract and Accepted ADRs.
 
@@ -316,7 +317,7 @@ The current bounded capabilities are active:
 1. **Ticket 06:** Complete and merged in PR #14; the bounded role-inference and column-pivot evidence is recorded above.
 2. **Ticket 07:** Horizontal-ribbon and vertical-restack candidates now produce the public Level 3 sample as a hard-valid pair locally. The original project-authored numeric text floor and post-rounding exact group relationship were reconciled against the source PDF through Accepted ADR-010 through ADR-012.
 3. **Ticket 08:** Four-family candidate search, source-derived variants, renderer-gated fixed-point ranking, artifact provenance, and local held-out-style evaluation are implemented; official/native qualification is pending.
-4. **Issue #71 dependency provenance:** Accepted ADR-013 and the source-bound apt/Python/renderer locks are implemented in PR #80; native run `40228417003` passed and its SBOM artifact was verified. The current PR-head required check and repository-maintainer review are the merge gates.
+4. **Issue #71 dependency provenance:** Accepted ADR-013 and the source-bound apt/Python/renderer locks are implemented in merged PR #80; Issue #71 is closed. Native run `40228417003` passed and its SBOM artifact was verified. The current native, cross-platform, organizer-held-out, and release-qualification boundaries remain explicit above.
 
 **Note:** `engine/main.py` warning-only self-check is not the contract validator - `engine/contract.validate_response()` is authoritative.
 

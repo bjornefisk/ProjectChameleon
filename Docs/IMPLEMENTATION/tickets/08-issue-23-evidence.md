@@ -4,7 +4,7 @@ This record expands the normative regression evidence on the integrated Ticket 0
 
 ## Authority and scope
 
-`PROJECT_CONTRACT.md` and Accepted ADR-001 through ADR-012 remain authoritative. The tests use the `chameleon-contract`, `chameleon-testing`, and `chameleon-review` skills:
+`PROJECT_CONTRACT.md` and Accepted ADR-001 through ADR-013 remain authoritative. The tests use the `chameleon-contract`, `chameleon-testing`, and `chameleon-review` skills:
 
 - hard validation is exercised before soft quality assertions;
 - mutable geometry/font-size behavior is checked after one half-even serialization step;
