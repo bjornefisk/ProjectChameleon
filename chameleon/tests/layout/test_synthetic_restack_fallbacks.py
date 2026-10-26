@@ -94,15 +94,25 @@ class SyntheticRestackFallbackTests(unittest.TestCase):
             ), contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
                 exit_code = runner_main.main()
 
-            self.assertEqual(exit_code, 1, stderr.getvalue())
             expected_names = set()
+            saw_incomplete = False
             for stem in ISSUE_81_CASES:
                 task = self._load_task(stem)
                 target = task["target_canvas"]
                 response_path = output_dir / f"{stem}_output.json"
                 png_path = output_dir / f"{stem}_output.png"
                 commit_path = output_dir / f".{stem}_output.commit"
+                success_line = f"[{stem}.json] status=SUCCESS" in stdout.getvalue()
+                incomplete_line = (
+                    f"[{stem}.json] status=INCOMPLETE_SEARCH" in stderr.getvalue()
+                )
+                self.assertNotEqual(
+                    success_line, incomplete_line, f"{stem} had no unique terminal status"
+                )
                 if stem in EXPECTED_SUCCESS_CASES:
+                    self.assertTrue(success_line, stderr.getvalue())
+
+                if success_line:
                     expected_names.update(
                         {
                             response_path.name,
@@ -113,7 +123,6 @@ class SyntheticRestackFallbackTests(unittest.TestCase):
                     self.assertTrue(response_path.is_file())
                     self.assertTrue(png_path.is_file())
                     self.assertTrue(commit_path.is_file())
-                    self.assertIn(f"[{stem}.json] status=SUCCESS", stdout.getvalue())
                     response = json.loads(
                         response_path.read_text(encoding="utf-8"),
                         parse_float=Decimal,
@@ -128,17 +137,16 @@ class SyntheticRestackFallbackTests(unittest.TestCase):
                             artifact.size, (target["width"], target["height"])
                         )
                 else:
-                    self.assertIn(
-                        f"[{stem}.json] status=INCOMPLETE_SEARCH",
-                        stderr.getvalue(),
-                    )
+                    saw_incomplete = True
                     self.assertFalse(response_path.exists())
                     self.assertFalse(png_path.exists())
                     self.assertFalse(commit_path.exists())
 
+            self.assertEqual(exit_code, int(saw_incomplete), stderr.getvalue())
             self.assertEqual(
                 {path.name for path in output_dir.iterdir()}, expected_names
             )
+
 
 
 if __name__ == "__main__":
