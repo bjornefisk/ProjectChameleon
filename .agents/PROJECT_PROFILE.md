@@ -7,7 +7,7 @@ This file supplies repository-specific context to the generic operating contract
 Read in this order:
 
 1. [`../AGENTS.md`](../AGENTS.md);
-2. [`../Docs/PROJECT_CONTRACT.md`](../Docs/PROJECT_CONTRACT.md) and Accepted ADR-001 through ADR-012;
+2. [`../Docs/PROJECT_CONTRACT.md`](../Docs/PROJECT_CONTRACT.md) and Accepted ADR-001 through ADR-013;
 3. [`../chameleon/chameleon_design_schema_v0.9.json`](../chameleon/chameleon_design_schema_v0.9.json);
 4. [`../Docs/DEPENDENCY_EVIDENCE.md`](../Docs/DEPENDENCY_EVIDENCE.md);
 5. [`../Docs/STATUS.md`](../Docs/STATUS.md) and [`../Docs/IMPLEMENTATION_ROADMAP.md`](../Docs/IMPLEMENTATION_ROADMAP.md);

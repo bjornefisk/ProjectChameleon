@@ -11,7 +11,7 @@ Accepted
 - Proposer: repository maintainer
 - Issue: #71
 - Approval authority: the issue owner directly instructed the agent to complete Issue #71, apply required changes, test them, open a PR, and merge it. This is approval in the current task, not a claim that an earlier public Issue comment approved the strategy.
-- Review: updated-head native run `40228417003` passed on candidate `a2b8543`; its uploaded SPDX-2.3 artifact was inspected and its SHA-256 matched the workflow digest. Verify the current PR-head required check and repository-maintainer review before merge; neither is superseded by this candidate run.
+- Review: **OBSERVED:** updated-head native run `40228417003` passed on candidate `a2b8543`; its uploaded SPDX-2.3 artifact was inspected and matched the workflow digest. The final required [`Verify and test` run 40233682826](https://github.com/bjornefisk/ProjectChameleon/actions/runs/40233682826) passed on merged PR-head commit `bd6660e7180cbd78d2d0dea1de95ca9d36a5950e`; PR #80 merged as `b019b73dbebb04d386d1bf30373db0351316b064`. The issue owner's direct 2026-10-25 task instruction authorized merge; GitHub records no separate repository-maintainer or partner approval. Cross-platform parity and organizer qualification remain separate, unverified boundaries.
 - Supersedes: the packaging-input detail in ADR-004 that pointed to direct pins in `requirements.txt`. The `linux/amd64`, Python 3.11, CPU-only, and offline-runtime boundaries are unchanged.
 
 ## Context
@@ -91,15 +91,22 @@ Rejected. A clean cache does not make remote package selection immutable. Apt no
 - `.github/workflows/ci.yml`, dependency provenance tests, and the PR review dependency trigger
 - `Docs/PROJECT_CONTRACT.md` §9, ADR-004, `Docs/DEPENDENCY_EVIDENCE.md`, `Docs/STATUS.md`, `tasks/`, and `.agents/runs/`
 
-## Required verification before Issue #71 closure
+## Closure verification evidence (PR #80)
 
-1. Verify source and lock hashes, apt source exclusivity/signatures, exact apt package closure/archive hashes, and license notices.
-2. Prepare the complete Python 3.11 `linux/amd64` wheelhouse from hashes; verify all locked runtime/build wheels and the source-bound renderer wheel.
-3. Build from clean cache on native `linux/amd64`; capture image digest, SBOM, `dpkg-query`, `pip inspect`/`pip freeze`, and native-library closure.
-4. Run all three samples with `--network none`; verify exact JSON/PNG/commit-marker pairs, repeated hashes, and clean-cache hashes.
-5. Exercise malformed input and verify nonzero status with an empty output directory; keep the permanent runner failure-cleanup tests.
-6. Record each command/result in the candidate run record. Do not use the historical direct-pin CI run or arm64-host emulation as lock-candidate evidence.
-7. Keep organizer-controlled limits, official scoring, cross-platform parity, and release qualification explicitly unverified unless authoritative evidence is obtained.
+**Observed disposition:** PR #80 merged and Issue #71 closed after the final
+required [Verify and test run 40233682826](https://github.com/bjornefisk/ProjectChameleon/actions/runs/40233682826)
+passed on PR-head commit `bd6660e7180cbd78d2d0dea1de95ca9d36a5950e`.
+Run-level details are recorded in
+[`DEPENDENCY_EVIDENCE.md`](../DEPENDENCY_EVIDENCE.md) and the
+[Issue #71 run record](../../.agents/runs/issue-71-clean-build-dependency-provenance-20261025.md).
+
+1. Source and lock hashes, apt-source exclusivity/signatures, exact package/archive hashes, and license notices were verified.
+2. The complete Python 3.11 `linux/amd64` wheelhouse was prepared from hashes; locked runtime/build wheels and the source-bound renderer wheel were verified.
+3. A clean-cache native `linux/amd64` build captured its image digest, SBOM, `dpkg-query`, `pip inspect`/`pip freeze`, and native-library closure.
+4. All three samples ran with `--network none`; exact JSON/PNG/commit-marker pairs, repeated hashes, and clean-cache hashes were verified.
+5. Malformed input returned nonzero with an empty output directory; permanent runner failure-cleanup tests remain in place.
+6. Commands and results are recorded in the candidate run record. Historical direct-pin CI and arm64-host emulation were not used as lock-candidate evidence.
+7. Organizer-controlled limits, official scoring, cross-platform parity, and release qualification remain explicitly unverified.
 
 ## Open external facts
 
