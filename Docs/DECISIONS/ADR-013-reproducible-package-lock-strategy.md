@@ -11,7 +11,7 @@ Accepted
 - Proposer: repository maintainer
 - Issue: #71
 - Approval authority: the issue owner directly instructed the agent to complete Issue #71, apply required changes, test them, open a PR, and merge it. This is approval in the current task, not a claim that an earlier public Issue comment approved the strategy.
-- Review: updated-head native run `40228417003` passed on candidate `a2b8543`; its uploaded SPDX-2.3 artifact was inspected and its SHA-256 matched the workflow digest. PR #80 is merged and Issue #71 is closed after the required final `Verify and test` run 40233682826 passed. Cross-platform parity and organizer qualification remain separate, unverified boundaries.
+- Review: **OBSERVED:** updated-head native run `40228417003` passed on candidate `a2b8543`; its uploaded SPDX-2.3 artifact was inspected and matched the workflow digest. The final required [`Verify and test` run 40233682826](https://github.com/bjornefisk/ProjectChameleon/actions/runs/40233682826) passed on merged PR-head commit `bd6660e7180cbd78d2d0dea1de95ca9d36a5950e`; PR #80 merged as `b019b73dbebb04d386d1bf30373db0351316b064`. The issue owner's direct 2026-10-25 task instruction authorized merge; GitHub records no separate repository-maintainer or partner approval. Cross-platform parity and organizer qualification remain separate, unverified boundaries.
 - Supersedes: the packaging-input detail in ADR-004 that pointed to direct pins in `requirements.txt`. The `linux/amd64`, Python 3.11, CPU-only, and offline-runtime boundaries are unchanged.
 
 ## Context
@@ -92,9 +92,13 @@ Rejected. A clean cache does not make remote package selection immutable. Apt no
 - `Docs/PROJECT_CONTRACT.md` §9, ADR-004, `Docs/DEPENDENCY_EVIDENCE.md`, `Docs/STATUS.md`, `tasks/`, and `.agents/runs/`
 
 ## Closure verification evidence (PR #80)
-The checks below were the required closure gates; they were completed before
-PR #80 merged and Issue #71 closed. Run-level details are recorded in
-`DEPENDENCY_EVIDENCE.md` and the linked Issue #71 run record.
+
+**Observed disposition:** PR #80 merged and Issue #71 closed after the final
+required [Verify and test run 40233682826](https://github.com/bjornefisk/ProjectChameleon/actions/runs/40233682826)
+passed on PR-head commit `bd6660e7180cbd78d2d0dea1de95ca9d36a5950e`.
+Run-level details are recorded in
+[`DEPENDENCY_EVIDENCE.md`](../DEPENDENCY_EVIDENCE.md) and the
+[Issue #71 run record](../../.agents/runs/issue-71-clean-build-dependency-provenance-20261025.md).
 
 1. Source and lock hashes, apt-source exclusivity/signatures, exact package/archive hashes, and license notices were verified.
 2. The complete Python 3.11 `linux/amd64` wheelhouse was prepared from hashes; locked runtime/build wheels and the source-bound renderer wheel were verified.

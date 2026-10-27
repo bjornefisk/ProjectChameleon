@@ -7,7 +7,7 @@ These instructions govern autonomous work in this repository. They describe how 
 For every implementation task, read these in order before editing:
 
 1. This file.
-2. [`Docs/PROJECT_CONTRACT.md`](Docs/PROJECT_CONTRACT.md) and every **Accepted** ADR in [`Docs/DECISIONS/`](Docs/DECISIONS/): ADR-001 through ADR-012.
+2. [`Docs/PROJECT_CONTRACT.md`](Docs/PROJECT_CONTRACT.md) and every **Accepted** ADR in [`Docs/DECISIONS/`](Docs/DECISIONS/): ADR-001 through ADR-013.
 3. [`chameleon/chameleon_design_schema_v0.9.json`](chameleon/chameleon_design_schema_v0.9.json).
 4. [`Docs/DEPENDENCY_EVIDENCE.md`](Docs/DEPENDENCY_EVIDENCE.md) for pinned/versioned external behavior.
 5. [`Docs/STATUS.md`](Docs/STATUS.md) and [`Docs/IMPLEMENTATION_ROADMAP.md`](Docs/IMPLEMENTATION_ROADMAP.md) for the current phase, gaps, blockers, and evidence plan.
