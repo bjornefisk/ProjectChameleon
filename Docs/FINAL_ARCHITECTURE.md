@@ -1,6 +1,6 @@
 # Project Chameleon final architecture
 
-**Status:** Gate 1 qualification is cleared and Tickets 06–08 have bounded implementation on the integrated tree. Issue #61's PDF-grounded public Level 3 fix is merged via PR #65 (`6dbbc0a3eaba3090997ad9731a4026677dc6978c`), and the issue is closed. Issue #81's dense Level 3 synthetic targets produce hard-valid committed pairs in the local 18-case benchmark on open PR #84; this is local evidence, not official scoring or release qualification. Required native x86_64 CI run 39711973748 passed on PR head `33f6fd9`; cross-platform parity, organizer-held-out scoring, and release qualification remain unverified.
+**Status:** Gate 1 qualification is cleared and Tickets 06–08 have bounded implementation on the integrated tree. Issue #61's PDF-grounded public Level 3 fix is merged via PR #65 (`6dbbc0a3eaba3090997ad9731a4026677dc6978c`), and the issue is closed. Issue #81's dense Level 3 synthetic targets produce hard-valid committed pairs in the local 18-case benchmark recorded with PR #84; this is local evidence, not official scoring or release qualification. Required native x86_64 CI run 39711973748 passed on PR head `33f6fd9`; cross-platform parity, organizer-held-out scoring, and release qualification remain unverified.
 
 **Scope:** Stage 1 retargeting engine and the separate finale integration boundary.
 

@@ -1226,12 +1226,6 @@ def _build_compact_grid_candidate(
         "dominant_copy": Fraction(6, 5),
         "dominant_media": Fraction(4, 5),
     }.get(variant, Fraction(1))
-    result = _serialize_extreme_candidate(
-        {
-            "canvas": {"width": target_width, "height": target_height},
-            "elements": response_elements,
-        }
-    )
 
     selected_sizes: dict[int, int] = {}
     minimum_body_heights: dict[int, int] = {}
@@ -1240,8 +1234,11 @@ def _build_compact_grid_candidate(
             Fraction(1),
             group_scales.get(index, canvas_scale) * variant_scale,
         )
+        fit_element = dict(response_elements[index])
+        fit_element["width"] = quantize_to_int(response_elements[index]["width"])
+        fit_element["height"] = quantize_to_int(response_elements[index]["height"])
         selected_size = _largest_fitting_font_size(
-            result["elements"][index],
+            fit_element,
             _preferred_font_size(
                 to_fraction(source_elements[index]["font_size"]), scale
             ),
@@ -1256,12 +1253,12 @@ def _build_compact_grid_candidate(
             return None
         selected_sizes[index] = selected_size
         required_height = minimum_text_box_height(
-            result["elements"][index],
-            result["elements"][index]["width"],
+            fit_element,
+            fit_element["width"],
             selected_size,
             font_manager,
         )
-        if required_height > result["elements"][index]["height"]:
+        if required_height > fit_element["height"]:
             work_diagnostics.update(
                 {"status": "text_box_too_short", "failed_element_id": source_elements[index]["id"]}
             )

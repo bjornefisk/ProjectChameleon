@@ -1,8 +1,8 @@
 # Project Chameleon status
 
-**Date:** 2026-10-27
+**Date:** 2026-10-26
 
-**Phase:** Gate 1 is cleared. Tickets 01-08 remain within their accepted bounded scopes. Issue #61's PDF-grounded public Level 3 fix is merged via PR #65 (`6dbbc0a3eaba3090997ad9731a4026677dc6978c`) and closed. Issue #81's dense Level 3 synthetic targets now produce hard-valid committed pairs in the local 18-case benchmark on open PR #84; this is not organizer scoring or release qualification. Required native x86_64 `Verify and test` run 39711973748 passed on PR head `33f6fd9`; cross-platform parity, organizer-held-out scoring, and release qualification remain unverified.
+**Phase:** Gate 1 is cleared. Tickets 01-08 remain within their accepted bounded scopes. Issue #61's PDF-grounded public Level 3 fix is merged via PR #65 (`6dbbc0a3eaba3090997ad9731a4026677dc6978c`) and closed. Issue #81's dense Level 3 synthetic targets now produce hard-valid committed pairs in the local 18-case benchmark recorded with PR #84; this is not organizer scoring or release qualification. Required native x86_64 `Verify and test` run 39711973748 passed on PR head `33f6fd9`; cross-platform parity, organizer-held-out scoring, and release qualification remain unverified.
 **Decision status:** The merged implementation preserves bounded four-topology search, at most twelve source-derived candidates, renderer-gated hard validation, fixed-point ranking, deterministic output, and typed fail-closed behavior. Accepted ADR-010 through ADR-012 reconcile only quantized common group transforms, the absence of a numeric readability floor, and the renderer-measured transient glyph inset against the source challenge PDF. Local success and native CI do not establish organizer qualification; cross-platform parity and organizer-held-out scoring remain unverified.
 **Ticket 06 authority:** User-requested GitHub issue #13; owner @bjornefisk; partner reviewer @gabegaines24. Implementation branch `feat/ticket-06-column-pivot-level2` merged as PR #14. The Issue #61 branch was based on main commit `c5b1159` before PR #65 merged the fix into main.
 

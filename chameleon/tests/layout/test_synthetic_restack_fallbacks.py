@@ -47,6 +47,8 @@ REQUIRED_SUCCESS_CASES = frozenset(
     {
         "chameleon_sample_level2_core_skyscraper",
         "chameleon_sample_level2_core_compact_square",
+        "chameleon_sample_level3_advanced_skyscraper",
+        "chameleon_sample_level3_advanced_medium_rectangle",
         "chameleon_sample_level3_advanced_compact_square",
     }
 )
