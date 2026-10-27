@@ -4,7 +4,7 @@
 
 **Scope:** Stage 1 retargeting engine and the separate finale integration boundary.
 
-**Authority:** `Docs/PROJECT_CONTRACT.md` and Accepted ADR-001 through ADR-012 are normative. The ratified schema and pinned renderer evidence follow them. This document consolidates those decisions for implementation; it does not add wire fields, change behavior, or override a contract or ADR.
+**Authority:** `Docs/PROJECT_CONTRACT.md` and Accepted ADR-001 through ADR-013 are normative. The ratified schema and pinned renderer evidence follow them. This document consolidates those decisions for implementation; it does not add wire fields, change behavior, or override a contract or ADR.
 
 ## 1. Architecture goals
 
@@ -294,6 +294,12 @@ The initial runtime is:
 
 A clean amd64 build must record dependency versions, renderer source, native-library imports, font hashes, asset resolution, PNG hashes, and no-network behavior. An arm64-only run is not Stage 1 qualification evidence.
 
+Accepted ADR-013 defines the reproducible package-lock strategy. Issue #71's
+dependency-provenance work is merged in PR #80 and the issue is closed; final
+required `Verify and test` run 40233682826 passed. Cross-platform parity,
+organizer-held-out scoring, organizer limits, and release qualification remain
+unverified.
+
 ## 10. Delivery gates
 
 | Gate | Deliverable | Exit evidence |
@@ -331,7 +337,7 @@ The architecture does not invent values for:
 - organizer CPU, RAM, disk, GPU, or model limits;
 - official scoring thresholds and complete target catalogue;
 - final font and asset licensing or Adobe font availability;
-- native amd64 qualification; and
+- native amd64 parity and qualification beyond the recorded PR #80 locked-candidate run;
 - final Adobe Express deployment topology.
 
 These facts are tracked in `Docs/STATUS.md` and `Docs/DEPENDENCY_EVIDENCE.md`. They may affect qualification or release claims but do not weaken the local Stage 1 contract.

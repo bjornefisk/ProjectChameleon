@@ -9,7 +9,7 @@ This directory contains the complete source of truth, architectural blueprints, 
 When reading or implementing this project, follow this strict precedence. A lower-precedence document never silently overrides a higher one:
 
 1. **Normative Behavioral Contract & Accepted ADRs:**  
-   [`PROJECT_CONTRACT.md`](PROJECT_CONTRACT.md) and [`DECISIONS/`](DECISIONS/) (ADR-001 through ADR-012).
+   [`PROJECT_CONTRACT.md`](PROJECT_CONTRACT.md) and [`DECISIONS/`](DECISIONS/) (ADR-001 through ADR-013).
 2. **Ratified Structural Wire Schema:**  
    [`../chameleon/chameleon_design_schema_v0.9.json`](../chameleon/chameleon_design_schema_v0.9.json).
 3. **Pinned Renderer Adapter & Upstream Source:**  
@@ -56,6 +56,7 @@ All accepted ADRs reside in [`DECISIONS/`](DECISIONS/):
 * **[ADR-010: Quantized Rigid Groups](DECISIONS/ADR-010-quantized-rigid-groups.md)** — Requires one shared exact group transform whose output is reproduced by the canonical round-half-even geometry quantizer.
 * **[ADR-011: No Numeric Readability Floor](DECISIONS/ADR-011-no-numeric-readable-font-floor.md)** — Makes ~10px a soft preference, not a minimum; renderer hard checks and qualitative legibility remain required.
 * **[ADR-012: Render Text Inside Declared Bounds](DECISIONS/ADR-012-render-text-inside-declared-bounds.md)** — Applies a minimal transient renderer inset based on actual glyph bounds without changing serialized text geometry.
+* **[ADR-013: Reproducible Package-Lock Strategy](DECISIONS/ADR-013-reproducible-package-lock-strategy.md)** — Pins Debian packages, hash-locked Python wheels, and the source-bound renderer artifact while preserving the offline `linux/amd64` runtime boundary.
 
 ### Architectural & technical deep-dives (guidance)
 

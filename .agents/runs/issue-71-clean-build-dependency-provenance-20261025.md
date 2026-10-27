@@ -4,11 +4,11 @@
 run_id: issue-71-clean-build-dependency-provenance-20261025
 owner/role: Lead orchestrator / implementation owner
 workflow/gate: Issue #71 dependency provenance and native qualification
-started/updated: 2026-10-25 / native runs `40227253405`, `40228417003`, `40229964417`, and runner-pinned run `40232041519` passed; all retained SBOM artifacts were verified; repository-maintainer review remains pending
+started/updated: 2026-10-25 / native runs `40227253405`, `40228417003`, `40229964417`, `40232041519`, and final merged-head run `40233682826` passed; retained SBOM artifacts were verified; PR #80 merged and Issue #71 closed
 
-branch/ref: `fix/issue-71-clean-build-provenance` / PR [#80](https://github.com/bjornefisk/ProjectChameleon/pull/80) (opened as draft)
-source revision: latest passed runner-pinned candidate `9af20a3b1863b0ba25bcf74bb1f4f1e1d9ed63fa`; earlier candidates `b004f609c70440a510ceae645b8ff5de66afb071`, `a2b8543f78bd2504b8d1051621972fb7220e1bce`, and `84ed3b4fac95efd208de87383fdc9009e1a48cf8`; based on main `84d8e3e00bc457dfb3714bf368700da2ff3620d`
-worktree state: runner-pinned candidate `9af20a3` is pushed and passed run `40232041519`; PR #80 remains draft with maintainer review requested from `@gabegaines24`.
+branch/ref: `fix/issue-71-clean-build-provenance` / PR [#80](https://github.com/bjornefisk/ProjectChameleon/pull/80) (merged)
+source revision: merged PR-head `bd6660e7180cbd78d2d0dea1de95ca9d36a5950e`; earlier candidates `9af20a3b1863b0ba25bcf74bb1f4f1e1d9ed63fa`, `b004f609c70440a510ceae645b8ff5de66afb071`, `a2b8543f78bd2504b8d1051621972fb7220e1bce`, and `84ed3b4fac95efd208de87383fdc9009e1a48cf8`; based on main `84d8e3e00bc457dfb3714bf368700da2ff3620d`
+worktree state: PR #80 merged as `b019b73dbebb04d386d1bf30373db0351316b064` after final run `40233682826` passed; no separate repository-maintainer or partner approval is recorded
 
 Goal/acceptance: close every Issue #71 build-input provenance gap, demonstrate an offline success artifact pair and fail-closed no-pair behavior, and qualify the exact candidate on native x86_64 GitHub Actions before merge.
 
@@ -27,7 +27,7 @@ Out of scope: organizer-held-out scoring, cross-platform hash parity, production
 2. Implement accepted source-bound Debian/Python/renderer locks, offline installation, build provenance, CI qualification, regression tests, and documentation.
 3. Run repository wiring and complete Python test suite.
 4. Build and smoke the exact container locally under arm64-host amd64 emulation; exercise success and failure publication paths.
-5. Record local evidence as supplemental only; independent implementation and security reviews found no actionable findings. Native GitHub qualification and repository-maintainer review remain gates.
+5. Record local evidence as supplemental only; independent implementation and security reviews found no actionable findings. Native GitHub qualification passed in the merged PR-head run; no separate repository-maintainer or partner approval is recorded.
 
 ## Commands and observed results
 
@@ -46,9 +46,10 @@ Out of scope: organizer-held-out scoring, cross-platform hash parity, production
 | Native x86_64 qualification, SBOM-retention follow-up | GitHub Actions run [40228417003](https://github.com/bjornefisk/ProjectChameleon/actions/runs/40228417003), job `Verify and test`, candidate head `a2b8543f78bd2504b8d1051621972fb7220e1bce`; merge ref `27eee971346a0b5c6733053b00d91564d1d4820b` | `PASS` (exit `0`) | Native Ubuntu 24.04.5 x86_64 job passed. The workflow SBOM artifact `chameleon-stage1-sbom.spdx.json` (`12611997130`) downloaded and parsed as SPDX-2.3, `chameleon-stage1`, 220 packages, 4,861 relationships, 3,614,257 bytes; SHA-256 `28eb3be04d8bdf5233595e8b752c94f6ea4392ea43aff598503c83efa8981268`, matching the job digest. |
 | Native x86_64 qualification, PR-head evidence | GitHub Actions run [40229964417](https://github.com/bjornefisk/ProjectChameleon/actions/runs/40229964417), job `Verify and test`, candidate head `b004f609c70440a510ceae645b8ff5de66afb071` | `PASS` (exit `0`) | Native Ubuntu 24.04.5 x86_64 run passed. The SBOM artifact `chameleon-stage1-sbom.spdx.json` (`12612674286`) parsed as SPDX-2.3, `chameleon-stage1`, 220 packages, 4,861 relationships, 3,614,257 bytes; SHA-256 `75f9def29db2071372d1a7e2ea92fbadea9e1b99bfab073eded669341e796da1`, matching the workflow log. The current runner-label pin postdates this run. |
 | Native x86_64 qualification, runner-pinned PR head | GitHub Actions run [40232041519](https://github.com/bjornefisk/ProjectChameleon/actions/runs/40232041519), job `Verify and test`, candidate head `9af20a3b1863b0ba25bcf74bb1f4f1e1d9ed63fa` | `PASS` (exit `0`) | Ubuntu 24.04.5 x86_64 (`ubuntu-24.04`, runner image `20261012.334.1`). Image ID `sha256:61d300a1aac034a03899640cd814489e7e9c4039a49c99a96ed8442aae8e1007`. SBOM artifact `12613273548` is SPDX-2.3 with 220 packages, 4,861 relationships, and 4,039 files; document SHA-256 `dacf4aa18eb8572e3b6750fa76fc2b933ac9ec04bd689f7e17dfc9a52b8d56c0`; compressed artifact digest `69ca4b1ae3349f1a57f2bc65816ad40148ccc262f9f17f58e22a496ac9152923`. |
+| Native x86_64 qualification, merged PR head | [GitHub Actions run 40233682826](https://github.com/bjornefisk/ProjectChameleon/actions/runs/40233682826), job `Verify and test`, candidate head `bd6660e7180cbd78d2d0dea1de95ca9d36a5950e` | `PASS` (exit `0`) | Final required job passed all recorded verification, test, native Docker, offline smoke, artifact-hash, and provenance steps before PR #80 merged. |
 
 | Independent implementation/security review | Read-only `reviewer` and `security-reviewer` assessment of the candidate diff | `PASS` (no actionable findings) | Contract, acceptance, maintainability, lock/build, CI, trust-boundary, secret/data scopes reviewed; neither agent ran tests or native CI. |
-| Repository maintainer review | PR #80 review request to `@gabegaines24` | `PENDING` | Requested on the draft PR; no human review recorded yet. |
+| Repository maintainer review | PR #80 merge disposition | `NOT RECORDED` | The issue owner's direct 2026-10-25 task instruction authorized merge; GitHub records no separate repository-maintainer or partner approval. |
 | Repository wiring/whitespace | `git diff --check && make verify PYTHON_BOOTSTRAP=python3.11` | `PASS` (exit `0`) | `git diff --check` emitted no errors; repository verification reported `Font provenance manifest verified` and `Repository governance and implementation wiring are consistent.` |
 
 ## Initial native x86_64 candidate
@@ -117,7 +118,7 @@ GitHub Actions run [40232041519](https://github.com/bjornefisk/ProjectChameleon/
 - Failure classification: initial local setup revealed a real venv-symlink bug; fixed and covered by regression test. No final verification command failed.
 - Environment side effect: the initial failed setup modified Python 3.11 user-site packages before the venv-symlink fix; prior package state is unknown, so no rollback was attempted.
 
-- Checks not complete: repository-maintainer review of PR #80 is pending. Runner-pinned run `40232041519` passed on candidate `9af20a3`, and its SPDX artifact was verified. The required `Verify and test` check must be green on the latest PR head before merge.
+- Checks not complete: organizer-controlled limits, cross-platform parity, official scoring, and release qualification remain unverified. Final required run `40233682826` passed; no separate repository-maintainer or partner approval is recorded.
 
 
 - Environment or platform limitation: local host is Darwin arm64; Buildx uses amd64 emulation. This does not prove native Linux/amd64 behavior.
@@ -130,8 +131,8 @@ GitHub Actions run [40232041519](https://github.com/bjornefisk/ProjectChameleon/
 
 ## Decision and handoff
 
-- Decision: native runs `40228417003`, `40229964417`, and `40232041519` passed and their SPDX artifacts were verified. Do not merge until the latest PR-head check passes and the requested maintainer review is complete.
+- Decision: native runs `40228417003`, `40229964417`, `40232041519`, and final merged-head run `40233682826` passed; PR #80 merged as `b019b73dbebb04d386d1bf30373db0351316b064`; Issue #71 closed.
 
 - Rollback/migration: revert the Issue #71 PR; old `requirements.txt` is removed as part of the clean cutover to reviewed lock inputs.
-- Next owner: PR maintainer/reviewer and native GitHub Actions runner.
-- Next concrete action: commit the final evidence update, verify the resulting PR-head `Verify and test` result, and process the requested maintainer review before merging.
+- Next owner: repository maintainer for future dependency changes.
+- Next concrete action: regenerate and requalify all locked dependency inputs together when any package, renderer, base image, or build input changes.

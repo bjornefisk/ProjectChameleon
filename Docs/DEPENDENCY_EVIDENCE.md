@@ -280,10 +280,9 @@ claim.
 GitHub's [runner-image migration notice #14748](https://github.com/actions/runner-images/issues/14748) states that `ubuntu-latest` is transitioning to Ubuntu 26 beginning October 19, 2026. CI is pinned to `ubuntu-24.04` for a stable qualification major version.
 
 
-Before merging, verify the live PR #80 maintainer review and required
-branch-protection check on the runner-pinned head. Cross-platform parity,
-organizer-held-out scoring, organizer resource limits, and release
-qualification remain unverified.
+PR #80 is merged and Issue #71 is closed. The final required `Verify and test`
+run 40233682826 passed. Cross-platform parity, organizer-held-out scoring,
+organizer resource limits, and release qualification remain unverified.
 
 
 Native runtime observation: Python `3.11.11` on Linux `x86_64`, exit `0`,
