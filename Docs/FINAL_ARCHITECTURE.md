@@ -337,7 +337,7 @@ The architecture does not invent values for:
 - organizer CPU, RAM, disk, GPU, or model limits;
 - official scoring thresholds and complete target catalogue;
 - final font and asset licensing or Adobe font availability;
-- native amd64 qualification; and
+- native amd64 parity and qualification beyond the recorded PR #80 locked-candidate run;
 - final Adobe Express deployment topology.
 
 These facts are tracked in `Docs/STATUS.md` and `Docs/DEPENDENCY_EVIDENCE.md`. They may affect qualification or release claims but do not weaken the local Stage 1 contract.

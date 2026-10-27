@@ -6,6 +6,15 @@
 **Decision status:** The merged implementation preserves bounded four-topology search, at most twelve source-derived candidates, renderer-gated hard validation, fixed-point ranking, deterministic output, and typed fail-closed behavior. Accepted ADR-010 through ADR-012 reconcile only quantized common group transforms, the absence of a numeric readability floor, and the renderer-measured transient glyph inset against the source challenge PDF. Accepted ADR-013 records the reproducible package-lock strategy. Local success and native CI do not establish organizer qualification; cross-platform parity and organizer-held-out scoring remain unverified.
 **Ticket 06 authority:** User-requested GitHub issue #13; owner @bjornefisk; partner reviewer @gabegaines24. Implementation branch `feat/ticket-06-column-pivot-level2` merged as PR #14. The Issue #61 branch was based on main commit `c5b1159` before PR #65 merged the fix into main.
 
+## Issue #83 documentation reconciliation verification
+
+**Observed:** `python3 scripts/verify_repository.py` passed. Plain `make verify`
+could not start on the local host because `python3.11` is unavailable; the
+available interpreter passed the equivalent command
+`make verify PYTHON_BOOTSTRAP=/Users/gabegaines/workflow/projects/project_chameleon/.venv/bin/python`.
+The required CI `Verify and test` check remains the authoritative clean-run
+verification for this documentation-only PR.
+
 ## Issue #69 official scoring evidence
 
 The official evaluator revision, Level 1/2/3 target coverage, rubric, thresholds, hardware/runtime limits, failure semantics, result format, disclosure permission, and official result remain **UNVERIFIED_EXTERNAL_FACT**. The seven-case local evaluator and public fixtures are not organizer-held-out scoring.
@@ -244,9 +253,9 @@ Ticket 06 implementation evidence is complete and PR #14 is merged into `main`. 
 
 
 
-## Ticket 07 implementation evidence (pre-PR #65; historical)
+## Ticket 07 implementation evidence (pre-PR #65; historical boundary before PR #65 merged 2026-10-22)
 
-At the pre-PR #65 boundary, Ticket 07 product work was implemented on `feat/ticket-07-horizontal-ribbon-level3`, but the public Level 3 fixture acceptance remained open. The implementation kept exact group transforms, rotated AABB checks, source-separated placement, image-ratio lattices, renderer-gated integer font search, missing-asset records, and typed fail-closed behavior; it had not produced a hard-valid output for the adversarial `1080 x 1350 -> 728 x 90` sample.
+At the pre-PR #65 boundary (`33f6fd9083817d90513572434503039926233763`), Ticket 07 product work was implemented on `feat/ticket-07-horizontal-ribbon-level3`, but the public Level 3 fixture acceptance remained open. The implementation kept exact group transforms, rotated AABB checks, source-separated placement, image-ratio lattices, renderer-gated integer font search, missing-asset records, and typed fail-closed behavior; it had not produced a hard-valid output for the adversarial `1080 x 1350 -> 728 x 90` sample.
 
 - **Changed product paths:** `chameleon/engine/layout/horizontal_ribbon.py`, `chameleon/engine/layout/vertical_restack.py`, `chameleon/engine/layout/__init__.py`, `chameleon/engine/resize.py`, and `chameleon/tests/layout/test_level3.py`.
 - **Historical focused evidence:** `cd chameleon && ../.venv/bin/python -m unittest tests.layout.test_level3 -v` — 4 passed. Feasible synthetic horizontal and vertical candidates validated and repeated synthetic rendering produced identical PNG hashes; the public Level 3 fixture still failed closed before PR #65.
