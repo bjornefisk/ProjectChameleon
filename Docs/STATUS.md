@@ -6,6 +6,51 @@
 **Decision status:** The merged implementation preserves bounded four-topology search, at most twelve source-derived candidates, renderer-gated hard validation, fixed-point ranking, deterministic output, and typed fail-closed behavior. Accepted ADR-010 through ADR-012 reconcile only quantized common group transforms, the absence of a numeric readability floor, and the renderer-measured transient glyph inset against the source challenge PDF. Accepted ADR-013 records the reproducible package-lock strategy. Local success and native CI do not establish organizer qualification; cross-platform parity and organizer-held-out scoring remain unverified.
 **Ticket 06 authority:** User-requested GitHub issue #13; owner @bjornefisk; partner reviewer @gabegaines24. Implementation branch `feat/ticket-06-column-pivot-level2` merged as PR #14. The Issue #61 branch was based on main commit `c5b1159` before PR #65 merged the fix into main.
 
+## Story visual-spacing audit
+
+The official `Final Chameleon Challenge.pdf` §§2.5 and 7.3 informed the
+portrait spacing and missing-asset behavior. The bounded refinements run inside
+the existing candidate path; the four-topology and twelve-candidate limits are
+unchanged. Adjusted responses still pass the authoritative hard validator
+before rendering. The holiday badge asset remains absent and is preserved as a
+renderer diagnostic placeholder.
+
+- **Level 1 Story (1080×1920):** foreground coverage increased from 627/1920
+  (32.66%) to 1152/1920 (60.00%). Outer margins are 384px top and 384px bottom.
+- **Level 3 Story (1080×1920):** the placeholder moved to y=1503; legal text
+  remains at y=1595. Their AABBs have a 12px gutter, and the layout inspector
+  reports zero unintended foreground overlaps.
+
+**Runner and inspection evidence:** the isolated engine run returned `SUCCESS`
+for both Story tasks. `scripts/inspect_layout.py` exited 0 on both generated
+outputs and reported zero unintended foreground overlaps.
+
+**Repository check:** `make verify` passed.
+
+**Test suite:** `make setup VENV_DIR=/tmp/projectchameleon-story-visual-rubric-venv-20261027`
+and `make test VENV_DIR=/tmp/projectchameleon-story-visual-rubric-venv-20261027`
+passed. The five unittest runs reported 288 engine, 48 review, 3 runtime,
+1 dependency-preparation, and 3 font-provenance tests (343 total).
+
+The initial `make test` against the existing `.venv` failed three renderer-wheel
+provenance assertions: its `cr-renderer` install had VCS provenance without the
+recorded wheel archive hash. `make setup` on that same environment left the
+same-version VCS install in place; the clean pinned environment above passed.
+
+**Container integration smoke:**
+- From `chameleon/`, `docker buildx build --platform linux/amd64 --load -t chameleon-stage1 .` — passed.
+- `docker run --rm --network none -v "$PWD/input:/app/input:ro" -v /tmp/chameleon-stage1-story-rubric-output-20261027:/app/output chameleon-stage1` — all three packaged tasks returned `status=SUCCESS`; output stayed outside `chameleon/output`.
+- `../.venv/bin/python ../scripts/inspect_layout.py /tmp/chameleon-stage1-story-rubric-inspect-20261027/output` with adjacent source inputs — zero unintended foreground overlaps for all three.
+
+The inspector and engine self-check emitted a non-fatal Level 2
+`deco_circle_1` off-canvas warning; all three tasks still returned `SUCCESS`.
+The missing Level 3 badge remains a diagnostic placeholder.
+
+Docker Desktop ran on a Darwin arm64 client with a linux/arm64 daemon; the
+linux/amd64 image ran under cross-architecture emulation. This is not native
+x86_64 or Stage 1 qualification evidence. The Dockerfile emitted its existing
+`FromPlatformFlagConstDisallowed` warning.
+
 ## Issue #83 documentation reconciliation verification
 
 **Observed:** `python3 scripts/verify_repository.py` passed. Plain `make verify`

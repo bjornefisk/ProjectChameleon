@@ -204,6 +204,46 @@ class Level3IntegrationTests(unittest.TestCase):
 
             self.assertEqual(signatures[0], signatures[1])
 
+    def test_story_keeps_missing_asset_placeholder_clear_of_legal_copy(self):
+        task = self._load_task()
+        source = task["source"]
+        target = {"width": 1080, "height": 1920}
+        before = copy.deepcopy(source)
+
+        response = resize(source, target)
+        validate_response(source, target, response)
+
+        self.assertEqual(source, before)
+        elements = {element["id"]: element for element in response["elements"]}
+        placeholder = elements["holiday_watermark"]
+        legal = elements["legal_text"]
+        self.assertEqual(
+            placeholder["asset_id"],
+            next(
+                element["asset_id"]
+                for element in source["elements"]
+                if element["id"] == "holiday_watermark"
+            ),
+        )
+        placeholder_box = rotated_aabb(placeholder)
+        legal_box = rotated_aabb(legal)
+        self.assertFalse(positive_aabb_intersection(placeholder_box, legal_box))
+
+        horizontal_gutter = max(
+            Fraction(0),
+            legal_box.min_x - placeholder_box.max_x,
+            placeholder_box.min_x - legal_box.max_x,
+        )
+        vertical_gutter = max(
+            Fraction(0),
+            legal_box.min_y - placeholder_box.max_y,
+            placeholder_box.min_y - legal_box.max_y,
+        )
+        self.assertGreaterEqual(
+            max(horizontal_gutter, vertical_gutter),
+            Fraction(legal["font_size"]),
+        )
+
     def test_dominant_copy_reports_bounded_font_and_layout_work(self):
         task = self._load_task()
         result = search(

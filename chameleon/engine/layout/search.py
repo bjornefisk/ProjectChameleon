@@ -10,6 +10,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass, field
 from fractions import Fraction
+from math import ceil, floor
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import MappingProxyType
@@ -469,6 +470,278 @@ def _derive_variant_response(
     return _serialize_variant_response(response)
 
 
+def _portrait_block_category(assignment) -> str | None:
+    """Map inferred source roles to the three portrait story blocks."""
+
+    role = assignment.role
+    if role is RoleKind.BACKGROUND:
+        return None
+    content = assignment.signals.get("content", {})
+    if role is RoleKind.CTA or content.get("action_words"):
+        return "cta"
+    if role in {
+        RoleKind.LOGO,
+        RoleKind.HERO_MEDIA,
+        RoleKind.IMAGE,
+        RoleKind.DECORATION,
+        RoleKind.SHAPE,
+    }:
+        return "brand_art"
+    if role in {
+        RoleKind.HEADLINE,
+        RoleKind.SUPPORTING_TEXT,
+        RoleKind.BADGE,
+        RoleKind.TEXT,
+    }:
+        return "copy"
+    return None
+
+
+def _distribute_portrait_vertical_slack(
+    response: Mapping[str, Any],
+    target_canvas: Mapping[str, Any],
+    roles: RoleModel,
+) -> tuple[Mapping[str, Any], bool]:
+    """Center three inferred story blocks over a bounded 60% canvas span."""
+
+    target_width = to_fraction(target_canvas["width"])
+    target_height = to_fraction(target_canvas["height"])
+    if target_width / target_height > Fraction(65, 100):
+        return response, False
+
+    elements = list(response.get("elements", ()))
+    if len(elements) != len(roles.assignments):
+        return response, False
+    categories: dict[str, list[int]] = {
+        "brand_art": [],
+        "copy": [],
+        "cta": [],
+    }
+    group_categories: dict[Any, set[str | None]] = {}
+    for index, (element, assignment) in enumerate(zip(elements, roles.assignments)):
+        category = (
+            None
+            if index == roles.background_index
+            else _portrait_block_category(assignment)
+        )
+        if index != roles.background_index:
+            if category is None:
+                return response, False
+            categories[category].append(index)
+        group_id = element.get("group_id")
+        if group_id is not None:
+            group_categories.setdefault(group_id, set()).add(category)
+    if any(len(group_roles) > 1 for group_roles in group_categories.values()):
+        return response, False
+
+    block_boxes = {
+        category: [
+            rotated_aabb(elements[index])
+            for index in indices
+            if to_fraction(elements[index]["width"]) > 0
+            and to_fraction(elements[index]["height"]) > 0
+        ]
+        for category, indices in categories.items()
+    }
+    if any(not block_boxes[category] for category in categories):
+        return response, False
+    all_boxes = [
+        box for boxes in block_boxes.values() for box in boxes
+    ]
+    content_top = min(box.min_y for box in all_boxes)
+    content_bottom = max(box.max_y for box in all_boxes)
+    if (content_bottom - content_top) / target_height >= Fraction(45, 100):
+        return response, False
+
+    block_bounds = {
+        category: (
+            min(box.min_y for box in boxes),
+            max(box.max_y for box in boxes),
+        )
+        for category, boxes in block_boxes.items()
+    }
+    block_heights = {
+        category: bottom - top
+        for category, (top, bottom) in block_bounds.items()
+    }
+    target_span = target_height * Fraction(3, 5)
+    occupied_height = sum(block_heights.values(), Fraction(0))
+    if occupied_height > target_span:
+        return response, False
+
+    ordered_categories = ("brand_art", "copy", "cta")
+    outer_margin = (target_height - target_span) / 2
+    internal_gap = (target_span - occupied_height) / (len(ordered_categories) - 1)
+    adjusted = deepcopy(dict(response))
+    cursor = outer_margin
+    for category in ordered_categories:
+        block_top, _block_bottom = block_bounds[category]
+        translation = quantize_to_int(cursor - block_top)
+        for index in categories[category]:
+            element = adjusted["elements"][index]
+            element["y"] = quantize_to_int(to_fraction(element["y"]) + translation)
+        cursor += block_heights[category] + internal_gap
+
+    adjusted_boxes = [
+        rotated_aabb(element)
+        for index, element in enumerate(adjusted["elements"])
+        if index != roles.background_index
+        and to_fraction(element["width"]) > 0
+        and to_fraction(element["height"]) > 0
+    ]
+    adjusted_top = min(box.min_y for box in adjusted_boxes)
+    adjusted_bottom = max(box.max_y for box in adjusted_boxes)
+    adjusted_coverage = (adjusted_bottom - adjusted_top) / target_height
+    if not Fraction(55, 100) <= adjusted_coverage <= Fraction(70, 100):
+        return response, False
+    if abs(adjusted_top - (target_height - adjusted_bottom)) > target_height / 10:
+        return response, False
+    return adjusted, True
+
+
+def _has_placeholder_text_gutter(
+    image: Mapping[str, Any], text: Mapping[str, Any], required: Fraction
+) -> bool:
+    image_box = rotated_aabb(image)
+    text_box = rotated_aabb(text)
+    horizontal_gap = max(
+        Fraction(0),
+        text_box.min_x - image_box.max_x,
+        image_box.min_x - text_box.max_x,
+    )
+    vertical_gap = max(
+        Fraction(0),
+        text_box.min_y - image_box.max_y,
+        image_box.min_y - text_box.max_y,
+    )
+    return max(horizontal_gap, vertical_gap) >= required
+
+
+def _separate_missing_placeholders_from_text(
+    response: Mapping[str, Any],
+    source: Mapping[str, Any],
+    target_canvas: Mapping[str, Any],
+    warnings: Sequence[str],
+    *,
+    font_manager: Any,
+    fonts_dir: str | Path | None,
+) -> tuple[Mapping[str, Any], bool]:
+    """Move diagnosed missing-image placeholders clear of text, if feasible."""
+
+    placeholder_indices = [
+        index
+        for index, element in enumerate(response.get("elements", ()))
+        if element.get("type") == "image"
+        and any(
+            "Missing asset " in warning
+            and "- rendered a placeholder." in warning
+            and f"for element '{element.get('id')}' " in warning
+            for warning in warnings
+        )
+    ]
+    text_indices = [
+        index
+        for index, element in enumerate(response.get("elements", ()))
+        if element.get("type") == "text"
+        and to_fraction(element["width"]) > 0
+        and to_fraction(element["height"]) > 0
+    ]
+    if not placeholder_indices or not text_indices:
+        return response, False
+
+    current = response
+    changed = False
+    for image_index in placeholder_indices:
+        image = current["elements"][image_index]
+        conflicts = [
+            index
+            for index in text_indices
+            if not _has_placeholder_text_gutter(
+                image,
+                current["elements"][index],
+                max(Fraction(1), to_fraction(current["elements"][index]["font_size"])),
+            )
+        ]
+        if not conflicts:
+            continue
+
+        image_box = rotated_aabb(image)
+        moves: dict[tuple[int, int], int] = {}
+        for text_index in conflicts:
+            text_box = rotated_aabb(current["elements"][text_index])
+            gutter = max(
+                Fraction(1),
+                to_fraction(current["elements"][text_index]["font_size"]),
+            )
+            proposals = (
+                ((0, floor(text_box.min_y - gutter - image_box.max_y)), 0),
+                ((0, ceil(text_box.max_y + gutter - image_box.min_y)), 1),
+                ((floor(text_box.min_x - gutter - image_box.max_x), 0), 2),
+                ((ceil(text_box.max_x + gutter - image_box.min_x), 0), 3),
+            )
+            for move, priority in proposals:
+                if move != (0, 0):
+                    moves[move] = min(priority, moves.get(move, priority))
+        group_id = image.get("group_id")
+        moving_indices = (
+            [
+                index
+                for index, element in enumerate(current["elements"])
+                if element.get("group_id") == group_id
+            ]
+            if group_id is not None
+            else [image_index]
+        )
+        ordered_moves = sorted(
+            moves,
+            key=lambda move: (
+                abs(move[0]) + abs(move[1]),
+                moves[move],
+                abs(move[1]),
+                abs(move[0]),
+                move[1],
+                move[0],
+            ),
+        )
+        for delta_x, delta_y in ordered_moves:
+            trial = deepcopy(dict(current))
+            for index in moving_indices:
+                element = trial["elements"][index]
+                element["x"] = quantize_to_int(
+                    to_fraction(element["x"]) + delta_x
+                )
+                element["y"] = quantize_to_int(
+                    to_fraction(element["y"]) + delta_y
+                )
+            moved_image = trial["elements"][image_index]
+            if not all(
+                _has_placeholder_text_gutter(
+                    moved_image,
+                    trial["elements"][index],
+                    max(Fraction(1), to_fraction(trial["elements"][index]["font_size"])),
+                )
+                for index in text_indices
+            ):
+                continue
+            try:
+                validate_response(
+                    source,
+                    target_canvas,
+                    trial,
+                    font_manager=font_manager,
+                    fonts_dir=fonts_dir,
+                )
+            except InfeasibleLayoutError as error:
+                if error.reason_code is InfeasibleReasonCode.RUNTIME_IO_FAILURE:
+                    raise
+                continue
+            current = trial
+            changed = True
+            break
+    return current, changed
+
+
+
 def _renderer_classes() -> tuple[type[BaseException], ...]:
     """Load text exceptions lazily, preserving offline import of this module."""
 
@@ -678,8 +951,20 @@ def search(
                     roles,
                     spec,
                 )
+            response, slack_distributed = _distribute_portrait_vertical_slack(
+                response, target_canvas, roles
+            )
+            response, placeholder_adjusted = _separate_missing_placeholders_from_text(
+                response,
+                source,
+                target_canvas,
+                warnings,
+                font_manager=font_manager,
+                fonts_dir=fonts_dir,
+            )
+            response_refined = slack_distributed or placeholder_adjusted
             # The centralized semantic gate remains authoritative and runs
-            # before rendering every derived response.
+            # before rendering every derived or refined response.
             validate_response(
                 source,
                 target_canvas,
@@ -687,7 +972,7 @@ def search(
                 font_manager=font_manager,
                 fonts_dir=fonts_dir,
             )
-            if spec.variant_index != 0:
+            if spec.variant_index != 0 or response_refined:
                 rendered_png, warnings = _render_candidate(
                     response,
                     assets_dir=assets_dir,
