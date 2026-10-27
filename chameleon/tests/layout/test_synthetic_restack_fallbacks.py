@@ -22,8 +22,14 @@ from scripts.generate_synthetic_cases import generate_cases
 from engine import main as runner_main
 from engine.contract import validate_response
 from engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
-from engine.layout.horizontal_ribbon import is_horizontal_ribbon_suitable
-from engine.layout.vertical_restack import is_vertical_restack_suitable
+from engine.layout.horizontal_ribbon import (
+    generate_horizontal_ribbon_candidate,
+    is_horizontal_ribbon_suitable,
+)
+from engine.layout.vertical_restack import (
+    generate_vertical_restack_candidate,
+    is_vertical_restack_suitable,
+)
 from engine.resize import resize
 
 
@@ -79,6 +85,51 @@ class SyntheticRestackFallbackTests(unittest.TestCase):
             (self.synthetic_root / f"{stem}.json").read_text(encoding="utf-8"),
             parse_float=Decimal,
         )
+
+
+    def test_dense_level3_targets_produce_hard_valid_layouts(self):
+        public_task = json.loads(
+            (
+                CHAMELEON_ROOT
+                / "input"
+                / "chameleon_sample_level3_advanced.json"
+            ).read_text(encoding="utf-8"),
+            parse_float=Decimal,
+        )
+        source = public_task["source"]
+        cases = (
+            (
+                "medium_rectangle",
+                {"width": 300, "height": 250},
+                generate_horizontal_ribbon_candidate,
+            ),
+            (
+                "skyscraper",
+                {"width": 160, "height": 600},
+                generate_vertical_restack_candidate,
+            ),
+        )
+
+        for name, target, solve in cases:
+            with self.subTest(target=name):
+                candidate = solve(
+                    source,
+                    target,
+                    assets_dir=ASSETS,
+                    fonts_dir=FONTS,
+                )
+                response = candidate.response
+                validate_response(
+                    source,
+                    target,
+                    response,
+                    fonts_dir=FONTS,
+                )
+                self.assertEqual(response["canvas"], target)
+                self.assertEqual(
+                    [element["id"] for element in response["elements"]],
+                    [element["id"] for element in source["elements"]],
+                )
 
     def test_issue_81_targets_admit_directional_restack_fallbacks(self):
         for stem in ISSUE_81_CASES:
