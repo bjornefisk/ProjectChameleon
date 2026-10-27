@@ -1,6 +1,6 @@
 # Project Chameleon final architecture
 
-**Status:** Gate 1 qualification is cleared and Tickets 06–08 have bounded implementation on the integrated tree. Issue #61's PDF-grounded public Level 3 fix is merged via PR #65 (`6dbbc0a3eaba3090997ad9731a4026677dc6978c`), and the issue is closed. Required native x86_64 CI run 39711973748 passed on PR head `33f6fd9`; cross-platform parity, organizer-held-out scoring, and release qualification remain unverified.
+**Status:** Gate 1 qualification is cleared and Tickets 06–08 have bounded implementation on the integrated tree. Issue #61's PDF-grounded public Level 3 fix is merged via PR #65 (`6dbbc0a3eaba3090997ad9731a4026677dc6978c`), and the issue is closed. Issue #81's dense Level 3 synthetic targets produce hard-valid committed pairs in the local 18-case benchmark recorded with PR #84; this is local evidence, not official scoring or release qualification. Required native x86_64 CI run 39711973748 passed on PR head `33f6fd9`; cross-platform parity, organizer-held-out scoring, and release qualification remain unverified.
 
 **Scope:** Stage 1 retargeting engine and the separate finale integration boundary.
 
@@ -228,6 +228,7 @@ The initial solver is a bounded structured search, not a model or CP-SAT system.
    - horizontal ribbon; and
    - vertical re-stack.
 5. Generate at most three source-derived slot or emphasis variants per family, for a maximum of twelve initial candidates.
+   - When an extreme target has `width < 350` or `height < 300`, the existing horizontal-ribbon and vertical-re-stack candidates may try one bounded compact-grid profile for the inferred dense badge/CTA/ribbon layout. Narrow/tall targets use individually measured full-width group rows; other compact targets use a two-row group cluster. Body text boxes use pinned-renderer minimum heights and distribute remaining vertical space between rows. The profile preserves source groups, image ratios, text content, and the existing `validate_response` checks; it is evaluated inside an existing topology-candidate attempt, adding neither a topology family nor variants and leaving the twelve-candidate cap unchanged.
 6. Serialize each candidate once using the numeric rules.
 7. Recompute serialized geometry and apply hard structural validation.
 8. Render through the pinned adapter and validate actual rendered bounds and pixels.

@@ -267,7 +267,7 @@ class Issue23SearchEvidenceTests(unittest.TestCase):
         # boundary: borderline sizes such as 40x12 or 400x12 are infeasible with
         # macOS (fractional) Skia advances but feasible with Linux (hinted integer)
         # advances, so they would make this test platform dependent.
-        target = {"width": 10, "height": 10}
+        target = {"width": 1, "height": 1}
         specs = enumerate_candidate_specs(SOURCE, target)
         with self.assertRaises(InfeasibleLayoutError) as caught:
             search(SOURCE, target, assets_dir=ASSETS, fonts_dir=FONTS)

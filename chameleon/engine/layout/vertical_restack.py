@@ -21,28 +21,30 @@ from .roles import infer_roles
 def is_vertical_restack_suitable(
     source: Mapping[str, Any], target_canvas: Mapping[str, Any]
 ) -> bool:
-    """Return whether source evidence supports a tall, narrow re-stack."""
+    """Return whether a vertical target can use a vertical re-stack attempt.
+
+    This is a topology gate, not a feasibility verdict. Candidate geometry is
+    still subject to the serialized hard validator.
+    """
 
     source_width = to_fraction(source["canvas"]["width"])
-    source_height = to_fraction(source["canvas"]["height"])
     target_width = to_fraction(target_canvas["width"])
     target_height = to_fraction(target_canvas["height"])
-    if not source["elements"] or target_height <= target_width:
+    if (
+        not source["elements"]
+        or target_height < target_width
+        or target_width >= source_width
+    ):
         return False
     model = infer_roles(source)
     foreground_widths = [
         rotated_aabb(element)[2] - rotated_aabb(element)[0]
         for index, element in enumerate(source["elements"])
-        if index != model.background_index and to_fraction(element["width"]) > 0 and to_fraction(element["height"]) > 0
+        if index != model.background_index
+        and to_fraction(element["width"]) > 0
+        and to_fraction(element["height"]) > 0
     ]
-    if not foreground_widths:
-        return False
-    return (
-        target_height > source_height
-        and target_width < source_width
-        and target_height / target_width > source_height / source_width
-        and target_width <= max(foreground_widths)
-    )
+    return bool(foreground_widths)
 
 
 def generate_vertical_restack_candidate(

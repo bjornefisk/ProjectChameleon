@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-26
 
-**Phase:** Gate 1 is cleared. Tickets 01-08 are implemented within their accepted bounded scopes. Issue #61's PDF-grounded fix produces the public 1080×1350 → 728×90 sample as one hard-valid JSON/PNG pair in repeated local runs. PR #65 merged the fix as `6dbbc0a3eaba3090997ad9731a4026677dc6978c`, and Issue #61 closed automatically. Required native x86_64 `Verify and test` run 39711973748 passed on PR head `33f6fd9`; the owner waived partner review and no partner approval is recorded. No official organizer score, cross-platform parity, or release qualification is claimed.
+**Phase:** Gate 1 is cleared. Tickets 01-08 are implemented within their accepted bounded scopes. Issue #61's PDF-grounded fix produces the public 1080×1350 → 728×90 sample as one hard-valid JSON/PNG pair in repeated local runs. PR #65 merged the fix as `6dbbc0a3eaba3090997ad9731a4026677dc6978c`, and Issue #61 closed automatically. Issue #81's dense Level 3 synthetic targets now produce hard-valid committed pairs in the local 18-case benchmark recorded with PR #84; this is not organizer scoring or release qualification. Required native x86_64 `Verify and test` run 39711973748 passed on PR head `33f6fd9`; the owner waived partner review and no partner approval is recorded. No official organizer score, cross-platform parity, or release qualification is claimed.
 **Decision status:** The merged implementation preserves bounded four-topology search, at most twelve source-derived candidates, renderer-gated hard validation, fixed-point ranking, deterministic output, and typed fail-closed behavior. Accepted ADR-010 through ADR-012 reconcile only quantized common group transforms, the absence of a numeric readability floor, and the renderer-measured transient glyph inset against the source challenge PDF. Accepted ADR-013 records the reproducible package-lock strategy. Local success and native CI do not establish organizer qualification; cross-platform parity and organizer-held-out scoring remain unverified.
 **Ticket 06 authority:** User-requested GitHub issue #13; owner @bjornefisk; partner reviewer @gabegaines24. Implementation branch `feat/ticket-06-column-pivot-level2` merged as PR #14. The Issue #61 branch was based on main commit `c5b1159` before PR #65 merged the fix into main.
 
@@ -131,6 +131,41 @@ Accepted ADR-010 through ADR-012 are based on the original challenge PDF §§2.3
 - Bounded work: font probes are capped at 74; grouped-text scale refinement is capped at 74 iterations per invocation and reports aggregate invocation/iteration counts. Hitting the refinement cutoff propagates `INCOMPLETE_SEARCH` with `search_exhausted=false`, never infeasibility.
 - Initial native-amd64 run 39710388785 exposed one font-metric-dependent test assertion; the regression was made deterministic and the focused plus full local suites passed. Required `Verify and test` run 39711291284 passed on code/test commit `eebe55e` on GitHub's x86_64 runner, including repository tests, native renderer qualification, linux/amd64 Buildx/offline smoke, repeated/clean-cache hashes, and native import/library checks.
 - PR #65's final required `Verify and test` run 39711973748 passed on GitHub's native x86_64 runner for PR head `33f6fd9`, including repository tests, native renderer qualification, linux/amd64 Buildx/offline smoke, repeated/clean-cache hashes, and native import/library checks. PR #65 merged as `6dbbc0a3eaba3090997ad9731a4026677dc6978c`; Issue #61 closed automatically. The owner waived partner review before merge; no partner approval is recorded.
+
+## Issue #81 dense 17-element synthetic targets
+
+The original bounded search exhausted its twelve source-derived macro-candidates for Level 3 medium rectangle (300×250) and skyscraper (160×600). On medium rectangle, horizontal-ribbon packing reached text fitting but the narrow boxes could not satisfy renderer-measured text/glyph bounds. On skyscraper, vertical restack failed while placing the rigid rotated ribbon group; this was group packing, not text overflow.
+
+`horizontal_ribbon.py` now tries one deterministic compact-grid profile inside an existing topology-candidate attempt for targets with `width < 350` or `height < 300`, and only for the inferred dense banner role profile. Medium rectangle uses a two-row pill/group cluster; narrow/tall layouts use individual full-width group rows. Group transforms remain rigid, image ratios exact, all text—including grouped labels—uses renderer-measured font and box fitting, and the serialized candidate still passes the unchanged `validate_response()`. The twelve macro-candidate cap, source identity/order/content/assets, and ADR-011 remain unchanged. No contract or ADR changed.
+
+**Local verification:** Darwin arm64, Python 3.11.14, pinned Skia 132.0b11 and Pillow 11.1.0. The focused direct-candidate regression passed both targets and checks strict hard validation, target canvas, and exact source ID/order. The final locked `make test` run passed all 338 tests. `make verify` passed. `make synthetic` generated the 18 benchmark inputs; the actual runner exited 0 with all 18 tasks `SUCCESS`. A separate pair audit checked all 18 commit markers and JSON/PNG hashes, strict response validation, PNG decoding, and target dimensions (`PAIR_VALIDATION=18/18`). Output remained under `/tmp/chameleon-issue-81-benchmark-final`.
+
+The earlier pre-sync `make test` attempt on the root `.venv` failed four artifact-evidence checks: three renderer-wheel provenance checks lacked a wheel hash in `direct_url.json`, and the Level 1 warmup output differed from its persisted Darwin-arm64 pin. After fetching the latest PR #84 commits through `10c84e1`, the canonical locked suite passed; no artifact pins were refreshed. The pre-sync mismatch is not current test evidence.
+
+Local rendered-output review: the 300×250 and 160×600 outputs retain all source records and show compact but visible copy; small badge/legal text remains visually compact. The existing missing `solstice_holiday_badge_2025.png` still renders its warning-only placeholder, and the Level 2 off-canvas `deco_circle_1` self-check warnings remain unchanged. These local visual observations are not organizer legibility or scoring evidence.
+
+| Level / source | Target | Status | Runtime |
+| --- | --- | --- | ---: |
+| L1 warmup — compact square | 600×600 | SUCCESS | 2.43 s |
+| L1 warmup — Facebook landscape | 1200×630 | SUCCESS | 2.17 s |
+| L1 warmup — Instagram story | 1080×1920 | SUCCESS | 3.15 s |
+| L1 warmup — medium rectangle | 300×250 | SUCCESS | 1.54 s |
+| L1 warmup — skyscraper | 160×600 | SUCCESS | 1.07 s |
+| L1 warmup — wide billboard | 970×250 | SUCCESS | 2.39 s |
+| L2 core — compact square | 600×600 | SUCCESS | 2.52 s |
+| L2 core — Facebook landscape | 1200×630 | SUCCESS | 1.78 s |
+| L2 core — Instagram story | 1080×1920 | SUCCESS | 2.94 s |
+| L2 core — medium rectangle | 300×250 | SUCCESS | 1.05 s |
+| L2 core — skyscraper | 160×600 | SUCCESS | 0.76 s |
+| L2 core — wide billboard | 970×250 | SUCCESS | 1.84 s |
+| L3 advanced — compact square | 600×600 | SUCCESS | 6.89 s |
+| L3 advanced — Facebook landscape | 1200×630 | SUCCESS | 2.11 s |
+| L3 advanced — Instagram story | 1080×1920 | SUCCESS | 3.67 s |
+| L3 advanced — medium rectangle | 300×250 | SUCCESS | 5.53 s |
+| L3 advanced — skyscraper | 160×600 | SUCCESS | 2.09 s |
+| L3 advanced — wide billboard | 970×250 | SUCCESS | 5.36 s |
+
+This is local synthetic evidence only. Native-amd64 parity, organizer-held-out scoring, official success scoring, and release qualification remain unverified.
 
 ## Issue #16 F-01..F-09 disposition matrix
 

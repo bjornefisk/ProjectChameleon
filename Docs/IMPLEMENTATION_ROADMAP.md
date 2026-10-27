@@ -1,6 +1,6 @@
 # Implementation roadmap and review report
 
-**Status:** Execution plan; `PROJECT_CONTRACT.md` and Accepted ADRs remain authoritative. Gate 1 is cleared, Tickets 01–08 have bounded implementation/evidence, and Issue #61's hard-valid public Level 3 pair is merged via PR #65; the issue is closed. Required native x86_64 CI run 39711973748 passed on PR head `33f6fd9`; the owner waived partner review and no partner approval is recorded. Held-out evaluation, cross-platform parity, broader release qualification, and organizer-controlled qualification remain unverified.
+**Status:** Execution plan; `PROJECT_CONTRACT.md` and Accepted ADRs remain authoritative. Gate 1 is cleared, Tickets 01–08 have bounded implementation/evidence, and Issue #61's hard-valid public Level 3 pair is merged via PR #65; the issue is closed. PR #84 records all 18 local synthetic cases passing with hard-valid committed pairs; see [`STATUS.md`](STATUS.md). This is not organizer scoring or release qualification. Required native x86_64 CI run 39711973748 passed on PR head `33f6fd9`; the owner waived partner review and no partner approval is recorded. Held-out evaluation, cross-platform parity, broader release qualification, and organizer-controlled qualification remain unverified.
 
 ## Issue #16 reconciliation
 
