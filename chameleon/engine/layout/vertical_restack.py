@@ -27,9 +27,14 @@ def is_vertical_restack_suitable(
     still subject to the serialized hard validator.
     """
 
+    source_width = to_fraction(source["canvas"]["width"])
     target_width = to_fraction(target_canvas["width"])
     target_height = to_fraction(target_canvas["height"])
-    if not source["elements"] or target_height < target_width:
+    if (
+        not source["elements"]
+        or target_height < target_width
+        or target_width >= source_width
+    ):
         return False
     model = infer_roles(source)
     foreground_widths = [

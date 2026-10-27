@@ -62,9 +62,16 @@ def is_horizontal_ribbon_suitable(
     still subject to the serialized hard validator.
     """
 
+    source_width = to_fraction(source["canvas"]["width"])
+    source_height = to_fraction(source["canvas"]["height"])
     target_width = to_fraction(target_canvas["width"])
     target_height = to_fraction(target_canvas["height"])
-    if not source["elements"] or target_width < target_height:
+    if (
+        not source["elements"]
+        or target_width < target_height
+        or target_width >= source_width
+        or target_height >= source_height
+    ):
         return False
     model = infer_roles(source)
     foreground_heights = [
