@@ -12,15 +12,22 @@ from PIL import Image
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 CHAMELEON_ROOT = PROJECT_ROOT / "chameleon"
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 if str(CHAMELEON_ROOT) not in sys.path:
     sys.path.insert(0, str(CHAMELEON_ROOT))
 
+from scripts.generate_synthetic_cases import generate_cases
+
 from engine import main as runner_main
 from engine.contract import validate_response
+from engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
 from engine.layout.horizontal_ribbon import is_horizontal_ribbon_suitable
 from engine.layout.vertical_restack import is_vertical_restack_suitable
+from engine.resize import resize
 
-SYNTHETIC_ROOT = CHAMELEON_ROOT / "input_synthetic"
+
+SYNTHETIC_SOURCE = CHAMELEON_ROOT / "input"
 ASSETS = CHAMELEON_ROOT / "brand_kit" / "assets"
 FONTS = CHAMELEON_ROOT / "brand_kit" / "fonts"
 ISSUE_81_CASES = (
@@ -55,9 +62,21 @@ HORIZONTAL_CASES = frozenset(
 
 
 class SyntheticRestackFallbackTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls._synthetic_directory = tempfile.TemporaryDirectory(
+            prefix="chameleon-issue-81-cases-"
+        )
+        cls.synthetic_root = Path(cls._synthetic_directory.name)
+        generate_cases(SYNTHETIC_SOURCE, cls.synthetic_root)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._synthetic_directory.cleanup()
+
     def _load_task(self, stem):
         return json.loads(
-            (SYNTHETIC_ROOT / f"{stem}.json").read_text(encoding="utf-8"),
+            (self.synthetic_root / f"{stem}.json").read_text(encoding="utf-8"),
             parse_float=Decimal,
         )
 
@@ -81,7 +100,7 @@ class SyntheticRestackFallbackTests(unittest.TestCase):
             output_dir.mkdir()
             for stem in ISSUE_81_CASES:
                 (input_dir / f"{stem}.json").write_bytes(
-                    (SYNTHETIC_ROOT / f"{stem}.json").read_bytes()
+                    (self.synthetic_root / f"{stem}.json").read_bytes()
                 )
 
             stdout = io.StringIO()
@@ -111,6 +130,8 @@ class SyntheticRestackFallbackTests(unittest.TestCase):
                 )
                 if stem in EXPECTED_SUCCESS_CASES:
                     self.assertTrue(success_line, stderr.getvalue())
+                else:
+                    self.assertFalse(success_line, stdout.getvalue())
 
                 if success_line:
                     expected_names.update(
@@ -138,6 +159,23 @@ class SyntheticRestackFallbackTests(unittest.TestCase):
                         )
                 else:
                     saw_incomplete = True
+                    with self.assertRaises(InfeasibleLayoutError) as failure:
+                        resize(task["source"], target)
+                    error = failure.exception
+                    self.assertEqual(
+                        error.reason_code, InfeasibleReasonCode.INCOMPLETE_SEARCH
+                    )
+                    self.assertEqual(
+                        error.details["status"], "INCOMPLETE_SEARCH"
+                    )
+                    self.assertFalse(error.details["search_exhausted"])
+                    self.assertTrue(error.details["unexamined_work"])
+                    self.assertGreater(error.details["evaluated_candidates"], 0)
+                    self.assertLessEqual(
+                        error.details["evaluated_candidates"],
+                        error.details["candidate_count"],
+                    )
+                    self.assertTrue(error.details["failures"])
                     self.assertFalse(response_path.exists())
                     self.assertFalse(png_path.exists())
                     self.assertFalse(commit_path.exists())
