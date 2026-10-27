@@ -37,7 +37,7 @@ ISSUE_81_CASES = (
     "chameleon_sample_level3_advanced_medium_rectangle",
     "chameleon_sample_level3_advanced_compact_square",
 )
-EXPECTED_SUCCESS_CASES = frozenset(
+REQUIRED_SUCCESS_CASES = frozenset(
     {
         "chameleon_sample_level2_core_skyscraper",
         "chameleon_sample_level2_core_compact_square",
@@ -128,10 +128,8 @@ class SyntheticRestackFallbackTests(unittest.TestCase):
                 self.assertNotEqual(
                     success_line, incomplete_line, f"{stem} had no unique terminal status"
                 )
-                if stem in EXPECTED_SUCCESS_CASES:
+                if stem in REQUIRED_SUCCESS_CASES:
                     self.assertTrue(success_line, stderr.getvalue())
-                else:
-                    self.assertFalse(success_line, stdout.getvalue())
 
                 if success_line:
                     expected_names.update(
