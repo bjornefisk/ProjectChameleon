@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 from decimal import Decimal
+from fractions import Fraction
 from pathlib import Path
 
 from PIL import Image
@@ -16,11 +17,15 @@ from chameleon.renderer.converter.convert import render_design_to_png
 
 try:
     from engine.contract import validate_response
+    from engine.geometry.bounds import rotated_aabb
     from engine.geometry.ratios import preserves_source_ratio
+    from engine.layout.roles import infer_roles
     from engine.resize import resize
 except ModuleNotFoundError:
     from chameleon.engine.contract import validate_response
+    from chameleon.engine.geometry.bounds import rotated_aabb
     from chameleon.engine.geometry.ratios import preserves_source_ratio
+    from chameleon.engine.layout.roles import infer_roles
     from chameleon.engine.resize import resize
 
 
@@ -84,6 +89,46 @@ class Level1IntegrationTests(unittest.TestCase):
             with Image.open(png_path) as image:
                 self.assertEqual(image.format, "PNG")
                 self.assertEqual(image.size, (1080, 1350))
+
+    def test_story_distributes_vertical_slack_across_semantic_blocks(self):
+        task = self._load_task()
+        source = task["source"]
+        target = {"width": 1080, "height": 1920}
+        before = copy.deepcopy(source)
+
+        response = resize(source, target)
+        validate_response(source, target, response)
+
+        self.assertEqual(source, before)
+        self.assertEqual(response["canvas"], target)
+        roles = infer_roles(source)
+        foreground_boxes = [
+            rotated_aabb(element)
+            for index, element in enumerate(response["elements"])
+            if index != roles.background_index
+            and element["width"] > 0
+            and element["height"] > 0
+        ]
+        content_top = min(box.min_y for box in foreground_boxes)
+        content_bottom = max(box.max_y for box in foreground_boxes)
+        coverage = (content_bottom - content_top) / target["height"]
+        self.assertGreaterEqual(coverage, Fraction(55, 100))
+        self.assertLessEqual(coverage, Fraction(70, 100))
+
+        top_margin = content_top
+        bottom_margin = target["height"] - content_bottom
+        self.assertLessEqual(
+            abs(top_margin - bottom_margin),
+            Fraction(target["height"], 10),
+        )
+
+        logo = next(element for element in response["elements"] if element["id"] == "logo")
+        source_logo = next(element for element in source["elements"] if element["id"] == "logo")
+        self.assertTrue(
+            preserves_source_ratio(
+                logo["width"], logo["height"], source_logo["width"], source_logo["height"]
+            )
+        )
 
 
 if __name__ == "__main__":
