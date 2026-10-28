@@ -847,6 +847,16 @@ def solve_near_isomorphic(
         "elements": response_elements,
     }
     response = _serialize_candidate(raw_response)
+    if Fraction(9, 10) <= target_ratio <= Fraction(11, 10):
+        from .vertical_restack import _distribute_vertical_slack
+
+        _distribute_vertical_slack(
+            source,
+            target_canvas,
+            response,
+            font_manager=font_manager,
+            fonts_dir=fonts_dir,
+        )
     try:
         validate_response(
             source,

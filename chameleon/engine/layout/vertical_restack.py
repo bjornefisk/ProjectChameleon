@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from fractions import Fraction
 from math import ceil
 from typing import Any
 
@@ -31,11 +32,11 @@ def _distribute_vertical_slack(
     """Spread unused vertical space over the stack while keeping units rigid."""
 
     elements = response["elements"]
-    if (
-        to_fraction(target_canvas["width"]) * 100
-        > to_fraction(target_canvas["height"]) * 35
-    ):
+    ratio = to_fraction(target_canvas["width"]) / to_fraction(target_canvas["height"])
+    compact_square = Fraction(9, 10) <= ratio <= Fraction(11, 10)
+    if not compact_square and ratio > Fraction(35, 100):
         return
+    gutter = 12 if compact_square else 6
     background = infer_roles(source).background_index
     foreground_bottoms = [
         rotated_aabb(element).max_y
@@ -46,7 +47,7 @@ def _distribute_vertical_slack(
     ]
     if (
         foreground_bottoms
-        and to_fraction(target_canvas["height"]) - max(foreground_bottoms) <= 6
+        and to_fraction(target_canvas["height"]) - max(foreground_bottoms) <= gutter
     ):
         return
     units = _candidate_units(source, background)
@@ -78,7 +79,7 @@ def _distribute_vertical_slack(
         (bottom - top for _indices, top, bottom in movable),
         start=to_fraction(0),
     )
-    required += 6 * (len(movable) - 1)
+    required += gutter * (len(movable) - 1)
     slack = canvas_height - required
     if slack < 0:
         return
@@ -88,7 +89,7 @@ def _distribute_vertical_slack(
     slots = [slot] * (len(movable) + 1)
     previous_bottom = None
     for position, (indices, top, _bottom) in enumerate(movable):
-        desired_top = slots[0] if position == 0 else previous_bottom + 6 + slots[position]
+        desired_top = slots[0] if position == 0 else previous_bottom + gutter + slots[position]
         shift = ceil(desired_top - top)
         for index in indices:
             elements[index]["y"] += shift
