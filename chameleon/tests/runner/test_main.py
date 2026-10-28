@@ -769,6 +769,18 @@ class RunnerPublicationTests(unittest.TestCase):
             self.assertTrue((output_dir / "second_output.png").is_file())
             self.assertTrue((output_dir / ".second_output.commit").is_file())
 
+
+    def test_startup_warmup_reuses_renderer_font_manager(self):
+        from chameleon.renderer.converter.brand_fonts import warm_brand_font_manager
+        from chameleon.renderer.converter.convert import _get_renderer
+
+        fonts_dir = PROJECT_ROOT / "chameleon" / "brand_kit" / "fonts"
+        warmed = warm_brand_font_manager(str(fonts_dir))
+        renderer = _get_renderer(str(fonts_dir.resolve()))
+
+        self.assertIs(renderer.font_manager, warmed)
+        self.assertIsNotNone(warmed._skia_warmup)
+
     def test_missing_renderer_fails_instead_of_writing_placeholder(self):
         with tempfile.TemporaryDirectory() as directory:
             png_path = Path(directory) / "output.png"

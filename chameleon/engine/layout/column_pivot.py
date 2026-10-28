@@ -16,6 +16,7 @@ from ..geometry.bounds import intersects_canvas, is_contained_in_canvas, rotated
 from ..geometry.math_util import quantize_to_int, to_fraction
 from ..geometry.ratios import reduced_ratio
 from .near_isomorphic import (
+    _is_wide_landscape_target,
     _largest_fitting_font_size,
     _render_candidate,
     _text_fits,
@@ -161,6 +162,46 @@ def _role_indices(model: RoleModel) -> dict[RoleKind, list[int]]:
         result.setdefault(assignment.role, []).append(assignment.index)
     return result
 
+def _center_foreground_envelope(
+    source_elements: list[Mapping[str, Any]],
+    response_elements: list[dict[str, Any]],
+    background_index: int | None,
+    source_canvas: Mapping[str, Any],
+    target_canvas: Mapping[str, Any],
+    *,
+    integer_translation: bool = False,
+) -> bool:
+    """Center foreground collectively while preserving every rigid transform."""
+
+    if (
+        background_index is not None
+        and source_elements[background_index].get("group_id") is not None
+    ):
+        return False
+    if any(
+        source_bleed_sides(element, rotated_aabb(element), source_canvas) is not None
+        for element in source_elements
+    ):
+        return False
+    indices = [index for index in range(len(source_elements)) if index != background_index]
+    if not indices:
+        return False
+    boxes = [rotated_aabb(response_elements[index]) for index in indices]
+    left = min(box[0] for box in boxes)
+    right = max(box[2] for box in boxes)
+    delta = (to_fraction(target_canvas["width"]) - right - left) / 2
+    if integer_translation:
+        delta = quantize_to_int(delta)
+    if not delta:
+        return False
+    for index in indices:
+        translated_x = to_fraction(response_elements[index]["x"]) + delta
+        response_elements[index]["x"] = (
+            quantize_to_int(translated_x) if integer_translation else translated_x
+        )
+    return True
+
+
 def _bleed_position(
     size: Fraction,
     canvas_size: Fraction,
@@ -196,6 +237,7 @@ def _build_column_candidate(
     target_height = to_fraction(target_canvas["height"])
     source_width = to_fraction(source["canvas"]["width"])
     source_height = to_fraction(source["canvas"]["height"])
+    wide_landscape = _is_wide_landscape_target(target_canvas)
     roles = _role_indices(model)
     transformed: set[int] = set()
 
@@ -296,10 +338,42 @@ def _build_column_candidate(
         transformed.update(indices)
 
     text_indices = roles.get(RoleKind.HEADLINE, []) + roles.get(RoleKind.SUPPORTING_TEXT, [])
+    if wide_landscape:
+        media_indices = [
+            index
+            for role in (RoleKind.HERO_MEDIA, RoleKind.LOGO, RoleKind.IMAGE)
+            for index in roles.get(role, [])
+            if index != model.background_index
+        ]
+        media_right = max(
+            (
+                rotated_aabb(response_elements[index])[2]
+                for index in media_indices
+            ),
+            default=left_slot,
+        )
+        copy_x = media_right + gutter
+        available_copy_width = target_width - copy_x - gutter
+        source_copy_width = max(
+            (
+                target_width
+                * to_fraction(source_elements[index]["width"])
+                / source_width
+                for index in text_indices
+            ),
+            default=right_width,
+        )
+        copy_width = min(
+            available_copy_width, max(right_width, source_copy_width)
+        )
+    else:
+        copy_x = right_x
+        copy_width = right_width
+
     for index in text_indices:
         element = source_elements[index]
-        # Derive box height from source geometry only; font_size is mutable.
-        width = max(Fraction(1), right_width)
+        # Wide-landscape targets use the bounded slack allocation above.
+        width = max(Fraction(1), copy_width)
         source_height_fraction = to_fraction(element["height"]) / source_height
         height = max(Fraction(1), target_height * source_height_fraction)
         if index in transformed:
@@ -319,7 +393,7 @@ def _build_column_candidate(
                     ),
                 )
             y = headline_end + target_height * Fraction(1, 25)
-        x = right_x
+        x = copy_x
         if y + height > target_height:
             y = max(Fraction(0), target_height - height - gutter)
         box = (x, y, width, height)
@@ -354,6 +428,15 @@ def _build_column_candidate(
             _fail("decoration cannot preserve source containment or bleed", element_id=element["id"])
         _set_box(response_elements, index, box)
         transformed.add(index)
+
+    if wide_landscape:
+        _center_foreground_envelope(
+            source_elements,
+            response_elements,
+            model.background_index,
+            source["canvas"],
+            target_canvas,
+        )
 
     # Any record not covered by an inferred role is unsupported rather than
     # silently shed.  Keep its source record and fail the bounded family.

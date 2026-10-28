@@ -141,6 +141,13 @@ def _global_transform(source: Mapping[str, Any], target: Mapping[str, Any]) -> t
     return scale, (target_width - source_width * scale) / 2, (target_height - source_height * scale) / 2
 
 
+def _is_wide_landscape_target(target_canvas: Mapping[str, Any]) -> bool:
+    """Scope slack redistribution to the requested Facebook-like aspect range."""
+    ratio = to_fraction(target_canvas["width"]) / to_fraction(target_canvas["height"])
+    return Fraction(9, 5) <= ratio <= Fraction(2)
+
+
+
 def _transformed_box(element: Mapping[str, Any], scale: Fraction, tx: Fraction, ty: Fraction) -> tuple[Fraction, Fraction, Fraction, Fraction]:
     width = to_fraction(element["width"]) * scale
     height = to_fraction(element["height"]) * scale
@@ -782,6 +789,33 @@ def solve_near_isomorphic(
             transformed[index] = geometries[source_elements[index]["id"]]
     for index, geometry in transformed.items():
         response_elements[index].update(dict(zip(_GEOMETRY_FIELDS, geometry)))
+
+    source_width = to_fraction(source["canvas"]["width"])
+    source_height = to_fraction(source["canvas"]["height"])
+    target_ratio = target_width / target_height
+    source_ratio = source_width / source_height
+    if _is_wide_landscape_target(target_canvas) and target_ratio > source_ratio:
+        grouped_indices = {
+            index
+            for indices in group_indices.values()
+            for index in indices
+        }
+        for index, element in enumerate(source_elements):
+            if element["type"] != "text" or index in grouped_indices:
+                continue
+            candidate = response_elements[index]
+            center_x = to_fraction(candidate["x"]) + to_fraction(candidate["width"]) / 2
+            source_width_allocation = (
+                to_fraction(element["width"]) * target_width / source_width
+            )
+            canvas_width_allocation = 2 * min(center_x, target_width - center_x)
+            width = min(
+                canvas_width_allocation,
+                max(to_fraction(candidate["width"]), source_width_allocation),
+            )
+            if width > to_fraction(candidate["width"]):
+                candidate["x"] = center_x - width / 2
+                candidate["width"] = width
 
     text_indices = [index for index, element in enumerate(source_elements) if element["type"] == "text"]
     if text_indices:

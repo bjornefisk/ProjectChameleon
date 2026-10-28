@@ -11,6 +11,7 @@ fail-closed without silent substitution or network access.
 """
 
 import re
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -131,11 +132,47 @@ def build_font_dict(fonts_dir: str) -> Dict[str, List[Dict[str, Any]]]:
     return font_dict
 
 
-def load_brand_font_manager(fonts_dir: str) -> FontManager:
-    """Build a `FontManager` populated from local brand-kit font files."""
+@lru_cache(maxsize=4)
+def _load_cached_brand_font_manager(fonts_dir: str) -> FontManager:
     font_dict = build_font_dict(fonts_dir)
     if not font_dict:
         raise FileNotFoundError(f"No .ttf/.otf font files found in: {fonts_dir}")
     manager = FontManager.__new__(FontManager)
     manager._fonts = font_dict
     return manager
+
+
+def load_brand_font_manager(fonts_dir: str) -> FontManager:
+    """Return the cached local font manager used by renderer and layout paths."""
+    return _load_cached_brand_font_manager(str(Path(fonts_dir).resolve()))
+
+
+@lru_cache(maxsize=4)
+def _prime_brand_font_manager(fonts_dir: str) -> FontManager:
+    manager = load_brand_font_manager(fonts_dir)
+    surface = skia.Surface.MakeRasterN32Premul(32, 24)
+    if surface is None:
+        raise RuntimeError("Skia could not create the CPU warmup surface")
+    canvas = surface.getCanvas()
+    paint = skia.Paint()
+    paint.setAntiAlias(True)
+    paint.setColor(skia.ColorBLACK)
+    typefaces = []
+    for faces in manager._fonts.values():
+        for face in faces:
+            typeface = skia.Typeface.MakeFromData(face["bytes"])
+            if typeface is None:
+                raise MissingFontError("font file could not be initialized by Skia")
+            font = skia.Font(typeface, 16)
+            glyphs = font.textToGlyphs("Ag")
+            font.getWidths(glyphs)
+            canvas.clear(skia.ColorTRANSPARENT)
+            canvas.drawString("Ag", 0, 18, font, paint)
+            typefaces.append(typeface)
+    manager._skia_warmup = (surface, tuple(typefaces))
+    return manager
+
+
+def warm_brand_font_manager(fonts_dir: str) -> FontManager:
+    """Prime bounded Skia typeface/glyph setup for all discovered local faces."""
+    return _prime_brand_font_manager(str(Path(fonts_dir).resolve()))

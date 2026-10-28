@@ -41,6 +41,21 @@ OUTPUT_DIR = Path("output")
 ASSETS_DIR = Path("brand_kit/assets")
 
 
+def _warmup_brand_fonts() -> None:
+    """Eagerly warm local Skia font caches without affecting fontless tasks."""
+    try:
+        from renderer.converter.brand_fonts import warm_brand_font_manager
+    except ModuleNotFoundError:
+        from chameleon.renderer.converter.brand_fonts import warm_brand_font_manager
+
+    try:
+        warm_brand_font_manager(str(ASSETS_DIR.parent / "fonts"))
+    except Exception:
+        # Actual text rendering still loads the exact local face and fails closed.
+        # Warmup alone must not make an otherwise fontless task fail.
+        return
+
+
 class _MalformedInputError(ValueError):
     """Raised when JSON contains a non-standard or non-finite number."""
 
@@ -280,6 +295,7 @@ def render_to_png(
 
 
 def main() -> int:
+    _warmup_brand_fonts()
     reconciliation_warnings: list[str] = []
     try:
         if OUTPUT_DIR.is_symlink():

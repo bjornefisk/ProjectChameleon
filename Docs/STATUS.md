@@ -6,6 +6,61 @@
 **Decision status:** The merged implementation preserves bounded four-topology search, at most twelve source-derived candidates, renderer-gated hard validation, fixed-point ranking, deterministic output, and typed fail-closed behavior. Accepted ADR-010 through ADR-012 reconcile only quantized common group transforms, the absence of a numeric readability floor, and the renderer-measured transient glyph inset against the source challenge PDF. Accepted ADR-013 records the reproducible package-lock strategy. Local success and native CI do not establish organizer qualification; cross-platform parity and organizer-held-out scoring remain unverified.
 **Ticket 06 authority:** User-requested GitHub issue #13; owner @bjornefisk; partner reviewer @gabegaines24. Implementation branch `feat/ticket-06-column-pivot-level2` merged as PR #14. The Issue #61 branch was based on main commit `c5b1159` before PR #65 merged the fix into main.
 
+## Engine polish trio integration
+
+**Branch:** `feature/engine-polish-trio`, based on clean `main` at `afa9408`.
+The changes preserve the ratified schema, source records and immutable fields,
+`validate_response()` hard checks, exact foreground-image ratios, rigid-group
+transforms with half-even integer serialization, and deterministic bounded
+search. No dependency, schema, or public API changed; runner startup now warms
+the local font manager.
+
+**Glyph side-bearing:** the converter measures positioned glyph paths and adds
+only a transient horizontal origin inset for left-aligned negative bearings.
+Rotated text uses a symmetric transient-box adjustment to preserve its center.
+The serialized geometry and source remain unchanged; the actual glyph bounds
+are still checked without tolerance or clipping.
+
+**Landscape utilization:** horizontal copy expansion and envelope centering
+are scoped to target aspect ratios from 1.8:1 through 2:1, covering the
+requested 1200×630 Facebook canvas without changing ultra-wide billboard
+behavior.
+
+| 1200×630 sample | Foreground union utilization | Horizontal margins (L/R) | Margin skew |
+| --- | ---: | ---: | ---: |
+| Level 1, before | 15.08% | 78px / 30px | 48px |
+| Level 1, after | 19.90% | 41px / 41px | 0px |
+| Level 3, before | 23.28% | 0px / 330.83px | 330.83px |
+| Level 3, after | 37.07% | 33px / 33px | 0px |
+
+Utilization counts the union of foreground rotated AABBs (overlap counted
+once; classified background excluded). Level 1 side slack fell from 108px to
+82px, with zero left/right skew. Level 3's right margin fell from 330.83px to
+33px, also with zero skew. Both serialized responses passed the hard validator.
+
+**Cold-start measurement:** in a fresh locked-environment process, local font
+warmup took 0.0286s. On the Level 1 source resized to 300×250, the first
+`resize()` after warmup took 1.1157s; the next three took 1.1060s, 1.1077s,
+and 1.1340s (warm median 1.1077s, max 1.1340s). All four responses were
+identical. This first call is below the prior 1.73s outlier and the requested
+1.25s target; the result is local Darwin arm64 evidence, not a cross-platform guarantee.
+
+**Verification:**
+- `make test VENV_DIR=/tmp/chameleon-hotspot-locked-venv-20261027` — passed:
+  302 engine, 48 review, 3 runtime, 1 dependency-preparation, and 3
+  font-provenance tests (357 total).
+- `make verify PYTHON_BOOTSTRAP=/tmp/chameleon-hotspot-locked-venv-20261027/bin/python`
+  — passed.
+- An isolated temporary-input run of `scripts.generate_synthetic_cases`
+  through `engine.main.main()` returned 18/18 `SUCCESS`, published 18
+  committed JSON/PNG pairs, and passed a separate `validate_response()` call
+  for all 18. The inspector exited 0; 12 reports had zero unintended
+  foreground overlaps and 6 emitted collision warnings. No generated
+  artifacts were retained in the repository.
+- The adversarial negative-bearing regression passed. Native x86_64,
+  Docker qualification, organizer-held-out scoring, and release qualification
+  were not run or claimed.
+
 ## Final rubric sprint integration
 
 **Branch:** `feature/final-rubric-sprint`, based on `main` at `1662157`.

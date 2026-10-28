@@ -118,7 +118,12 @@ def convert_chameleon_to_crello(
 
         if etype == "text":
             out["type"].append("TextElement")
-            out["top"][-1] += _append_text(out, element, font_manager)
+            horizontal_inset, vertical_inset = _append_text(out, element, font_manager)
+            out["left"][-1] += horizontal_inset
+            out["top"][-1] += vertical_inset
+            if float(element.get("rotation", 0.0)) % 360.0:
+                out["width"][-1] -= 2 * horizontal_inset
+                out["height"][-1] -= 2 * vertical_inset
             out["image"].append(_BLANK_IMAGE)
         elif etype == "shape":
             out["type"].append("ImageElement")
@@ -345,11 +350,13 @@ def _positioned_glyph_metrics(
     colors: List[str],
     bold_flags: List[bool],
     italic_flags: List[bool],
-) -> tuple[float, float, float | None]:
-    """Return the minimal top inset and adjusted glyph bottom for this text."""
+) -> tuple[float, float, float | None, float | None, float | None, float | None]:
+    """Return minimal x/y insets and the unadjusted tight glyph envelope."""
     element_width = float(element.get("width", 1.0))
     text_align = element.get("text_align", "left")
     capitalize = bool(element.get("capitalize", False))
+    minimum_left = float("inf")
+    maximum_right = float("-inf")
     minimum_top = float("inf")
     maximum_bottom = float("-inf")
 
@@ -404,20 +411,26 @@ def _positioned_glyph_metrics(
                 right = span_offset + position + glyph_bound.right()
                 top = baseline + glyph_bound.top()
                 bottom = baseline + glyph_bound.bottom()
-                if left < 0 or right > element_width:
-                    raise TextOverflowError(
-                        "positioned glyph bounds exceed text element "
-                        f"(line={line_index}, bounds=({left:g}, {top:g}, "
-                        f"{right:g}, {bottom:g}), width={element_width:g})"
-                    )
+                minimum_left = min(minimum_left, left)
+                maximum_right = max(maximum_right, right)
                 minimum_top = min(minimum_top, top)
                 maximum_bottom = max(maximum_bottom, bottom)
             span_offset += span_width
 
     if minimum_top == float("inf"):
-        return 0.0, 0.0, None
-    inset = max(0.0, -minimum_top)
-    return inset, maximum_bottom + inset, minimum_top
+        return 0.0, 0.0, None, None, None, None
+    horizontal_inset = (
+        max(0.0, -minimum_left) if text_align == "left" else 0.0
+    )
+    vertical_inset = max(0.0, -minimum_top)
+    return (
+        horizontal_inset,
+        vertical_inset,
+        minimum_left,
+        maximum_right,
+        minimum_top,
+        maximum_bottom,
+    )
 
 
 def _validate_positioned_glyph_bounds(
@@ -433,9 +446,16 @@ def _validate_positioned_glyph_bounds(
     colors: List[str],
     bold_flags: List[bool],
     italic_flags: List[bool],
-) -> float:
-    """Reject glyph envelopes outside the box after the exact vertical inset."""
-    inset, maximum_bottom, minimum_top = _positioned_glyph_metrics(
+) -> Tuple[float, float]:
+    """Reject glyph envelopes outside the box after minimal x/y insets."""
+    (
+        horizontal_inset,
+        vertical_inset,
+        minimum_left,
+        maximum_right,
+        minimum_top,
+        maximum_bottom,
+    ) = _positioned_glyph_metrics(
         wrapped,
         line_indices,
         line_count,
@@ -449,16 +469,31 @@ def _validate_positioned_glyph_bounds(
         bold_flags,
         italic_flags,
     )
+    if minimum_left is None:
+        return horizontal_inset, vertical_inset
+    element_width = float(element.get("width", 1.0))
     element_height = float(element.get("height", 1.0))
-    if minimum_top is not None and (
-        minimum_top + inset < 0 or maximum_bottom > element_height
+    rotated = float(element.get("rotation", 0.0)) % 360.0 != 0.0
+    adjusted_minimum_left = minimum_left + horizontal_inset
+    adjusted_maximum_right = maximum_right + horizontal_inset
+    adjusted_minimum_top = minimum_top + vertical_inset
+    adjusted_maximum_bottom = maximum_bottom + vertical_inset
+    right_limit = element_width - horizontal_inset if rotated else element_width
+    bottom_limit = element_height - vertical_inset if rotated else element_height
+    if (
+        adjusted_minimum_left < 0
+        or adjusted_maximum_right > right_limit
+        or adjusted_minimum_top < 0
+        or adjusted_maximum_bottom > bottom_limit
     ):
         raise TextOverflowError(
             "positioned glyph bounds exceed text element "
-            f"(bounds=({minimum_top + inset:g}, {maximum_bottom:g}), "
-            f"box=({float(element.get('width', 1.0)):g}, {element_height:g}))"
+            f"(bounds=({adjusted_minimum_left:g}, {adjusted_minimum_top:g}, "
+            f"{adjusted_maximum_right:g}, {adjusted_maximum_bottom:g}), "
+            f"box=({element_width:g}, {element_height:g}), "
+            f"adjusted_limits=({right_limit:g}, {bottom_limit:g}))"
         )
-    return inset
+    return horizontal_inset, vertical_inset
 
 
 def _prepare_text(element: Dict[str, Any], font_manager) -> _PreparedText:
@@ -506,7 +541,9 @@ def _prepare_text(element: Dict[str, Any], font_manager) -> _PreparedText:
     )
 
 
-def _append_text(out: Dict[str, Any], element: Dict[str, Any], font_manager) -> float:
+def _append_text(
+    out: Dict[str, Any], element: Dict[str, Any], font_manager
+) -> Tuple[float, float]:
     prepared = _prepare_text(element, font_manager)
     enforce_text_limits(
         prepared.wrapped,
@@ -516,7 +553,7 @@ def _append_text(out: Dict[str, Any], element: Dict[str, Any], font_manager) -> 
         float(element.get("height", 1.0)),
         prepared.line_count,
     )
-    inset = _validate_positioned_glyph_bounds(
+    horizontal_inset, vertical_inset = _validate_positioned_glyph_bounds(
         prepared.wrapped,
         prepared.line_indices,
         prepared.line_count,
@@ -542,7 +579,7 @@ def _append_text(out: Dict[str, Any], element: Dict[str, Any], font_manager) -> 
     out["font_italic"].append(prepared.italic_flags)
     out["text_color"].append(prepared.colors)
     out["text_line"].append(prepared.line_indices)
-    return inset
+    return horizontal_inset, vertical_inset
 
 
 def minimum_text_box_height(
@@ -564,7 +601,14 @@ def minimum_text_box_height(
         float("inf"),
         prepared.line_count,
     )
-    _inset, glyph_bottom, _minimum_top = _positioned_glyph_metrics(
+    (
+        horizontal_inset,
+        vertical_inset,
+        minimum_left,
+        maximum_right,
+        _minimum_top,
+        maximum_bottom,
+    ) = _positioned_glyph_metrics(
         prepared.wrapped,
         prepared.line_indices,
         prepared.line_count,
@@ -577,6 +621,22 @@ def minimum_text_box_height(
         prepared.colors,
         prepared.bold_flags,
         prepared.italic_flags,
+    )
+    rotated = float(candidate.get("rotation", 0.0)) % 360.0 != 0.0
+    right_limit = width - horizontal_inset if rotated else width
+    if minimum_left is not None and (
+        minimum_left + horizontal_inset < 0
+        or maximum_right + horizontal_inset > right_limit
+    ):
+        raise TextOverflowError(
+            "positioned glyph bounds exceed text element "
+            f"(x=({minimum_left + horizontal_inset:g}, "
+            f"{maximum_right + horizontal_inset:g}), width={right_limit:g})"
+        )
+    glyph_bottom = (
+        0.0
+        if maximum_bottom is None
+        else maximum_bottom + vertical_inset * (2 if rotated else 1)
     )
     line_box_height = prepared.line_count * prepared.size * prepared.line_height
     return ceil(max(line_box_height, glyph_bottom))
