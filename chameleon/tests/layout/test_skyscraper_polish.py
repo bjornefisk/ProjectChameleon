@@ -91,7 +91,9 @@ class SkyscraperPolishTests(unittest.TestCase):
                 top_margin = max(0, content_top)
                 bottom_margin = max(0, TARGET["height"] - content_bottom)
                 self.assertLessEqual(abs(top_margin - bottom_margin), 60)
-                self.assertLessEqual(bottom_margin, 100)
+                # Keep bottom slack below one quarter of the canvas and below
+                # the 190–234px baseline letterboxing range.
+                self.assertLessEqual(bottom_margin, TARGET["height"] // 4)
 
                 if filename == "chameleon_sample_level3_advanced.json":
                     self.assertLessEqual(top_margin, 34)

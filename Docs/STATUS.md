@@ -29,6 +29,16 @@ relationships.
 | L2 | 0px / 234px | 15px / 15px | 0px | 21px |
 | L3 | 34px / 0px | 10px / 0px | 16px | 16px |
 
+The table records the local Darwin arm64 selected output. The production
+`linux/amd64` image probe selected a different hard-valid near-isomorphic L1
+candidate with top/bottom margins of 120/120px and source-separated unit
+gutters of 154/155px. GitHub x86_64 CI also observed 120px bottom slack and
+passed the margin-balance assertion before failing the test-only 100px ceiling.
+The ceiling is now one quarter of the 600px canvas (150px), still below the
+190–234px baseline dead space. Cross-platform candidate/metric parity remains
+unverified.
+
+
 All three isolated runner outputs returned `SUCCESS` and passed
 `validate_response()`. `scripts/inspect_layout.py` exited 0 for all three.
 Its Level 2 report retains the source-bleed warning for `deco_circle_1`
@@ -73,6 +83,12 @@ restored it. The focused source-order and extreme-target tests passed (2/2).
 `make verify` passed. The Level 1/2/3 isolated runner and inspector passed as
 described above. Native-amd64 execution, organizer-held-out scoring, and
 release qualification remain unverified; `make preflight` was not run.
+
+PR #93 run 40743322330 failed only the new L1 bottom-margin ceiling: x86_64
+reported 120px against the original 100px assertion; all earlier assertions
+for that sample, including hard validation and margin balance, passed. The
+ceiling now tracks one quarter of the canvas and still requires improvement
+over the measured baseline. A successful CI rerun remains required before merge.
 
 ## Engine polish trio integration
 
