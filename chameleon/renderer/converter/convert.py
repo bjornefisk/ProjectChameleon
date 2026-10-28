@@ -249,25 +249,36 @@ def _measure_text(
     bold_flags: List[bool],
     italic_flags: List[bool],
 ):
-    """Measure ranges exactly as cr-renderer's per-style text spans do."""
+    """Measure ranges from precomputed glyph advances for their styled spans."""
+
+    runs: List[Tuple[int, int, List[float]]] = []
+    for span_start, span_end, (_color, is_bold, is_italic) in _style_spans(
+        0, len(content), colors, bold_flags, italic_flags
+    ):
+        weight = "bold" if is_bold else "regular"
+        style = _weight_style_to_font_style(is_bold, is_italic)
+        advances = char_widths(
+            font_manager,
+            family,
+            weight,
+            style,
+            size,
+            content[span_start:span_end],
+        )
+        runs.append((span_start, span_end, advances))
 
     def measure(start: int, end: int) -> float:
         total = 0.0
-        for span_start, span_end, (_color, is_bold, is_italic) in _style_spans(
-            start, end, colors, bold_flags, italic_flags
-        ):
-            weight = "bold" if is_bold else "regular"
-            style = _weight_style_to_font_style(is_bold, is_italic)
-            advances = char_widths(
-                font_manager,
-                family,
-                weight,
-                style,
-                size,
-                content[span_start:span_end],
-            )
-            total += sum(advances)
-            total += letter_spacing * max(0, len(advances) - 1)
+        for span_start, span_end, advances in runs:
+            if span_end <= start:
+                continue
+            if span_start >= end:
+                break
+            local_start = max(start, span_start) - span_start
+            local_end = min(end, span_end) - span_start
+            segment = advances[local_start:local_end]
+            total += sum(segment)
+            total += letter_spacing * max(0, len(segment) - 1)
         return total
 
     return measure

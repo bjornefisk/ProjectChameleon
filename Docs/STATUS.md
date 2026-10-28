@@ -1,10 +1,63 @@
 # Project Chameleon status
 
-**Date:** 2026-10-26
+**Date:** 2026-10-28
 
 **Phase:** Gate 1 is cleared. Tickets 01-08 are implemented within their accepted bounded scopes. Issue #61's PDF-grounded fix produces the public 1080×1350 → 728×90 sample as one hard-valid JSON/PNG pair in repeated local runs. PR #65 merged the fix as `6dbbc0a3eaba3090997ad9731a4026677dc6978c`, and Issue #61 closed automatically. Issue #81's dense Level 3 synthetic targets now produce hard-valid committed pairs in the local 18-case benchmark recorded with PR #84; this is not organizer scoring or release qualification. Required native x86_64 `Verify and test` run 39711973748 passed on PR head `33f6fd9`; the owner waived partner review and no partner approval is recorded. No official organizer score, cross-platform parity, or release qualification is claimed.
 **Decision status:** The merged implementation preserves bounded four-topology search, at most twelve source-derived candidates, renderer-gated hard validation, fixed-point ranking, deterministic output, and typed fail-closed behavior. Accepted ADR-010 through ADR-012 reconcile only quantized common group transforms, the absence of a numeric readability floor, and the renderer-measured transient glyph inset against the source challenge PDF. Accepted ADR-013 records the reproducible package-lock strategy. Local success and native CI do not establish organizer qualification; cross-platform parity and organizer-held-out scoring remain unverified.
 **Ticket 06 authority:** User-requested GitHub issue #13; owner @bjornefisk; partner reviewer @gabegaines24. Implementation branch `feat/ticket-06-column-pivot-level2` merged as PR #14. The Issue #61 branch was based on main commit `c5b1159` before PR #65 merged the fix into main.
+
+## Final rubric sprint integration
+
+**Branch:** `feature/final-rubric-sprint`, based on `main` at `1662157`.
+Changes retain the bounded four-topology/twelve-candidate search, source
+identity, immutable fields, exact foreground-image ratios, renderer-measured
+glyph bounds, and quantized common group transforms.
+
+**Track 1 — Level 3 300×250:** the compact ribbon fallback now enforces a 6px
+outer inset, 6px minimum unit gap, and at least 6px badge separation. The
+hard-valid output uses an 11px headline, 6px subhead, and 9px legal copy. A
+7px subhead fails the renderer's positioned-glyph check at x = -0.162px for
+the unchanged source text; it remains 6px rather than weakening the hard
+validator or adding a numeric readability floor (ADR-011). The selected
+response passed `validate_response`.
+
+**Track 2 — local contrast ranking:** text fills now follow the renderer's
+effective style-run precedence, and WCAG-style relative luminance is measured
+against at most 25 rendered background samples per text box. On the locked
+Python 3.11.14 environment, the Level 3 medium-rectangle contrast subscore
+measured 1.148ms median / 1.339ms maximum over 100 evaluations;
+`score_candidate` measured 3.118ms median / 3.319ms maximum. Seven `resize()`
+calls on the same 300×250 input measured 1.263s median / 1.292s maximum and
+returned the same response each time.
+
+An earlier three-call sample observed one first-call 1.73s outlier; the later
+seven-call series stayed at or below 1.292s. These are local measurements, not
+a cross-platform latency guarantee.
+
+**Track 3 — adversarial inputs:** arbitrary element/group IDs preserve inferred
+roles and resize successfully; 300+ character centered copy wraps and scales
+without changing content; missing asset references remain intact and render
+the diagnostic placeholder. An attempted left-aligned long-copy case failed
+at every tested font size because its immutable leading glyph exceeded the
+text box by 1px. That case remains fail-closed; no unapproved horizontal glyph
+inset or text mutation was added.
+
+**Track 4 — integration:** the isolated `input_synthetic/` runner completed
+18/18 `SUCCESS`; a separate serialized-response pass ran `validate_response`
+on all 18 outputs (18/18 hard-valid). `scripts/inspect_layout.py` exited 0
+across 18 reports: 12 reported zero unintended foreground overlaps; six
+Level 2 reports retained source-decoration off-canvas/overlap warnings, which
+do not override the authoritative source-aware validator.
+
+Runner per-task elapsed time averaged 2.020s (median 1.875s; range 0.62–3.96s);
+the Level 3 medium-rectangle task completed in 1.41s.
+
+`make test VENV_DIR=/tmp/chameleon-hotspot-locked-venv-20261027` passed:
+299 engine, 48 review, 3 runtime, 1 dependency-preparation, and 3
+font-provenance tests (354 total). `make verify PYTHON_BOOTSTRAP=/tmp/chameleon-hotspot-locked-venv-20261027/bin/python`
+passed. Both ran on local Darwin arm64; no Docker,
+native x86_64, organizer-held-out, or release qualification is claimed.
+
 
 ## Story visual-spacing audit
 

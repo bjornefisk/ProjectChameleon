@@ -301,15 +301,17 @@ def _variant_fits(
     response: Mapping[str, Any],
     indices: Sequence[int],
     target_canvas: Mapping[str, Any],
+    *,
+    inset: Fraction = Fraction(0),
 ) -> bool:
     target_width = to_fraction(target_canvas["width"])
     target_height = to_fraction(target_canvas["height"])
     return all(
         not (
-            (box := rotated_aabb(response["elements"][index]))[0] < 0
-            or box[1] < 0
-            or box[2] > target_width
-            or box[3] > target_height
+            (box := rotated_aabb(response["elements"][index]))[0] < inset
+            or box[1] < inset
+            or box[2] > target_width - inset
+            or box[3] > target_height - inset
         )
         for index in indices
     )
@@ -321,6 +323,8 @@ def _apply_variant_emphasis(
     roles: RoleModel,
     target_canvas: Mapping[str, Any],
     spec: CandidateSpec,
+    *,
+    inset: Fraction = Fraction(0),
 ) -> None:
     focus = _variant_focus_indices(source, roles, spec.variant_index)
     if not focus:
@@ -357,7 +361,7 @@ def _apply_variant_emphasis(
                 factor=factor,
                 lattice_images=False,
             )
-            if _variant_fits(trial, indices, target_canvas):
+            if _variant_fits(trial, indices, target_canvas, inset=inset):
                 response["elements"] = trial["elements"]
                 break
     for index in individual:
@@ -376,7 +380,7 @@ def _apply_variant_emphasis(
                 factor=factor,
                 lattice_images=True,
             )
-            if _variant_fits(trial, [index], target_canvas):
+            if _variant_fits(trial, [index], target_canvas, inset=inset):
                 response["elements"] = trial["elements"]
                 break
 
@@ -433,14 +437,18 @@ def _derive_variant_response(
 
     target_width = to_fraction(target_canvas["width"])
     target_height = to_fraction(target_canvas["height"])
+    compact_profile = (
+        spec.topology == "horizontal_ribbon" and target_width < 350
+    )
+    minimum_inset = Fraction(6) if compact_profile else Fraction(0)
     lower_x, upper_x = Fraction(0), target_width
     lower_y, upper_y = Fraction(0), target_height
     boxes = {index: rotated_aabb(response["elements"][index]) for index in eligible}
     for box in boxes.values():
-        lower_x = max(lower_x, -box[0])
-        upper_x = min(upper_x, target_width - box[2])
-        lower_y = max(lower_y, -box[1])
-        upper_y = min(upper_y, target_height - box[3])
+        lower_x = max(lower_x, minimum_inset - box[0])
+        upper_x = min(upper_x, target_width - minimum_inset - box[2])
+        lower_y = max(lower_y, minimum_inset - box[1])
+        upper_y = min(upper_y, target_height - minimum_inset - box[3])
     x_interval = _integer_bounds(lower_x, upper_x)
     y_interval = _integer_bounds(lower_y, upper_y)
     if x_interval is None or y_interval is None:
@@ -466,7 +474,9 @@ def _derive_variant_response(
         )
         for index in eligible:
             response["elements"][index]["y"] += translation
-    _apply_variant_emphasis(response, source, roles, target_canvas, spec)
+    _apply_variant_emphasis(
+        response, source, roles, target_canvas, spec, inset=minimum_inset
+    )
     return _serialize_variant_response(response)
 
 
