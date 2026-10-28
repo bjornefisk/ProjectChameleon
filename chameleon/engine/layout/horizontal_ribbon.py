@@ -1014,6 +1014,267 @@ def _compact_image_placement(
     return True
 
 
+def _build_wide_three_column_candidate(
+    source: Mapping[str, Any],
+    target_canvas: Mapping[str, Any],
+    model: RoleModel,
+    source_elements: list[Mapping[str, Any]],
+    art_images: list[int],
+    secondary_images: list[int],
+    headlines: list[int],
+    supporting_text: list[int],
+    badges: list[tuple[int, list[int]]],
+    cta: tuple[int, list[int]],
+    ribbon: tuple[int, list[int]],
+    font_manager,
+    fonts_dir: str | None,
+    work_diagnostics: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Fit a dense, wide banner into source-role art, copy, and action columns."""
+    target_width = int(target_canvas["width"])
+    target_height = int(target_canvas["height"])
+    padding_x = max(1, target_height // 10)
+    padding_y = max(1, target_height // 6)
+    column_gap = max(8, target_height // 16)
+    item_gap = max(9, target_height // 32)
+    inner_height = target_height - 2 * padding_y
+    inner_width = target_width - 2 * padding_x - 2 * column_gap
+    left_width = inner_width // 5
+    right_width = inner_width // 4
+    middle_width = inner_width - left_width - right_width
+    work_diagnostics.update(
+        {
+            "status": "running",
+            "text_fit_attempts": 0,
+            "hard_validation_attempts": 0,
+        }
+    )
+    if (
+        model.background_index is None
+        or len(art_images) != 2
+        or len(secondary_images) != 1
+        or len(headlines) != 1
+        or len(supporting_text) != 2
+        or len(badges) != 3
+        or inner_height <= 0
+        or min(left_width, middle_width, right_width) <= 0
+    ):
+        work_diagnostics["status"] = "unsupported_wide_profile"
+        return None
+
+    left_x = padding_x
+    middle_x = left_x + left_width + column_gap
+    right_x = middle_x + middle_width + column_gap
+    response_elements = [dict(element) for element in source_elements]
+    response_elements[model.background_index].update(
+        {"x": 0, "y": 0, "width": target_width, "height": target_height}
+    )
+
+    image_indices = [*art_images, *secondary_images]
+    logo_height = inner_height // 4
+    hero_height = inner_height * 2 // 5
+    secondary_height = inner_height - logo_height - hero_height - 2 * item_gap
+    image_slot_heights = (logo_height, hero_height, secondary_height)
+    if secondary_height <= 0:
+        work_diagnostics["status"] = "insufficient_art_space"
+        return None
+    image_y = padding_y
+    for index, slot_height in zip(image_indices, image_slot_heights):
+        if not _compact_image_placement(
+            source_elements[index],
+            response_elements[index],
+            (left_x, image_y, left_width, slot_height),
+        ):
+            work_diagnostics.update(
+                {
+                    "status": "image_ratio_does_not_fit",
+                    "failed_element_id": source_elements[index]["id"],
+                }
+            )
+            return None
+        response_elements[index]["x"] = left_x
+        image_y += slot_height + item_gap
+
+    if font_manager is None:
+        from .near_isomorphic import _renderer_components
+
+        load_brand_font_manager = _renderer_components()[0]
+        resolved_fonts_dir = fonts_dir or str(
+            Path(__file__).resolve().parents[2] / "brand_kit" / "fonts"
+        )
+        font_manager = load_brand_font_manager(resolved_fonts_dir)
+    else:
+        resolved_fonts_dir = fonts_dir
+    if __package__.startswith("chameleon."):
+        from chameleon.renderer.converter.convert import minimum_text_box_height
+    else:
+        from renderer.converter.convert import minimum_text_box_height
+
+    text_indices = [*headlines, *supporting_text]
+    text_sizes: dict[int, int] = {}
+    text_heights: dict[int, int] = {}
+    for index in text_indices:
+        element = source_elements[index]
+        fit_element = dict(element)
+        fit_element.update(
+            {
+                "x": middle_x,
+                "y": padding_y,
+                "width": middle_width,
+                "height": inner_height,
+            }
+        )
+        preferred = _preferred_font_size(
+            to_fraction(element["font_size"]), Fraction(1)
+        )
+        preferred = min(preferred, 15 if index in headlines else 9)
+        selected_size = _largest_fitting_font_size(
+            fit_element, preferred, font_manager, target_canvas
+        )
+        work_diagnostics["text_fit_attempts"] += 1
+        if selected_size is None or (
+            index in headlines and selected_size < 13
+        ) or (index in supporting_text and selected_size < 8):
+            work_diagnostics.update(
+                {
+                    "status": "copy_hierarchy_does_not_fit",
+                    "failed_element_id": element["id"],
+                }
+            )
+            return None
+        text_sizes[index] = selected_size
+        text_heights[index] = minimum_text_box_height(
+            fit_element, middle_width, selected_size, font_manager
+        )
+
+    ribbon_height = max(1, inner_height // 4)
+    copy_height = (
+        ribbon_height
+        + sum(text_heights.values())
+        + item_gap * len(text_indices)
+    )
+    minimum_margin = max(1, target_height // 8)
+    if copy_height > target_height - 2 * minimum_margin:
+        work_diagnostics["status"] = "insufficient_copy_space"
+        return None
+
+    group_scales: dict[int, Fraction] = {}
+    y = (target_height - copy_height) // 2
+    ribbon_scale = _compact_group_placement(
+        source_elements,
+        response_elements,
+        ribbon[1],
+        (middle_x, y, middle_width, ribbon_height),
+    )
+    if ribbon_scale is None:
+        work_diagnostics["status"] = "ribbon_does_not_fit"
+        return None
+    group_scales.update((index, ribbon_scale) for index in ribbon[1])
+    y += ribbon_height + item_gap
+    for index in text_indices:
+        response_elements[index].update(
+            {
+                "x": middle_x,
+                "y": y,
+                "width": middle_width,
+                "height": text_heights[index],
+                "font_size": text_sizes[index],
+            }
+        )
+        y += text_heights[index] + item_gap
+
+    badge_height = max(1, inner_height // 6)
+    cta_height = max(1, inner_height // 4)
+    right_units = [
+        (first, indices, badge_height) for first, indices in badges
+    ]
+    right_units.append((cta[0], cta[1], cta_height))
+    right_stack_height = sum(height for _first, _indices, height in right_units)
+    right_stack_height += item_gap * (len(right_units) - 1)
+    if right_stack_height > target_height - 2 * minimum_margin:
+        work_diagnostics["status"] = "insufficient_action_space"
+        return None
+    y = (target_height - right_stack_height) // 2
+    for first, indices, slot_height in right_units:
+        scale = _compact_group_placement(
+            source_elements,
+            response_elements,
+            indices,
+            (right_x, y, right_width, slot_height),
+        )
+        if scale is None:
+            work_diagnostics.update(
+                {
+                    "status": "action_group_does_not_fit",
+                    "failed_group_id": source_elements[first].get("group_id"),
+                }
+            )
+            return None
+        group_scales.update((index, scale) for index in indices)
+        group_aabbs = [
+            rotated_aabb(response_elements[index]) for index in indices
+        ]
+        translate_x = (
+            Fraction(target_width - padding_x)
+            - max(to_fraction(aabb[2]) for aabb in group_aabbs)
+        )
+        for index in indices:
+            response_elements[index]["x"] += translate_x
+        y += slot_height + item_gap
+
+    for index, element in enumerate(source_elements):
+        if element["type"] != "text" or index not in group_scales:
+            continue
+        fit_element = dict(response_elements[index])
+        fit_element["width"] = quantize_to_int(fit_element["width"])
+        fit_element["height"] = quantize_to_int(fit_element["height"])
+        preferred = _preferred_font_size(
+            to_fraction(element["font_size"]), group_scales[index]
+        )
+        selected_size = _largest_fitting_font_size(
+            fit_element, preferred, font_manager, target_canvas
+        )
+        work_diagnostics["text_fit_attempts"] += 1
+        if selected_size is None or selected_size < 8:
+            work_diagnostics.update(
+                {
+                    "status": "action_text_does_not_fit",
+                    "failed_element_id": element["id"],
+                }
+            )
+            return None
+        response_elements[index]["font_size"] = selected_size
+
+    result = _serialize_extreme_candidate(
+        {
+            "canvas": {"width": target_width, "height": target_height},
+            "elements": response_elements,
+        }
+    )
+    work_diagnostics["hard_validation_attempts"] += 1
+    try:
+        validate_response(
+            source,
+            target_canvas,
+            result,
+            font_manager=font_manager,
+            fonts_dir=resolved_fonts_dir,
+        )
+    except InfeasibleLayoutError as error:
+        if error.reason_code is InfeasibleReasonCode.RUNTIME_IO_FAILURE:
+            raise
+        work_diagnostics.update(
+            {
+                "status": "hard_validation_failed",
+                "failure_reason_code": error.reason_code.value,
+                "failure_details": error.details,
+            }
+        )
+        return None
+    work_diagnostics["status"] = "hard_valid"
+    return result
+
+
 def _build_compact_grid_candidate(
     source: Mapping[str, Any],
     target_canvas: Mapping[str, Any],
@@ -1024,6 +1285,8 @@ def _build_compact_grid_candidate(
     font_manager,
     fonts_dir: str | None,
     work_diagnostics: dict[str, Any],
+    *,
+    prefer_wide_ribbon: bool = False,
 ) -> dict[str, Any] | None:
     """Try a renderer-checked compact grid for the dense banner profile."""
     target_width = int(target_canvas["width"])
@@ -1106,6 +1369,23 @@ def _build_compact_grid_candidate(
     ):
         work_diagnostics["status"] = "unsupported_dense_profile"
         return None
+    if prefer_wide_ribbon and target_width > target_height:
+        return _build_wide_three_column_candidate(
+            source,
+            target_canvas,
+            model,
+            source_elements,
+            art_images,
+            secondary_images,
+            headlines,
+            supporting_text,
+            badges,
+            cta,
+            ribbon,
+            font_manager,
+            fonts_dir,
+            work_diagnostics,
+        )
 
     padding_x = max(2, target_width // 50)
     padding_y = max(2, target_height // 80)
@@ -1359,6 +1639,24 @@ def _build_extreme_candidate(
     target_height = int(target_canvas["height"])
     background = model.background_index
     units = _candidate_units(source, background)
+    if variant == "source_proportional" and axis == "horizontal" and target_width > target_height:
+        wide_ribbon_work: dict[str, Any] = {}
+        wide_ribbon = _build_compact_grid_candidate(
+            source,
+            target_canvas,
+            model,
+            source_elements,
+            units,
+            variant,
+            font_manager,
+            fonts_dir,
+            wide_ribbon_work,
+            prefer_wide_ribbon=True,
+        )
+        if work_diagnostics is not None:
+            work_diagnostics["wide_ribbon_layout"] = wide_ribbon_work
+        if wide_ribbon is not None:
+            return wide_ribbon
 
     if variant == "dominant_copy" and axis == "horizontal":
         copy_band_work: dict[str, Any] = {}
