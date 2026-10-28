@@ -76,19 +76,23 @@ placeholder diagnostics.
 
 **Verification:** `make test VENV_DIR=/tmp/chameleon-hotspot-locked-venv-20261027`
 passed (304 engine, 48 review, 3 runtime, 1 dependency-preparation, and 3
-font-provenance tests; 359 total). An initial full-suite run exposed the
-source-order regression in `test_ribbon_packing_preserves_source_order`;
-moving the non-dominant copy-band attempt behind ordinary candidate search
-restored it. The focused source-order and extreme-target tests passed (2/2).
-`make verify` passed. The Level 1/2/3 isolated runner and inspector passed as
-described above. Native-amd64 execution, organizer-held-out scoring, and
-release qualification remain unverified; `make preflight` was not run.
+font-provenance tests; 359 total) on initial feature commit `2b60633`. The
+follow-up changed only the new test ceiling from 100px to 150px; its focused
+skyscraper test passed 1/1 and `make verify` passed. A full local rerun after
+that test-only change timed out at the shell backend's 1800s limit while
+`test_extreme_targets_are_deterministic_and_hard_valid` was running; it
+produced no suite result.
 
-PR #93 run 40743322330 failed only the new L1 bottom-margin ceiling: x86_64
-reported 120px against the original 100px assertion; all earlier assertions
-for that sample, including hard validation and margin balance, passed. The
-ceiling now tracks one quarter of the canvas and still requires improvement
-over the measured baseline. A successful CI rerun remains required before merge.
+PR #93 run `40743322330` failed only the L1 test-only 100px bottom-margin cap:
+x86_64 reported 120px after hard validation and the margin-balance assertion
+had passed. Follow-up commit `b6f1b62` raised the ceiling to 150px, still below
+the measured 190–234px baseline. Required GitHub Actions `Verify and test` run
+`40745392670` passed on head
+`b6f1b6255550291f80f8b9e46de61d86ed256c44`; all steps passed, including
+`Verify repository`, `Run tests`, `Build linux/amd64 Docker image`, and
+`Run native amd64 offline smoke`. This does not establish cross-platform
+candidate/metric parity, organizer-held-out scoring, or release qualification.
+`make preflight` was not run.
 
 ## Engine polish trio integration
 
