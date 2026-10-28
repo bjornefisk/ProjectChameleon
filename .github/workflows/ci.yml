@@ -149,6 +149,20 @@ jobs:
             test -f "$path"
           done
           test -z "$(find chameleon/output -maxdepth 1 -type l -print -quit)"
+      - name: Run native amd64 offline synthetic qualification
+        shell: bash
+        run: |
+          set -o pipefail
+          test "$(uname -m)" = "x86_64"
+          set +e
+          make docker-synthetic 2>&1 | tee "$RUNNER_TEMP/docker-synthetic.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          test "$status" -eq 0
+          grep -F "Image architecture: linux/amd64" "$RUNNER_TEMP/docker-synthetic.log"
+          grep -F "Task statuses: 18/18 SUCCESS" "$RUNNER_TEMP/docker-synthetic.log"
+          grep -F "Committed JSON/PNG pairs: 18/18" "$RUNNER_TEMP/docker-synthetic.log"
+          grep -F "In-image serialized responses hard-validated: 18/18" "$RUNNER_TEMP/docker-synthetic.log"
       - name: Verify failed task publishes no artifact pair
         shell: bash
         run: |

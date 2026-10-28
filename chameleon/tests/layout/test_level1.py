@@ -20,12 +20,14 @@ try:
     from engine.geometry.bounds import rotated_aabb
     from engine.geometry.ratios import preserves_source_ratio
     from engine.layout.roles import infer_roles
+    from engine.layout.vertical_restack import _distribute_vertical_slack
     from engine.resize import resize
 except ModuleNotFoundError:
     from chameleon.engine.contract import validate_response
     from chameleon.engine.geometry.bounds import rotated_aabb
     from chameleon.engine.geometry.ratios import preserves_source_ratio
     from chameleon.engine.layout.roles import infer_roles
+    from chameleon.engine.layout.vertical_restack import _distribute_vertical_slack
     from chameleon.engine.resize import resize
 
 
@@ -129,6 +131,79 @@ class Level1IntegrationTests(unittest.TestCase):
                 logo["width"], logo["height"], source_logo["width"], source_logo["height"]
             )
         )
+
+    def test_compact_square_balances_margins_and_unit_gutters(self):
+        task = self._load_task()
+        source = task["source"]
+        target = {"width": 600, "height": 600}
+        response = resize(source, target)
+        validate_response(source, target, response)
+
+        roles = infer_roles(source)
+        foreground = [
+            rotated_aabb(element)
+            for index, element in enumerate(response["elements"])
+            if index != roles.background_index
+            and element["width"] > 0
+            and element["height"] > 0
+        ]
+        content_top = min(box.min_y for box in foreground)
+        content_bottom = max(box.max_y for box in foreground)
+        top_margin = content_top
+        bottom_margin = target["height"] - content_bottom
+        self.assertGreaterEqual(top_margin, 90)
+        self.assertLessEqual(top_margin, 130)
+        self.assertGreaterEqual(bottom_margin, 90)
+        self.assertLessEqual(bottom_margin, 130)
+        self.assertLessEqual(abs(top_margin - bottom_margin), 20)
+
+        ordered = sorted(foreground, key=lambda box: box.min_y)
+        gutters = [
+            right.min_y - left.max_y
+            for left, right in zip(ordered, ordered[1:])
+        ]
+        self.assertGreaterEqual(min(gutters), 12)
+
+        # The refinement is reserved for square-ish canvases with spare
+        # vertical room; non-square targets outside the gate stay untouched.
+        for gated_target in (
+            {"width": 540, "height": 600},
+            {"width": 660, "height": 600},
+        ):
+            gated_response = resize(source, gated_target)
+            validate_response(source, gated_target, gated_response)
+            gated_boxes = [
+                rotated_aabb(element)
+                for index, element in enumerate(gated_response["elements"])
+                if index != roles.background_index
+                and element["width"] > 0
+                and element["height"] > 0
+            ]
+            gated_top = min(box.min_y for box in gated_boxes)
+            gated_bottom = max(box.max_y for box in gated_boxes)
+            self.assertLessEqual(abs(gated_top - (600 - gated_bottom)), 20)
+            gated_bottom_margin = 600 - gated_bottom
+            self.assertGreaterEqual(gated_top, 90)
+            self.assertLessEqual(gated_top, 130)
+            self.assertGreaterEqual(gated_bottom_margin, 90)
+            self.assertLessEqual(gated_bottom_margin, 130)
+            gated_ordered = sorted(gated_boxes, key=lambda box: box.min_y)
+            gated_gutters = [
+                right.min_y - left.max_y
+                for left, right in zip(gated_ordered, gated_ordered[1:])
+            ]
+            self.assertGreaterEqual(min(gated_gutters), 12)
+        for outside_target in (
+            {"width": 539, "height": 600},
+            {"width": 661, "height": 600},
+        ):
+            outside_response = resize(source, outside_target)
+            validate_response(source, outside_target, outside_response)
+            unadjusted = copy.deepcopy(outside_response)
+            _distribute_vertical_slack(
+                source, outside_target, outside_response
+            )
+            self.assertEqual(outside_response, unadjusted)
 
 
 if __name__ == "__main__":

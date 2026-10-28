@@ -6,6 +6,50 @@
 **Decision status:** The merged implementation preserves bounded four-topology search, at most twelve source-derived candidates, renderer-gated hard validation, fixed-point ranking, deterministic output, and typed fail-closed behavior. Accepted ADR-010 through ADR-012 reconcile only quantized common group transforms, the absence of a numeric readability floor, and the renderer-measured transient glyph inset against the source challenge PDF. Accepted ADR-013 records the reproducible package-lock strategy. Local success and native CI do not establish organizer qualification; cross-platform parity and organizer-held-out scoring remain unverified.
 **Ticket 06 authority:** User-requested GitHub issue #13; owner @bjornefisk; partner reviewer @gabegaines24. Implementation branch `feat/ticket-06-column-pivot-level2` merged as PR #14. The Issue #61 branch was based on main commit `c5b1159` before PR #65 merged the fix into main.
 
+## Compact-square optical centering
+
+**Branch:** `feature/compact-square-polish`, based on clean `main` at
+`b7e49c9`. For target aspect ratios from 0.9 through 1.1, the near-isomorphic
+candidate now redistributes available vertical slack across outer margins and
+at least 12px inter-unit gutters. The serialized candidate is hard-validated;
+source image ratios, quantized group transforms, and renderer-measured glyph
+bounds remain unchanged. Tests cover the inclusive 540×600 and 660×600 gates
+and verify no redistribution just outside them at 539×600 and 661×600.
+
+Margins exclude the background and source-bleed elements. Minimum gutters are
+the smallest edge-to-edge unit AABB distance among source-separated pairs;
+source-overlapping pairs are excluded. “Before” is measured by the public
+`resize()` seam at base commit `b7e49c9` using the same 600×600 synthetic
+inputs as the after run.
+
+| Level | Top/bottom margins before | Top/bottom margins after | Minimum gutter before | Minimum gutter after |
+| --- | ---: | ---: | ---: | ---: |
+| L1 | 45px / 208px | 100px / 95px | 7px | 97px |
+| L2 | 0px / 84px | 0px / 84px | 0px | 0px |
+| L3 | 4px / 0px | 4px / 0px | 0px | 0px |
+
+`inspect_layout.py` exited 0 for the L1, L2, and L3 outputs. Its L2 collision
+warnings were confirmed against the same source pairs; the in-image serialized
+hard validator passed all 18 synthetic responses. L2 and L3 have no additional
+vertical slack to redistribute in these selected layouts.
+
+**Native amd64 CI:** `.github/workflows/ci.yml` now runs `make docker-synthetic`
+on pinned `ubuntu-24.04`, asserts the runner is `x86_64`, and checks the offline
+`linux/amd64` 18-case and hard-validation results in the job log. This branch's
+GitHub Actions run is pending. The local Docker daemon reported `aarch64`, so
+the local `linux/amd64` synthetic run used emulation and is not native-amd64
+qualification.
+
+**Verification:** `make test
+VENV_DIR=/tmp/chameleon-hotspot-locked-venv-20261027
+PYTHON_BOOTSTRAP=python3.11` passed 360 tests; `make verify
+PYTHON_BOOTSTRAP=python3.11` passed. `make docker-synthetic` reported 18/18
+`SUCCESS`, 18 committed JSON/PNG pairs, and 18/18 in-image hard-validated
+responses. The local run retains non-fatal Docker platform, Fontconfig, and
+missing holiday-badge diagnostics.
+
+
+
 
 ## Skyscraper, extreme-aspect, and offline-Docker integration
 
