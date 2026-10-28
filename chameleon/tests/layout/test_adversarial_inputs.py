@@ -18,6 +18,8 @@ try:
     from engine.resize import resize
     from renderer.converter.brand_fonts import load_brand_font_manager
     from renderer.converter.convert import (
+        _positioned_glyph_metrics,
+        _prepare_text,
         convert_chameleon_to_crello,
         render_design_to_png,
     )
@@ -27,6 +29,8 @@ except ModuleNotFoundError:
     from chameleon.engine.resize import resize
     from chameleon.renderer.converter.brand_fonts import load_brand_font_manager
     from chameleon.renderer.converter.convert import (
+        _positioned_glyph_metrics,
+        _prepare_text,
         convert_chameleon_to_crello,
         render_design_to_png,
     )
@@ -144,6 +148,92 @@ class AdversarialInputTests(unittest.TestCase):
                 image.load()
                 self.assertEqual(image.size, (target["width"], target["height"]))
 
+
+    def test_left_aligned_negative_bearing_glyphs_fit_after_transient_inset(self):
+        target = {"width": 240, "height": 240}
+        checked_negative_bearings = 0
+        for glyph in ("T", "V", "W", '"', "‘", "j", "f"):
+            source = {
+                "canvas": dict(target),
+                "elements": [
+                    {
+                        "id": "leading-glyph",
+                        "type": "text",
+                        "x": 70,
+                        "y": 65,
+                        "width": 64,
+                        "height": 100,
+                        "color": "rgba(0,0,0,1)",
+                        "content": glyph,
+                        "font_family": "Solstice Sans",
+                        "font_size": 64,
+                        "text_align": "left",
+                        "rotation": 27,
+                    }
+                ],
+            }
+            before = copy.deepcopy(source)
+            element = source["elements"][0]
+            prepared = _prepare_text(element, self.font_manager)
+            (
+                horizontal_inset,
+                vertical_inset,
+                minimum_left,
+                maximum_right,
+                minimum_top,
+                maximum_bottom,
+            ) = _positioned_glyph_metrics(
+                prepared.wrapped,
+                prepared.line_indices,
+                prepared.line_count,
+                element,
+                self.font_manager,
+                prepared.family,
+                prepared.size,
+                prepared.line_height,
+                prepared.letter_spacing,
+                prepared.colors,
+                prepared.bold_flags,
+                prepared.italic_flags,
+            )
+            if minimum_left is None or minimum_left >= 0:
+                continue
+
+            checked_negative_bearings += 1
+            response = {
+                "canvas": dict(target),
+                "elements": copy.deepcopy(source["elements"]),
+            }
+            validate_response(source, target, response, fonts_dir=FONTS)
+            self.assertEqual(response["elements"], source["elements"])
+            self.assertEqual(source, before)
+
+            converted, _warnings = convert_chameleon_to_crello(
+                response, self.font_manager, str(ASSETS)
+            )
+            self.assertAlmostEqual(
+                converted["left"][0] + converted["width"][0] / 2,
+                float(element["x"]) + element["width"] / 2,
+            )
+            self.assertAlmostEqual(
+                converted["top"][0] + converted["height"][0] / 2,
+                float(element["y"]) + element["height"] / 2,
+            )
+            self.assertAlmostEqual(converted["width"][0], 64 - 2 * horizontal_inset)
+            self.assertAlmostEqual(converted["height"][0], 100 - 2 * vertical_inset)
+            self.assertGreater(horizontal_inset, 0)
+            self.assertGreaterEqual(minimum_left + horizontal_inset, 0)
+            self.assertLessEqual(
+                maximum_right + horizontal_inset,
+                element["width"] - horizontal_inset,
+            )
+            self.assertGreaterEqual(minimum_top + vertical_inset, 0)
+            self.assertLessEqual(
+                maximum_bottom + vertical_inset,
+                element["height"] - vertical_inset,
+            )
+
+        self.assertGreater(checked_negative_bearings, 0)
     def test_missing_asset_is_preserved_and_renders_diagnostic_placeholder(self):
         source = {
             "canvas": {"width": 200, "height": 120},

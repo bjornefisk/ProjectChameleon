@@ -25,9 +25,12 @@ from ..geometry.bounds import rotated_aabb, source_bleed_sides
 from ..geometry.math_util import quantize_to_int, to_fraction
 from ..geometry.ratios import reduced_ratio
 from .candidate import RenderedCandidate
-from .column_pivot import solve_column_pivot
+from .column_pivot import _center_foreground_envelope, solve_column_pivot
 from .horizontal_ribbon import solve_horizontal_ribbon
-from .near_isomorphic import solve_near_isomorphic
+from .near_isomorphic import (
+    _is_wide_landscape_target,
+    solve_near_isomorphic,
+)
 from .ranking import QualityScore, score_candidate, select_best
 from .roles import RoleKind, RoleModel, infer_roles
 from .vertical_restack import solve_vertical_restack
@@ -972,7 +975,19 @@ def search(
                 font_manager=font_manager,
                 fonts_dir=fonts_dir,
             )
-            response_refined = slack_distributed or placeholder_adjusted
+            landscape_centered = False
+            if _is_wide_landscape_target(target_canvas):
+                landscape_centered = _center_foreground_envelope(
+                    list(source["elements"]),
+                    response["elements"],
+                    roles.background_index,
+                    source["canvas"],
+                    target_canvas,
+                    integer_translation=True,
+                )
+            response_refined = (
+                slack_distributed or placeholder_adjusted or landscape_centered
+            )
             # The centralized semantic gate remains authoritative and runs
             # before rendering every derived or refined response.
             validate_response(
