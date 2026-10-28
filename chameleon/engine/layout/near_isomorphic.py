@@ -517,9 +517,8 @@ def _text_fits(
     candidate = dict(element)
     candidate["font_size"] = font_size
     try:
-        # Passing the candidate through the production converter is important:
-        # it exercises effective style runs, Unicode wrapping, line-height,
-        # letter spacing, and positioned glyph bounds together.
+        # Use the production converter here. It checks style runs, Unicode wrapping,
+        # line height, letter spacing, and glyph bounds together.
         convert_chameleon_to_crello(
             {"canvas": dict(target), "elements": [candidate]}, font_manager
         )

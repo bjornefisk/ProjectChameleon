@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — pre-implementation contract decision. This ADR ratifies the Stage 1 numeric and geometry semantics for future implementation. It is documentation-only: acceptance does not claim that the parser, serializer, validator, engine, or runtime behavior is implemented or qualified, and it does not authorize code changes by itself.
+Accepted — implemented in the parser, serializer, validator, geometry, and search paths. Cross-platform precision, organizer scoring, and release qualification remain separate evidence questions.
 
 ## Date
 
@@ -17,7 +17,7 @@ A binary floating-point ratio comparison can reject a mathematically valid image
 ### Authority classification
 
 - **Ratified current contract:** `Docs/PROJECT_CONTRACT.md` §§4–7, ADR-002, and ADR-003. These require the v0.9 wire schema, immutable source fields, integer serialized mutable geometry, post-rounding validation, rotated AABB containment, foreground image ratio invariance, rigid groups, source-bleed limits, and fail-closed hard validation.
-- **Accepted internal contract decision:** exact rational ingress, one half-even serialization quantization, the common group transform, positive-area AABB collision, deterministic background/bleed tie rules, and the arithmetic procedures below are ratified defaults for future implementation. They remain unimplemented until the relevant work is completed and evidenced.
+- **Accepted internal contract decision:** exact rational ingress, one half-even serialization quantization, the common group transform, positive-area AABB collision, deterministic background/bleed tie rules, and the arithmetic procedures below are ratified defaults used by the current implementation. Evidence is recorded in `Docs/STATUS.md` and the implementation tickets.
 - **Externally unverified organizer fact:** no organizer clarification is currently needed to define the local arithmetic, but the official target catalogue and scoring thresholds remain external facts. They must not be inferred from the sample set when qualification is planned.
 
 ## Decision
@@ -146,13 +146,13 @@ Rejected. Positive-area overlap is the simpler convention for the contract's AAB
 - The AABB predicate can be conservative for rotated rectangles. That conservatism is compatible with Stage 1 and avoids a second geometry contract.
 - Background classification and source-bleed handling are deterministic without changing source records or renderer pixels.
 - A pinned runtime remains relevant for trigonometric evaluation and renderer measurements; exact organizer hardware facts are not invented here.
-- No code, schema, fixture, Docker, dependency, or runtime change is claimed or authorized by this documentation-only ratification.
+- The parser, serializer, validator, and geometry paths use the ratified arithmetic without changing the v0.9 schema.
 
 ## Affected files/schema fields
 
-When implemented, the affected work would touch the future numeric parser, candidate serializer, semantic validator, and geometry/role-inference code. Relevant existing schema fields are `x`, `y`, `width`, `height`, `rotation`, `opacity`, `z_index`, `group_id`, `fit`, and text `font_size`; no field is added, removed, or retyped by this decision.
+The implementation touches the numeric parser, candidate serializer, semantic validator, and geometry/role-inference code. Relevant existing schema fields are `x`, `y`, `width`, `height`, `rotation`, `opacity`, `z_index`, `group_id`, `fit`, and text `font_size`; no field is added, removed, or retyped by this decision.
 
-This documentation-only ratification changes project documentation only; implementation and qualification remain pending.
+The current implementation and qualification evidence use this decision's rules. Native platform, cross-platform parity, organizer scoring, and release qualification remain separate evidence questions.
 
 ## Required validation/evidence
 
@@ -172,4 +172,4 @@ Before implementation can claim conformance, the evidence must include at least:
 
 The external arithmetic references used for this decision are [Python `Fraction`](https://docs.python.org/3/library/fractions.html), [Python `Decimal`](https://docs.python.org/3/library/decimal.html), [Geometric Tools' separating-axis reference](https://www.geometrictools.com/Documentation/MethodOfSeparatingAxes.pdf), [MDN `matrix()`](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Values/transform-function/matrix), and [MDN `transform-origin`](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/transform-origin). They document general numeric/transform behavior; the ratified project contract remains the authority for Stage 1 semantics.
 
-No such tests or runtime changes were run or made for this documentation-only ratification; acceptance does not imply qualification.
+Geometry and validator evidence is recorded in the implementation tickets, `Docs/STATUS.md`, and the repository test suites. This ADR defines the required evidence and does not replace those records.

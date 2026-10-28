@@ -46,7 +46,7 @@ Level 3 introduces:
 
 A representative transition is a tall portrait asset of $1080 \times 1350$ to a narrow web leaderboard of $728 \times 90$.
 
-A horizontal ribbon can work for a wide target, while a vertical re-stack is needed when the target is tall and the source is wide. Both must derive positions from source order, group extents, content measurement, and the target canvas rather than fixed logo, text, image, or CTA slots. To maximize feasibility, the engine may reduce font sizes toward the readable preference near 10–12px unless the source is smaller, scale artwork isotropically, and compress margins before reporting a typed failure. These levers improve feasibility; they do not guarantee that every target has a hard-valid candidate.
+The engine may try larger font sizes first, then smaller positive sizes when measured checks and qualitative readability allow. It may also scale artwork isotropically and compress margins before reporting a typed failure. There is no universal numeric minimum. These levers improve feasibility; they do not guarantee that every target has a hard-valid candidate.
 
 The renderer uses explicit text line information instead of automatic width-based wrapping. Long copy therefore requires measured line geometry and font-size search. Missing files must not crash the pipeline or lead to a new asset. The original element record remains in the output.
 

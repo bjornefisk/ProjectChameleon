@@ -7,7 +7,7 @@ A resilient batch orchestrator and task execution harness in `chameleon/engine/m
 `01: Semantic Contract Validator and Failure Reason Codes`
 
 **Status:**  
-implemented — focused runner/staging integration evidence recorded below; deterministic cutoff producer integration remains pending with the solver
+implemented — focused runner/staging integration and deterministic cutoff propagation are complete; current bounded-search and qualification evidence is recorded in `Docs/STATUS.md`
 
 - [x] Create `chameleon/engine/staging.py` providing task-private staging primitives, JSON/PNG validation, and a hidden commit manifest with both staged-file hashes; publish the marker last, and treat final files without a matching marker as uncommitted.
 - [x] Implement stale artifact cleanup and quarantine in `staging.py`: if a task fails or raises an error, remove or move pre-existing final, temporary, commit-manifest, and private staging paths so stale outputs are never scored.
@@ -18,7 +18,7 @@ implemented — focused runner/staging integration evidence recorded below; dete
 - [x] Update exit code logic in `main.py`: return exit status `0` if and only if all discovered task files successfully produced and committed their output pair; return nonzero if any task failed, encountered malformed input, or raised an error.
 - [x] Add runner-seam regression tests under `chameleon/tests/runner/` verifying valid publication, marker-gated pair visibility, half-even serialization, integral-exponent immutable-token preservation, invalid/infeasible tasks, renderer and filesystem failures, exact numeric ingress, safe asset references, target validation, independent-task continuation after quarantine, aggregate exit status, symlink/path-boundary rejection, stale-artifact reconciliation, temporary-artifact inspector rejection, and safe diagnostics.
 
-**Verification evidence:**
+**Earlier focused evidence:**
 
 - `cd chameleon && ../.venv/bin/python -m unittest discover -s tests/runner -p 'test_*.py' -v` — 70 tests passed, including the audit regression rejecting symlinked inspection roots.
 - `cd chameleon && ../.venv/bin/python -m unittest discover -s tests -t . -p 'test_*.py' -v` — 140 tests passed; the first-four focused suites account for 132 tests and the eight layout tests are Ticket 05 coverage.

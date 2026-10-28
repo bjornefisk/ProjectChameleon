@@ -255,9 +255,8 @@ def _readability_score(
     for index in text_indices:
         source_size = max(Fraction(1), to_fraction(source_elements[index].get("font_size", 1)))
         response_size = max(Fraction(1), to_fraction(response_elements[index].get("font_size", 1)))
-        # Ten pixels is the documented readable preference unless the source is
-        # smaller.  A 24px cap preserves a useful distinction among larger,
-        # still-readable text without making huge source sizes dominate.
+        # The contract treats 10 pixels as a preference unless the source is smaller.
+        # The 24-pixel cap keeps larger text from dominating the score.
         preferred = min(Fraction(24), max(Fraction(1), source_size))
         reference = preferred
         size_scores.append(_clamp(response_size / reference * SCORE_SCALE))
