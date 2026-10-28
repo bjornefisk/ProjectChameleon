@@ -33,12 +33,15 @@ warnings were confirmed against the same source pairs; the in-image serialized
 hard validator passed all 18 synthetic responses. L2 and L3 have no additional
 vertical slack to redistribute in these selected layouts.
 
-**Native amd64 CI:** `.github/workflows/ci.yml` now runs `make docker-synthetic`
-on pinned `ubuntu-24.04`, asserts the runner is `x86_64`, and checks the offline
-`linux/amd64` 18-case and hard-validation results in the job log. This branch's
-GitHub Actions run is pending. The local Docker daemon reported `aarch64`, so
-the local `linux/amd64` synthetic run used emulation and is not native-amd64
-qualification.
+**Native amd64 CI:** `.github/workflows/ci.yml` runs `make docker-synthetic`
+on pinned `ubuntu-24.04`, asserts `uname -m` is `x86_64`, and verifies offline
+`linux/amd64` outputs. Pull request #94 run
+[`40776147805`](https://github.com/bjornefisk/ProjectChameleon/actions/runs/40776147805)
+passed on head `585f2eb`; `Verify and test` completed successfully in 12m.
+The logs record an `x86_64` runner and Docker daemon, 18/18 `SUCCESS`, 18
+JSON/PNG/marker pairs, and 18/18 in-image hard validation. The local Docker
+daemon reported `aarch64`; its separate `linux/amd64` run used emulation and
+is not native-amd64 evidence.
 
 **Verification:** `make test
 VENV_DIR=/tmp/chameleon-hotspot-locked-venv-20261027
