@@ -50,9 +50,6 @@ except ModuleNotFoundError:
 ROOT = PROJECT_ROOT / "chameleon"
 FIXTURE = ROOT / "input" / "chameleon_sample_level3_advanced.json"
 ASSETS = ROOT / "brand_kit" / "assets"
-WIDE_BILLBOARD_FIXTURE = (
-    ROOT / "input_synthetic" / "chameleon_sample_level3_advanced_wide_billboard.json"
-)
 
 
 class Level3IntegrationTests(unittest.TestCase):
@@ -353,12 +350,9 @@ class Level3IntegrationTests(unittest.TestCase):
                 )
 
     def test_wide_billboard_uses_balanced_three_column_ribbon(self):
-        task = json.loads(
-            WIDE_BILLBOARD_FIXTURE.read_text(encoding="utf-8"),
-            parse_float=Decimal,
-        )
+        task = self._load_task()
         source = task["source"]
-        target = task["target_canvas"]
+        target = {"width": 970, "height": 250}
         response = resize(source, target)
         validate_response(source, target, response)
         self.assertEqual(
