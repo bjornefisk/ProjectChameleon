@@ -1369,7 +1369,7 @@ def _build_compact_grid_candidate(
     ):
         work_diagnostics["status"] = "unsupported_dense_profile"
         return None
-    if prefer_wide_ribbon and target_width > target_height:
+    if prefer_wide_ribbon and target_width >= 350 and target_width > target_height:
         return _build_wide_three_column_candidate(
             source,
             target_canvas,
@@ -1387,16 +1387,17 @@ def _build_compact_grid_candidate(
             work_diagnostics,
         )
 
-    padding_x = max(2, target_width // 50)
-    padding_y = max(2, target_height // 80)
-    gap = max(2, min(target_width, target_height) // 90)
-    inner_width = target_width - 2 * padding_x
+    padding_x = min(10, max(6, target_width // 50))
+    padding_right = min(10, max(6, target_width // 30))
+    padding_y = min(10, max(6, target_height // 40))
+    gap = max(6, min(target_width, target_height) // 90)
+    inner_width = target_width - padding_x - padding_right
     inner_height = target_height - 2 * padding_y
     if inner_width <= 0 or inner_height <= 0:
         work_diagnostics["status"] = "insufficient_canvas"
         return None
 
-    media_height = min(inner_height // 3, inner_width // 2)
+    media_height = min(inner_height // 4, inner_width // 2)
     if target_height >= 2 * target_width:
         badge_height = max(1, min(inner_height // 24, inner_width // 7))
         group_rows = [
@@ -1411,12 +1412,12 @@ def _build_compact_grid_candidate(
             (
                 badges[:2],
                 2,
-                min(inner_height // 10, inner_width // 5),
+                min(inner_height // 12, inner_width // 5),
             ),
             (
                 [badges[2], cta, ribbon],
                 3,
-                min(inner_height // 8, inner_width // 4),
+                min(inner_height // 10, inner_width // 4),
             ),
         ]
     if media_height < 1 or any(height < 1 for _units, _columns, height in group_rows):
@@ -1481,7 +1482,7 @@ def _build_compact_grid_candidate(
             group_scales.update((index, scale) for index in indices)
         y += height + gap
 
-    weights = (4, 4, 2) if variant == "dominant_copy" else (5, 3, 2)
+    weights = (4, 3, 3) if variant == "dominant_copy" else (5, 3, 3)
     allocations = [text_space * weight // sum(weights) for weight in weights]
     allocations[0] += text_space - sum(allocations)
     for index, height in zip(body_text, allocations):
@@ -1522,11 +1523,18 @@ def _build_compact_grid_candidate(
         fit_element = dict(response_elements[index])
         fit_element["width"] = quantize_to_int(response_elements[index]["width"])
         fit_element["height"] = quantize_to_int(response_elements[index]["height"])
+        source_size = to_fraction(source_elements[index]["font_size"])
+        preferred_size = _preferred_font_size(source_size, scale)
+        role = model.assignments[index].role
+        if role is RoleKind.HEADLINE:
+            preferred_size = min(
+                int(source_size), max(preferred_size, 11)
+            )
+        elif role is RoleKind.SUPPORTING_TEXT:
+            preferred_size = min(int(source_size), max(preferred_size, 8))
         selected_size = _largest_fitting_font_size(
             fit_element,
-            _preferred_font_size(
-                to_fraction(source_elements[index]["font_size"]), scale
-            ),
+            preferred_size,
             font_manager,
             target_canvas,
         )

@@ -111,46 +111,134 @@ def _role_weight(role: RoleKind | None) -> Fraction:
     }.get(role, Fraction(1))
 
 
+def _text_fills(element: Mapping[str, Any]) -> tuple[tuple[int, int, int, float], ...]:
+    """Return only base and run colors that actually style text code points."""
+
+    try:
+        from renderer.converter.colorutil import parse_rgba
+        from renderer.converter.convert import _style_maps
+    except ModuleNotFoundError:
+        from chameleon.renderer.converter.colorutil import parse_rgba
+        from chameleon.renderer.converter.convert import _style_maps
+
+    content = str(element.get("content", ""))
+    colors, _bold_flags, _italic_flags = _style_maps(dict(element), len(content))
+    values = colors or [element.get("color", "rgba(0,0,0,1)")]
+    fills = []
+    seen_values = set()
+    for value in values:
+        if value in seen_values:
+            continue
+        seen_values.add(value)
+        red, green, blue, alpha = parse_rgba(value)
+        fill = (red, green, blue, max(0.0, min(1.0, alpha)))
+        if fill not in fills:
+            fills.append(fill)
+    return tuple(fills)
+
+
+def _relative_luminance(rgb: tuple[int, int, int]) -> float:
+    def linear(channel: int) -> float:
+        value = channel / 255
+        return value / 12.92 if value <= 0.04045 else ((value + 0.055) / 1.055) ** 2.4
+
+    red, green, blue = (linear(channel) for channel in rgb)
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+
+
 def _contrast_score(
     rendered_png: bytes | None,
     response_elements: Sequence[Mapping[str, Any]],
     text_indices: Sequence[int],
     canvas: Mapping[str, Any],
 ) -> int:
-    """Return a deterministic pixel-variation proxy for text contrast.
+    """Score WCAG contrast against a bounded sample of each local rendered box.
 
-    The renderer has already enforced actual glyph bounds.  This deliberately
-    modest proxy uses the luminance range in each rendered text box, so it
-    cannot admit or rescue a hard-invalid candidate and remains useful when a
-    foreground is rendered over an image rather than a flat color.
+    At most 25 evenly spaced pixels per text box are inspected. Pixels close
+    to an effective (base or style-run) fill after alpha compositing are
+    treated as ink and excluded, which also removes most anti-aliased edges.
+    Each fill is compared with the median sampled local background contrast.
+    The fixed-point mapping is ``clamp((ratio - 1) / 20, 0, 1) * 1000``,
+    truncated toward zero; a 1:1 ratio maps to 0 and 21:1 or greater to 1000.
+    Style-run colors are ranking inputs only; source and response styles remain
+    immutable and are never rewritten here.
     """
 
-    if rendered_png is None or not text_indices:
-        return 500 if text_indices else SCORE_SCALE
+    if not text_indices:
+        return SCORE_SCALE
+    if rendered_png is None:
+        return 500
     try:
         from io import BytesIO
         from PIL import Image
 
-        with Image.open(BytesIO(rendered_png)) as image:
-            image.load()
-            image = image.convert("L")
-            image_width, image_height = image.size
-            target_width = max(1, int(canvas["width"]))
-            target_height = max(1, int(canvas["height"]))
-            scores: list[int] = []
-            for index in text_indices:
-                element = response_elements[index]
-                left = max(0, min(image_width, int(to_fraction(element["x"]) * image_width / target_width)))
-                top = max(0, min(image_height, int(to_fraction(element["y"]) * image_height / target_height)))
-                right = max(left + 1, min(image_width, int((to_fraction(element["x"]) + to_fraction(element["width"])) * image_width / target_width)))
-                bottom = max(top + 1, min(image_height, int((to_fraction(element["y"]) + to_fraction(element["height"])) * image_height / target_height)))
-                low, high = image.crop((left, top, right, bottom)).getextrema()
-                spread = Fraction(high - low)
-                scores.append(_clamp(spread / 128 * SCORE_SCALE))
-            return int(sum(scores) / len(scores)) if scores else 500
+        with Image.open(BytesIO(rendered_png)) as decoded:
+            image = decoded.convert("RGBA")
+        image_width, image_height = image.size
+        target_width = max(1, int(canvas["width"]))
+        target_height = max(1, int(canvas["height"]))
+        scores: list[int] = []
+        for index in text_indices:
+            element = response_elements[index]
+            left = max(0, min(image_width, int(to_fraction(element["x"]) * image_width / target_width)))
+            top = max(0, min(image_height, int(to_fraction(element["y"]) * image_height / target_height)))
+            right = max(left + 1, min(image_width, int((to_fraction(element["x"]) + to_fraction(element["width"])) * image_width / target_width)))
+            bottom = max(top + 1, min(image_height, int((to_fraction(element["y"]) + to_fraction(element["height"])) * image_height / target_height)))
+            width, height = right - left, bottom - top
+            points = {
+                (left + min(width - 1, ((2 * column + 1) * width) // 10),
+                 top + min(height - 1, ((2 * row + 1) * height) // 10))
+                for row in range(5)
+                for column in range(5)
+            }
+            pixels = [image.getpixel(point)[:3] for point in sorted(points)]
+            fill_scores: list[int] = []
+            fills = _text_fills(element)
+            for red, green, blue, alpha in fills:
+                local_scores: list[int] = []
+                for background in pixels:
+                    # Exclude ink matching any effective fill, not just the
+                    # fill being scored; style-run glyphs are ink too.
+                    if any(
+                        max(
+                            abs(
+                                background[channel]
+                                - int(
+                                    round(
+                                        ink[channel]
+                                        * ink_alpha
+                                        + background[channel] * (1 - ink_alpha)
+                                    )
+                                )
+                            )
+                            for channel in range(3)
+                        )
+                        <= 20
+                        for ink_red, ink_green, ink_blue, ink_alpha in fills
+                        for ink in ((ink_red, ink_green, ink_blue),)
+                    ):
+                        continue
+                    foreground = tuple(
+                        int(round(channel * alpha + background[i] * (1 - alpha)))
+                        for i, channel in enumerate((red, green, blue))
+                    )
+                    background_luminance = _relative_luminance(background)
+                    foreground_luminance = _relative_luminance(foreground)
+                    lighter = max(background_luminance, foreground_luminance)
+                    darker = min(background_luminance, foreground_luminance)
+                    ratio = (lighter + 0.05) / (darker + 0.05)
+                    local_scores.append(max(0, min(SCORE_SCALE, int((ratio - 1) * SCORE_SCALE / 20))))
+                if local_scores:
+                    local_scores.sort()
+                    fill_scores.append(local_scores[len(local_scores) // 2])
+                else:
+                    # No measurable contrast anywhere is itself a zero score;
+                    # never omit this fill when another style color scores well.
+                    fill_scores.append(0)
+            scores.append(min(fill_scores) if fill_scores else 0)
+        return int(sum(scores) / len(scores)) if scores else 500
     except (OSError, ValueError, TypeError, ZeroDivisionError) as error:
         raise RuntimeError("rendered candidate PNG could not be decoded") from error
-
 
 def _readability_score(
     source_elements: Sequence[Mapping[str, Any]],

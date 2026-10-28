@@ -1,7 +1,8 @@
 """Unicode-safe text measurement and deterministic greedy wrapping."""
 
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Sequence, Set, Tuple
+from functools import lru_cache
+from typing import Callable, FrozenSet, List, Optional, Sequence, Set, Tuple
 
 import skia  # type: ignore
 
@@ -67,6 +68,19 @@ def _collapse_crlf(text: str) -> tuple[str, List[int]]:
 
 
 
+@lru_cache(maxsize=512)
+def _cached_char_widths(
+    ttf_bytes: bytes, size: int, text: str
+) -> Tuple[float, ...]:
+    typeface = skia.Typeface.MakeFromData(ttf_bytes)
+    font = skia.Font(typeface, size)
+    glyphs = font.textToGlyphs(text)
+    widths = list(font.getWidths(glyphs))
+    if len(widths) < len(text):
+        widths.extend([0.0] * (len(text) - len(widths)))
+    return tuple(widths[: len(text)])
+
+
 def char_widths(
     font_manager: FontManager, family: str, weight: str, style: str, size: float, text: str
 ) -> List[float]:
@@ -74,13 +88,7 @@ def char_widths(
     if not text:
         return []
     ttf_bytes = lookup_exact_font(font_manager, family, weight, style)
-    typeface = skia.Typeface.MakeFromData(ttf_bytes)
-    font = skia.Font(typeface, int(size))
-    glyphs = font.textToGlyphs(text)
-    widths = list(font.getWidths(glyphs))
-    if len(widths) < len(text):
-        widths.extend([0.0] * (len(text) - len(widths)))
-    return widths[: len(text)]
+    return list(_cached_char_widths(ttf_bytes, int(size), text))
 
 
 def _grapheme_break_property(char: str) -> str:
@@ -428,6 +436,13 @@ def _break_boundaries(text: str, clusters: Sequence[_Cluster]) -> Set[int]:
     return boundaries
 
 
+@lru_cache(maxsize=128)
+def _line_break_data(text: str) -> Tuple[Tuple[_Cluster, ...], FrozenSet[int]]:
+    """Reuse content-only Unicode segmentation across width and font probes."""
+    clusters = tuple(_grapheme_clusters(text))
+    return clusters, frozenset(_break_boundaries(text, clusters))
+
+
 def _default_measure(
     widths: Sequence[float], text: str, start: int, end: int, letter_spacing: float
 ) -> float:
@@ -563,8 +578,7 @@ def wrap_text_with_line_map(
             widths, text, start, end, letter_spacing
         )
 
-    clusters = _grapheme_clusters(text)
-    boundaries = _break_boundaries(text, clusters)
+    clusters, boundaries = _line_break_data(text)
     chars = list(text)
     line_indices = [0] * len(text)
     current_line = 0
