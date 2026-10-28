@@ -8,7 +8,7 @@ PYTHON := $(VENV_DIR)/bin/python
 PIP := $(VENV_DIR)/bin/pip
 PYTHON_BOOTSTRAP ?= python3.11
 
-.PHONY: help setup verify verify-fonts install-hooks preflight test run agent-check inspect synthetic prepare-dependencies docker-build docker-test clean
+.PHONY: help setup verify verify-fonts install-hooks preflight test run agent-check inspect synthetic prepare-dependencies docker-build docker-test docker-synthetic clean
 
 help:
 	@echo "Project Chameleon Developer & Agent Commands:"
@@ -25,6 +25,7 @@ help:
 	@echo "  make docker-build - Build the official linux/amd64 Docker image"
 	@echo "  make prepare-dependencies - Prepare the verified linux/amd64 Docker wheelhouse"
 	@echo "  make docker-test  - Run the Docker container offline with --network none"
+	@echo "  make docker-synthetic - Build and run all 18 synthetic cases offline; preserve artifacts under /tmp"
 	@echo "  make clean        - Remove generated outputs, caches, and temporary files"
 
 setup:
@@ -93,6 +94,9 @@ docker-test:
 		-v "$(ROOT_DIR)/chameleon/output:/app/output" \
 		chameleon-stage1
 	@echo "Docker test completed."
+
+docker-synthetic: docker-build
+	@$(PYTHON) scripts/run_synthetic_docker.py
 
 clean:
 	@rm -rf chameleon/.wheelhouse chameleon/.wheelhouse.tmp-*

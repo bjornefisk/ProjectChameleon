@@ -205,7 +205,13 @@ def _singleton_dimensions(
         scale *= art_scale
         desired_width = max(Fraction(1), source_width * scale)
         desired_height = max(Fraction(1), source_height * scale)
-        return _image_dimensions(element, desired_width, desired_height)
+        image_dimensions = _image_dimensions(element, desired_width, desired_height)
+        if image_dimensions is not None:
+            return image_dimensions
+        ratio = reduced_ratio(element["width"], element["height"])
+        if ratio is not None and ratio[0] <= target_width and ratio[1] <= target_height:
+            return Fraction(ratio[0]), Fraction(ratio[1])
+        return None
     if element["type"] == "text":
         if text_dimensions is not None:
             return (
@@ -1666,7 +1672,7 @@ def _build_extreme_candidate(
         if wide_ribbon is not None:
             return wide_ribbon
 
-    if variant == "dominant_copy" and axis == "horizontal":
+    if axis == "horizontal" and variant == "dominant_copy":
         copy_band_work: dict[str, Any] = {}
         compact = _build_copy_band_candidate(
             source,
@@ -1900,6 +1906,24 @@ def _build_extreme_candidate(
                         raise
                     continue
                 return result
+
+    if axis == "horizontal" and target_width >= 4 * target_height:
+        copy_band_work: dict[str, Any] = {}
+        compact = _build_copy_band_candidate(
+            source,
+            target_canvas,
+            model,
+            source_elements,
+            units,
+            font_manager,
+            fonts_dir,
+            copy_band_work,
+        )
+        if work_diagnostics is not None:
+            work_diagnostics["dominant_copy_layout"] = copy_band_work
+        if compact is not None:
+            return compact
+
 
     compact_work: dict[str, Any] = {}
     compact = _build_compact_grid_candidate(

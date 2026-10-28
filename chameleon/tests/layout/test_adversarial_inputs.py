@@ -39,12 +39,42 @@ ROOT = PROJECT_ROOT / "chameleon"
 ASSETS = ROOT / "brand_kit" / "assets"
 FONTS = ROOT / "brand_kit" / "fonts"
 LEVEL3_INPUT = ROOT / "input" / "chameleon_sample_level3_advanced.json"
+LEVEL1_INPUT = ROOT / "input" / "chameleon_sample_level1_warmup.json"
+EXTREME_TARGETS = (
+    {"width": 320, "height": 50},
+    {"width": 120, "height": 700},
+    {"width": 3840, "height": 2160},
+    {"width": 100, "height": 100},
+)
 
 
 class AdversarialInputTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.font_manager = load_brand_font_manager(str(FONTS))
+
+    def test_extreme_targets_are_deterministic_and_hard_valid(self):
+        task = json.loads(LEVEL1_INPUT.read_text(encoding="utf-8"), parse_float=Decimal)
+        source = task["source"]
+        original_source = copy.deepcopy(source)
+
+        for target in EXTREME_TARGETS:
+            with self.subTest(target=target):
+                first = resize(source, target)
+                second = resize(source, target)
+
+                validate_response(source, target, first, fonts_dir=FONTS)
+                validate_response(source, target, second, fonts_dir=FONTS)
+                self.assertEqual(first, second)
+                self.assertEqual(first["canvas"], target)
+                self.assertEqual(source, original_source)
+
+                source_ids = [element["id"] for element in source["elements"]]
+                self.assertEqual(
+                    [element["id"] for element in first["elements"]], source_ids
+                )
+
+
 
     def test_arbitrary_element_and_group_ids_preserve_roles_and_resize(self):
         task = json.loads(LEVEL3_INPUT.read_text(encoding="utf-8"), parse_float=Decimal)
