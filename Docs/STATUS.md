@@ -212,6 +212,16 @@ Local rendered-output review: the 300×250 and 160×600 outputs retain all sourc
 
 This is local synthetic evidence only. Native-amd64 parity, organizer-held-out scoring, official success scoring, and release qualification remain unverified.
 
+### L3 970×250 wide-billboard follow-up
+
+The existing `horizontal_ribbon` source-proportional attempt now tries a three-column, source-role layout for the short-landscape dense banner profile: art on the left, renderer-fitted copy in the middle, and rigid badges/CTA on the right. It does not add a topology, variant, macro-candidate, case-ID rule, or contract change. If the profile cannot satisfy the renderer and hard validator, the existing bounded path continues.
+
+On the L3 wide-billboard synthetic case, foreground-AABB-envelope utilization changed from 58.4% to 66.4%; top/bottom/left/right margins changed from 0/84/0/117 px to 36.89/38/25/25 px. Headline/subhead/CTA sizes changed from 9/8/10 px to 15/9/10 px. Minimum independent-unit gutter changed from 0 to 8.89 px; minimum badge gutter changed from 1 to 9 px. `inspect_layout.py` reports no collision or off-canvas warnings for this case. The missing holiday-watermark asset remains referenced and visibly renders its expected placeholder.
+
+An isolated real-runner batch published all 18 synthetic cases as `SUCCESS`; all 18 serialized responses passed `validate_response()` with source ID/order preserved. `inspect_layout.py` inspected all 18 output pairs. Its existing Level 2 `deco_circle_1` bleed/overlap diagnostics remain warning-only; they are separate from the strict hard-validator results.
+
+**Follow-up verification:** the workspace `.venv` `make test` attempt failed three renderer/engine provenance assertions because the installed renderer's `direct_url.json` had no wheel hash. `make setup VENV_DIR=/tmp/chameleon-hotspot-locked-venv-20261027 PYTHON_BOOTSTRAP=python3.11` created a fresh locked environment; `make test VENV_DIR=/tmp/chameleon-hotspot-locked-venv-20261027` passed 344 tests (289 engine, 48 review, 3 runtime, 1 dependency-preparation, and 3 font-provenance). `make verify` passed.
+
 ## Issue #16 F-01..F-09 disposition matrix
 
 This matrix is an audit index, not a new contract or qualification claim. `PROJECT_CONTRACT.md` and Accepted ADRs remain authoritative. Local evidence does not establish organizer-controlled qualification.

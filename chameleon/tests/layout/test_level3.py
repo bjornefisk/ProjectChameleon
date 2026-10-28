@@ -23,6 +23,7 @@ try:
     from engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
     from engine.geometry.bounds import positive_aabb_intersection, rotated_aabb
     from engine.geometry.ratios import preserves_source_ratio
+    from engine.layout.roles import infer_roles
     from engine.layout.horizontal_ribbon import (
         _MAX_GROUP_SCALE_REFINEMENT_STEPS,
         _group_scale_for_text,
@@ -37,6 +38,7 @@ except ModuleNotFoundError:
     from chameleon.engine.errors import InfeasibleLayoutError, InfeasibleReasonCode
     from chameleon.engine.geometry.bounds import positive_aabb_intersection, rotated_aabb
     from chameleon.engine.geometry.ratios import preserves_source_ratio
+    from chameleon.engine.layout.roles import infer_roles
     from chameleon.engine.layout.horizontal_ribbon import (
         _MAX_GROUP_SCALE_REFINEMENT_STEPS,
         _group_scale_for_text,
@@ -48,6 +50,9 @@ except ModuleNotFoundError:
 ROOT = PROJECT_ROOT / "chameleon"
 FIXTURE = ROOT / "input" / "chameleon_sample_level3_advanced.json"
 ASSETS = ROOT / "brand_kit" / "assets"
+WIDE_BILLBOARD_FIXTURE = (
+    ROOT / "input_synthetic" / "chameleon_sample_level3_advanced_wide_billboard.json"
+)
 
 
 class Level3IntegrationTests(unittest.TestCase):
@@ -346,6 +351,95 @@ class Level3IntegrationTests(unittest.TestCase):
                 self.assertFalse(
                     positive_aabb_intersection(response_aabbs[left], response_aabbs[right])
                 )
+
+    def test_wide_billboard_uses_balanced_three_column_ribbon(self):
+        task = json.loads(
+            WIDE_BILLBOARD_FIXTURE.read_text(encoding="utf-8"),
+            parse_float=Decimal,
+        )
+        source = task["source"]
+        target = task["target_canvas"]
+        response = resize(source, target)
+        validate_response(source, target, response)
+        self.assertEqual(
+            [element["id"] for element in response["elements"]],
+            [element["id"] for element in source["elements"]],
+        )
+
+        model = infer_roles(source)
+        elements = response["elements"]
+        foreground = [
+            element
+            for index, element in enumerate(elements)
+            if index != model.background_index
+        ]
+        boxes = [rotated_aabb(element) for element in foreground]
+        left = min(box[0] for box in boxes)
+        top = min(box[1] for box in boxes)
+        right = max(box[2] for box in boxes)
+        bottom = max(box[3] for box in boxes)
+        left_margin = left
+        top_margin = top
+        right_margin = target["width"] - right
+        bottom_margin = target["height"] - bottom
+        self.assertGreaterEqual(top_margin, 35)
+        self.assertLessEqual(top_margin, 50)
+        self.assertGreaterEqual(bottom_margin, 35)
+        self.assertLessEqual(bottom_margin, 50)
+        self.assertGreaterEqual(left_margin, 20)
+        self.assertGreaterEqual(right_margin, 20)
+        self.assertLessEqual(abs(left_margin - right_margin), 8)
+
+        unit_boxes = {}
+        for index, element in enumerate(elements):
+            if index == model.background_index:
+                continue
+            group_id = element.get("group_id")
+            key = ("group", group_id) if group_id is not None else ("element", index)
+            box = rotated_aabb(element)
+            previous = unit_boxes.get(key)
+            if previous is None:
+                unit_boxes[key] = box
+            else:
+                unit_boxes[key] = (
+                    min(previous[0], box[0]),
+                    min(previous[1], box[1]),
+                    max(previous[2], box[2]),
+                    max(previous[3], box[3]),
+                )
+
+        def gap_squared(first, second):
+            gap_x = max(Fraction(0), first[0] - second[2], second[0] - first[2])
+            gap_y = max(Fraction(0), first[1] - second[3], second[1] - first[3])
+            return gap_x**2 + gap_y**2
+
+        boxes_by_unit = list(unit_boxes.values())
+        unit_gaps = [
+            gap_squared(boxes_by_unit[left_index], boxes_by_unit[right_index])
+            for left_index in range(len(boxes_by_unit))
+            for right_index in range(left_index + 1, len(boxes_by_unit))
+        ]
+        self.assertGreaterEqual(min(unit_gaps), Fraction(64))
+        badge_boxes = [unit_boxes[("group", f"badge{index}")] for index in range(1, 4)]
+        badge_gaps = [
+            gap_squared(badge_boxes[left_index], badge_boxes[right_index])
+            for left_index in range(len(badge_boxes))
+            for right_index in range(left_index + 1, len(badge_boxes))
+        ]
+        self.assertGreaterEqual(min(badge_gaps), Fraction(36))
+
+        text = {
+            element["id"]: element
+            for element in elements
+            if element["type"] == "text"
+        }
+        self.assertGreaterEqual(text["headline"]["font_size"], 13)
+        self.assertGreater(text["headline"]["font_size"], text["cta_label"]["font_size"])
+        self.assertGreaterEqual(text["subhead"]["font_size"], 8)
+        self.assertLessEqual(text["subhead"]["font_size"], 9)
+        self.assertGreaterEqual(text["cta_label"]["font_size"], 9)
+        self.assertLessEqual(text["cta_label"]["font_size"], 11)
+
 
     def test_repeated_render_hash_is_deterministic(self):
         source, target = self._horizontal_fixture()
