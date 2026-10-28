@@ -6,6 +6,94 @@
 **Decision status:** The merged implementation preserves bounded four-topology search, at most twelve source-derived candidates, renderer-gated hard validation, fixed-point ranking, deterministic output, and typed fail-closed behavior. Accepted ADR-010 through ADR-012 reconcile only quantized common group transforms, the absence of a numeric readability floor, and the renderer-measured transient glyph inset against the source challenge PDF. Accepted ADR-013 records the reproducible package-lock strategy. Local success and native CI do not establish organizer qualification; cross-platform parity and organizer-held-out scoring remain unverified.
 **Ticket 06 authority:** User-requested GitHub issue #13; owner @bjornefisk; partner reviewer @gabegaines24. Implementation branch `feat/ticket-06-column-pivot-level2` merged as PR #14. The Issue #61 branch was based on main commit `c5b1159` before PR #65 merged the fix into main.
 
+
+## Skyscraper, extreme-aspect, and offline-Docker integration
+
+**Branch:** `feature/skyscraper-fuzz-docker`, created from clean `main` at
+`d3dff4d`. Changes preserve the fixed topology/variant bounds, source records,
+exact foreground-image ratios, quantized group transforms, renderer-measured
+glyph containment, and fail-closed typed statuses. No schema, dependency, or
+public API changed.
+
+**160×600 optical spacing:** for narrow vertical targets (aspect ratio ≤0.35),
+the vertical-restack candidate distributes available whitespace between outer
+margins and inter-unit gutters, targeting at least 6px between source-separated
+units. The serialized result is revalidated; failed optional redistribution
+keeps the original hard-valid candidate. Margins below exclude the background
+and the source-bleed `deco_circle_1`; gutter measurements exclude source-overlap
+relationships.
+
+| Level | Top/bottom margins before | Top/bottom margins after | Minimum unit gutter before | Minimum unit gutter after |
+| --- | ---: | ---: | ---: | ---: |
+| L1 | 0px / 190px | 45px / 43px | 0px | 51px |
+| L2 | 0px / 234px | 15px / 15px | 0px | 21px |
+| L3 | 34px / 0px | 10px / 0px | 16px | 16px |
+
+The table records the local Darwin arm64 selected output. The production
+`linux/amd64` image probe selected a different hard-valid near-isomorphic L1
+candidate with top/bottom margins of 120/120px and source-separated unit
+gutters of 154/155px. GitHub x86_64 CI also observed 120px bottom slack and
+passed the margin-balance assertion before failing the test-only 100px ceiling.
+The ceiling is now one quarter of the 600px canvas (150px), still below the
+190–234px baseline dead space. Cross-platform candidate/metric parity remains
+unverified.
+
+
+All three isolated runner outputs returned `SUCCESS` and passed
+`validate_response()`. `scripts/inspect_layout.py` exited 0 for all three.
+Its Level 2 report retains the source-bleed warning for `deco_circle_1`
+([-1,-1,73,73]) and reports its source-existing overlaps with `logo` and
+`product`; the authoritative source-aware validator accepts these preserved
+relationships. The missing holiday-badge asset remains a diagnostic
+placeholder.
+
+**Extreme-aspect stress:** the parametrized test uses the public Level 1 source
+at 320×50, 120×700, 3840×2160, and 100×100. It runs each target twice; all
+eight `resize()` calls produced equal responses, passed `validate_response()`,
+preserved the source and element IDs, and returned the requested canvas.
+`horizontal_ribbon` now tries the copy-band layout as a fallback after ordinary
+source-proportional search, preserving existing source-order behavior; tiny
+foreground images use the smallest positive exact-ratio lattice point that
+fits. This evidence covers the tested Level 1 source, not every source/target
+cross-product. No best-effort invalid fallback was added.
+
+**Offline Docker qualification:** `make docker-synthetic` rebuilt the
+production `linux/amd64` image and ran both engine and serialized-response
+audit containers with `--network none`.
+
+| Result | Evidence |
+| --- | --- |
+| Synthetic cases | 18/18 `SUCCESS` |
+| Committed artifacts | 18 JSON + 18 PNG + 18 commit markers |
+| In-image hard validation | 18/18 responses |
+| Engine / audit / total wall time | 492.374s / 5.544s / 497.918s |
+
+Docker Desktop's daemon reported `aarch64`; the image was `linux/amd64` under
+emulation. This is not native-amd64 qualification. Warnings: existing Docker
+`FromPlatformFlagConstDisallowed`, Fontconfig `unknown element "reset-dirs"`,
+Level 2 source-decoration off-canvas self-checks, and missing holiday-badge
+placeholder diagnostics.
+
+**Verification:** `make test VENV_DIR=/tmp/chameleon-hotspot-locked-venv-20261027`
+passed (304 engine, 48 review, 3 runtime, 1 dependency-preparation, and 3
+font-provenance tests; 359 total) on initial feature commit `2b60633`. The
+follow-up changed only the new test ceiling from 100px to 150px; its focused
+skyscraper test passed 1/1 and `make verify` passed. A full local rerun after
+that test-only change timed out at the shell backend's 1800s limit while
+`test_extreme_targets_are_deterministic_and_hard_valid` was running; it
+produced no suite result.
+
+PR #93 run `40743322330` failed only the L1 test-only 100px bottom-margin cap:
+x86_64 reported 120px after hard validation and the margin-balance assertion
+had passed. Follow-up commit `b6f1b62` raised the ceiling to 150px, still below
+the measured 190–234px baseline. Required GitHub Actions `Verify and test` run
+`40745392670` passed on head
+`b6f1b6255550291f80f8b9e46de61d86ed256c44`; all steps passed, including
+`Verify repository`, `Run tests`, `Build linux/amd64 Docker image`, and
+`Run native amd64 offline smoke`. This does not establish cross-platform
+candidate/metric parity, organizer-held-out scoring, or release qualification.
+`make preflight` was not run.
+
 ## Engine polish trio integration
 
 **Branch:** `feature/engine-polish-trio`, based on clean `main` at `afa9408`.
