@@ -149,20 +149,263 @@ jobs:
             test -f "$path"
           done
           test -z "$(find chameleon/output -maxdepth 1 -type l -print -quit)"
-      - name: Run native amd64 offline synthetic qualification
+      - name: Run repeated native amd64 offline synthetic qualification
         shell: bash
+        env:
+          NATIVE_AUDIT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          NATIVE_AUDIT_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PYTHONHASHSEED: "0"
+          TZ: UTC
+          LC_ALL: C.UTF-8
         run: |
-          set -o pipefail
+          set -euo pipefail
           test "$(uname -m)" = "x86_64"
-          set +e
-          make docker-synthetic 2>&1 | tee "$RUNNER_TEMP/docker-synthetic.log"
-          status=${PIPESTATUS[0]}
-          set -e
-          test "$status" -eq 0
-          grep -F "Image architecture: linux/amd64" "$RUNNER_TEMP/docker-synthetic.log"
-          grep -F "Task statuses: 18/18 SUCCESS" "$RUNNER_TEMP/docker-synthetic.log"
-          grep -F "Committed JSON/PNG pairs: 18/18" "$RUNNER_TEMP/docker-synthetic.log"
-          grep -F "In-image serialized responses hard-validated: 18/18" "$RUNNER_TEMP/docker-synthetic.log"
+          audit_root="$RUNNER_TEMP/native-synthetic-audit"
+          mkdir -p "$audit_root"
+          git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main
+          git fetch --no-tags origin "$NATIVE_AUDIT_BASE_SHA"
+          origin_main="$(git rev-parse origin/main)"
+          {
+            printf 'origin_main_commit=%s\n' "$origin_main"
+            printf 'base_commit=%s\n' "$NATIVE_AUDIT_BASE_SHA"
+            printf 'audit_head_commit=%s\n' "$NATIVE_AUDIT_HEAD_SHA"
+            printf 'checkout_commit=%s\n' "$(git rev-parse HEAD)"
+            printf 'checkout_tree_sha=%s\n' "$(git rev-parse HEAD^{tree})"
+            printf 'origin_main_tree_sha=%s\n' "$(git rev-parse origin/main^{tree})"
+            printf 'origin_main_chameleon_tree_sha=%s\n' "$(git rev-parse origin/main:chameleon)"
+            printf 'audited_chameleon_tree_sha=%s\n' "$(git rev-parse HEAD:chameleon)"
+            printf 'base_chameleon_tree_sha=%s\n' "$(git rev-parse "$NATIVE_AUDIT_BASE_SHA:chameleon")"
+          } > "$audit_root/source-tree.txt"
+          git diff --name-status origin/main HEAD > "$audit_root/source-tree-diff.txt"
+          run_audit() {
+            local run_number="$1"
+            local log="$audit_root/run-$run_number.log"
+            local workspace started_at finished_at started_ns finished_ns status
+            started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            started_ns="$(date +%s%N)"
+            set +e
+            .venv/bin/python scripts/run_synthetic_docker.py 2>&1 | tee "$log"
+            status=${PIPESTATUS[0]}
+            set -e
+            finished_ns="$(date +%s%N)"
+            finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            printf 'started_at_utc=%s\nfinished_at_utc=%s\nelapsed_ns=%s\nexit_code=%s\n' \
+              "$started_at" "$finished_at" "$((finished_ns - started_ns))" "$status" \
+              > "$audit_root/run-$run_number.timing"
+            workspace="$(awk -F': ' '$1 == "Preserved artifacts" { path=$2 } END { print path }' "$log")"
+            if [ -n "$workspace" ]; then
+              mkdir -p "$audit_root/run-$run_number"
+              cp -a "$workspace/input" "$audit_root/run-$run_number/"
+              cp -a "$workspace/output" "$audit_root/run-$run_number/"
+              cp "$log" "$audit_root/run-$run_number/runner.log"
+            fi
+            test "$status" -eq 0
+            grep -F "Image architecture: linux/amd64" "$log"
+            grep -F "Task statuses: 18/18 SUCCESS" "$log"
+            grep -F "Committed JSON/PNG pairs: 18/18" "$log"
+            grep -F "In-image serialized responses hard-validated: 18/18" "$log"
+          }
+          image_before="$(docker image inspect --format '{{.Id}}' chameleon-stage1)"
+          run_audit 1
+          image_after_run_1="$(docker image inspect --format '{{.Id}}' chameleon-stage1)"
+          run_audit 2
+          image_after_run_2="$(docker image inspect --format '{{.Id}}' chameleon-stage1)"
+          test "$image_before" = "$image_after_run_1"
+          test "$image_before" = "$image_after_run_2"
+          {
+            printf 'before=%s\n' "$image_before"
+            printf 'after_run_1=%s\n' "$image_after_run_1"
+            printf 'after_run_2=%s\n' "$image_after_run_2"
+          } > "$audit_root/image-digests.txt"
+          for run_number in 1 2; do
+            docker run --rm --network none --platform linux/amd64 -i \
+              -v "$audit_root/run-$run_number/input:/audit/input:ro" \
+              -v "$audit_root/run-$run_number/output:/audit/output:ro" \
+              --entrypoint python chameleon-stage1 - "$run_number" \
+              <<'PY' 2>&1 | tee "$audit_root/run-$run_number-independent-validation.log"
+          import hashlib
+          import json
+          import sys
+          from decimal import Decimal
+          from pathlib import Path
+
+          from engine.contract import validate_response
+          from engine.staging import validate_png
+          from renderer.converter.assets import asset_path, missing_asset_warning
+
+          run_number = sys.argv[1]
+          input_dir = Path("/audit/input")
+          output_dir = Path("/audit/output")
+          assets_dir = Path("/app/brand_kit/assets")
+          fonts_dir = Path("/app/brand_kit/fonts")
+          tasks = {path.stem: path for path in input_dir.glob("*.json")}
+          responses = {
+              path.name.removesuffix("_output.json"): path
+              for path in output_dir.glob("*_output.json")
+          }
+          pngs = {
+              path.name.removesuffix("_output.png"): path
+              for path in output_dir.glob("*_output.png")
+          }
+          markers = {
+              path.name.removeprefix(".").removesuffix("_output.commit"): path
+              for path in output_dir.glob(".*_output.commit")
+          }
+          expected = set(tasks)
+          if len(expected) != 18 or set(responses) != expected or set(pngs) != expected or set(markers) != expected:
+              raise SystemExit(
+                  f"run {run_number}: expected 18 complete triples; "
+                  f"got inputs={len(tasks)} JSON={len(responses)} PNG={len(pngs)} markers={len(markers)}"
+              )
+          for stem in sorted(expected):
+              task = json.loads(tasks[stem].read_text(), parse_float=Decimal)
+              response_path = responses[stem]
+              response = json.loads(response_path.read_text(), parse_float=Decimal)
+              validate_response(task["source"], task["target_canvas"], response)
+              png_path = pngs[stem]
+              marker = json.loads(markers[stem].read_text())
+              digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
+              if (
+                  marker.get("committed") is not True
+                  or marker.get("json") != response_path.name
+                  or marker.get("png") != png_path.name
+                  or marker.get("json_sha256") != digest(response_path)
+                  or marker.get("png_sha256") != digest(png_path)
+              ):
+                  raise SystemExit(f"run {run_number}: invalid commit marker for {stem}")
+              warnings = [
+                  missing_asset_warning(element.get("id"), element.get("asset_id"))
+                  for element in response.get("elements", ())
+                  if element.get("type") == "image"
+                  and asset_path(str(assets_dir), element.get("asset_id")) is None
+              ]
+              validate_png(
+                  png_path,
+                  design=response,
+                  assets_dir=assets_dir,
+                  fonts_dir=fonts_dir,
+                  warnings=warnings,
+              )
+          print(
+              f"INDEPENDENT_AUDIT_RUN={run_number} "
+              f"JSON_VALIDATED={len(responses)} PNG_VALIDATED={len(pngs)} "
+              f"MARKERS_VALIDATED={len(markers)}"
+          )
+          PY
+            status=${PIPESTATUS[0]}
+            test "$status" -eq 0
+          done
+      - name: Compare native audit hashes and write manifest
+        if: always()
+        shell: bash
+        env:
+          NATIVE_AUDIT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          NATIVE_AUDIT_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PYTHONHASHSEED: "0"
+          TZ: UTC
+          LC_ALL: C.UTF-8
+        run: |
+          set -euo pipefail
+          audit_root="$RUNNER_TEMP/native-synthetic-audit"
+          mkdir -p "$audit_root"
+          complete=true
+          for run_number in 1 2; do
+            run_root="$audit_root/run-$run_number"
+            mkdir -p "$run_root"
+            for kind in input output; do
+              hash_file="$audit_root/run-$run_number-$kind.sha256"
+              if [ -d "$run_root/$kind" ]; then
+                (cd "$run_root/$kind" && find . -maxdepth 1 -type f -print0 | sort -z | xargs -0 -r sha256sum) > "$hash_file"
+              else
+                : > "$hash_file"
+                complete=false
+              fi
+            done
+            input_count="$(find "$run_root/input" -maxdepth 1 -type f -name '*.json' -print 2>/dev/null | wc -l | tr -d ' ')"
+            json_count="$(find "$run_root/output" -maxdepth 1 -type f -name '*_output.json' -print 2>/dev/null | wc -l | tr -d ' ')"
+            png_count="$(find "$run_root/output" -maxdepth 1 -type f -name '*_output.png' -print 2>/dev/null | wc -l | tr -d ' ')"
+            marker_count="$(find "$run_root/output" -maxdepth 1 -type f -name '.*_output.commit' -print 2>/dev/null | wc -l | tr -d ' ')"
+            if [ "$input_count" != 18 ] || [ "$json_count" != 18 ] || [ "$png_count" != 18 ] || [ "$marker_count" != 18 ]; then
+              complete=false
+            fi
+            printf 'run_%s_input_json=%s\nrun_%s_output_json=%s\nrun_%s_output_png=%s\nrun_%s_commit_markers=%s\n' \
+              "$run_number" "$input_count" "$run_number" "$json_count" \
+              "$run_number" "$png_count" "$run_number" "$marker_count" \
+              >> "$audit_root/file-counts.txt"
+          done
+          if diff -u "$audit_root/run-1-input.sha256" "$audit_root/run-2-input.sha256" > "$audit_root/input-hash-diff.txt"; then
+            input_hashes_match=true
+          else
+            input_hashes_match=false
+          fi
+          if diff -u "$audit_root/run-1-output.sha256" "$audit_root/run-2-output.sha256" > "$audit_root/output-hash-diff.txt"; then
+            output_hashes_match=true
+          else
+            output_hashes_match=false
+          fi
+          origin_main="$(git rev-parse origin/main 2>/dev/null || printf 'unavailable')"
+          {
+            printf 'origin_main_commit=%s\n' "$origin_main"
+            printf 'base_commit=%s\n' "$NATIVE_AUDIT_BASE_SHA"
+            printf 'audit_head_commit=%s\n' "$NATIVE_AUDIT_HEAD_SHA"
+            printf 'checkout_commit=%s\n' "$(git rev-parse HEAD 2>/dev/null || printf 'unavailable')"
+            printf 'checkout_tree_sha=%s\n' "$(git rev-parse 'HEAD^{tree}' 2>/dev/null || printf 'unavailable')"
+            printf 'origin_main_tree_sha=%s\n' "$(git rev-parse 'origin/main^{tree}' 2>/dev/null || printf 'unavailable')"
+            printf 'origin_main_chameleon_tree_sha=%s\n' "$(git rev-parse origin/main:chameleon 2>/dev/null || printf 'unavailable')"
+            printf 'audited_chameleon_tree_sha=%s\n' "$(git rev-parse HEAD:chameleon 2>/dev/null || printf 'unavailable')"
+            printf 'base_chameleon_tree_sha=%s\n' "$(git rev-parse "$NATIVE_AUDIT_BASE_SHA:chameleon" 2>/dev/null || printf 'unavailable')"
+            printf '\n[changes from origin/main to audited checkout]\n'
+            cat "$audit_root/source-tree-diff.txt" 2>/dev/null || git diff --name-status origin/main HEAD 2>/dev/null || true
+            printf '\n[run commands]\n'
+            printf 'image_build=make docker-build\n'
+            printf 'audit_command=PYTHONHASHSEED=0 TZ=UTC LC_ALL=C.UTF-8 .venv/bin/python scripts/run_synthetic_docker.py (run twice)\n'
+            printf 'independent_validation=docker run --rm --network none --platform linux/amd64 --entrypoint python chameleon-stage1 - <validator>\n'
+            printf '\n[runner environment]\nPYTHONHASHSEED=%s\nTZ=%s\nLC_ALL=%s\n' \
+              "$PYTHONHASHSEED" "$TZ" "$LC_ALL"
+            printf '\n[architecture]\nhost=%s\ndocker_daemon=%s\nimage=%s\n' \
+              "$(uname -m)" \
+              "$(docker info --format '{{.Architecture}}' 2>/dev/null || printf 'unavailable')" \
+              "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' chameleon-stage1 2>/dev/null || printf 'unavailable')"
+            printf 'container_config_env=%s\nruntime_network=none\nruntime_platform=linux/amd64\n' \
+              "$(docker image inspect --format '{{json .Config.Env}}' chameleon-stage1 2>/dev/null || printf 'unavailable')"
+            printf '\n[image digest]\n'
+            cat "$audit_root/image-digests.txt" 2>/dev/null || printf 'unavailable\n'
+            printf '\n[timings and case validation]\n'
+            for run_number in 1 2; do
+              printf '\nrun_%s_timing:\n' "$run_number"
+              cat "$audit_root/run-$run_number.timing" 2>/dev/null || printf 'unavailable\n'
+              printf 'run_%s_runner_summary:\n' "$run_number"
+              grep -E 'Engine container wall time:|In-image audit wall time:|Total container wall time:|Engine Docker command:|Audit Docker command:|Task statuses:|Committed JSON/PNG pairs:|In-image serialized responses hard-validated:' \
+                "$audit_root/run-$run_number.log" 2>/dev/null || true
+              printf 'run_%s_independent_validation:\n' "$run_number"
+              cat "$audit_root/run-$run_number-independent-validation.log" 2>/dev/null || printf 'unavailable\n'
+            done
+            printf '\n[file counts]\n'
+            cat "$audit_root/file-counts.txt"
+            printf '\n[input and output hashes, relative to each run directory]\n'
+            for run_number in 1 2; do
+              printf '\nrun_%s_inputs_sha256:\n' "$run_number"
+              cat "$audit_root/run-$run_number-input.sha256"
+              printf 'run_%s_outputs_sha256:\n' "$run_number"
+              cat "$audit_root/run-$run_number-output.sha256"
+            done
+            printf '\n[case-by-case comparison]\ninput_hashes_match=%s\noutput_hashes_match=%s\ncomplete_18_case_pairs=%s\n' \
+              "$input_hashes_match" "$output_hashes_match" "$complete"
+          } > "$audit_root/manifest.txt"
+          sha256sum "$audit_root/manifest.txt" > "$audit_root/manifest.sha256"
+          if [ "$input_hashes_match" != true ] || [ "$output_hashes_match" != true ] || [ "$complete" != true ]; then
+            exit 1
+          fi
+      - name: Upload native synthetic audit artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: native-synthetic-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/native-synthetic-audit/
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 0
+          include-hidden-files: true
       - name: Verify failed task publishes no artifact pair
         shell: bash
         run: |
@@ -349,3 +592,115 @@ jobs:
             ldd "$pillow_path"
           ' 2>&1 | tee "$closure_log"
           ! grep -F "not found" "$closure_log"
+      - name: Compare native audit hashes and write manifest
+        if: always()
+        shell: bash
+        env:
+          NATIVE_AUDIT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          NATIVE_AUDIT_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PYTHONHASHSEED: "0"
+          TZ: UTC
+          LC_ALL: C.UTF-8
+        run: |
+          set -euo pipefail
+          audit_root="$RUNNER_TEMP/native-synthetic-audit"
+          mkdir -p "$audit_root"
+          hash_match=true
+          complete=true
+          for run_number in 1 2; do
+            run_root="$audit_root/run-$run_number"
+            mkdir -p "$run_root"
+            for kind in input output; do
+              hash_file="$audit_root/run-$run_number-$kind.sha256"
+              if [ -d "$run_root/$kind" ]; then
+                (cd "$run_root/$kind" && find . -maxdepth 1 -type f -print0 | sort -z | xargs -0 -r sha256sum) > "$hash_file"
+              else
+                : > "$hash_file"
+                complete=false
+              fi
+            done
+            input_count="$(find "$run_root/input" -maxdepth 1 -type f -name '*.json' -print 2>/dev/null | wc -l | tr -d ' ')"
+            json_count="$(find "$run_root/output" -maxdepth 1 -type f -name '*_output.json' -print 2>/dev/null | wc -l | tr -d ' ')"
+            png_count="$(find "$run_root/output" -maxdepth 1 -type f -name '*_output.png' -print 2>/dev/null | wc -l | tr -d ' ')"
+            marker_count="$(find "$run_root/output" -maxdepth 1 -type f -name '.*_output.commit' -print 2>/dev/null | wc -l | tr -d ' ')"
+            if [ "$input_count" != 18 ] || [ "$json_count" != 18 ] || [ "$png_count" != 18 ] || [ "$marker_count" != 18 ]; then
+              complete=false
+            fi
+            printf 'run_%s_input_json=%s\nrun_%s_output_json=%s\nrun_%s_output_png=%s\nrun_%s_commit_markers=%s\n' \
+              "$run_number" "$input_count" "$run_number" "$json_count" \
+              "$run_number" "$png_count" "$run_number" "$marker_count" \
+              >> "$audit_root/file-counts.txt"
+          done
+          if diff -u "$audit_root/run-1-input.sha256" "$audit_root/run-2-input.sha256" > "$audit_root/input-hash-diff.txt"; then
+            input_hashes_match=true
+          else
+            input_hashes_match=false
+            hash_match=false
+          fi
+          if diff -u "$audit_root/run-1-output.sha256" "$audit_root/run-2-output.sha256" > "$audit_root/output-hash-diff.txt"; then
+            output_hashes_match=true
+          else
+            output_hashes_match=false
+            hash_match=false
+          fi
+          origin_main="$(git rev-parse origin/main 2>/dev/null || printf 'unavailable')"
+          {
+            printf 'origin_main_commit=%s\n' "$origin_main"
+            printf 'base_commit=%s\n' "$NATIVE_AUDIT_BASE_SHA"
+            printf 'audit_head_commit=%s\n' "$NATIVE_AUDIT_HEAD_SHA"
+            printf 'checkout_commit=%s\n' "$(git rev-parse HEAD 2>/dev/null || printf 'unavailable')"
+            printf 'checkout_tree_sha=%s\n' "$(git rev-parse 'HEAD^{tree}' 2>/dev/null || printf 'unavailable')"
+            printf 'origin_main_tree_sha=%s\n' "$(git rev-parse 'origin/main^{tree}' 2>/dev/null || printf 'unavailable')"
+            printf 'origin_main_chameleon_tree_sha=%s\n' "$(git rev-parse origin/main:chameleon 2>/dev/null || printf 'unavailable')"
+            printf 'audited_chameleon_tree_sha=%s\n' "$(git rev-parse HEAD:chameleon 2>/dev/null || printf 'unavailable')"
+            printf 'base_chameleon_tree_sha=%s\n' "$(git rev-parse "$NATIVE_AUDIT_BASE_SHA:chameleon" 2>/dev/null || printf 'unavailable')"
+            printf '\n[changes from origin/main to audited checkout]\n'
+            cat "$audit_root/source-tree-diff.txt" 2>/dev/null || git diff --name-status origin/main HEAD 2>/dev/null || true
+            printf '\n[run commands]\n'
+            printf 'image_build=make docker-build\n'
+            printf 'audit_command=PYTHONHASHSEED=0 TZ=UTC LC_ALL=C.UTF-8 .venv/bin/python scripts/run_synthetic_docker.py (run twice)\n'
+            printf 'independent_validation=docker run --rm --network none --platform linux/amd64 --entrypoint python chameleon-stage1 - <validator>\n'
+            printf '\n[runner environment]\nPYTHONHASHSEED=%s\nTZ=%s\nLC_ALL=%s\n' \
+              "$PYTHONHASHSEED" "$TZ" "$LC_ALL"
+            printf '\n[architecture]\nhost=%s\ndocker_daemon=%s\nimage=%s\n' \
+              "$(uname -m)" \
+              "$(docker info --format '{{.Architecture}}' 2>/dev/null || printf 'unavailable')" \
+              "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' chameleon-stage1 2>/dev/null || printf 'unavailable')"
+            printf '\n[image digest]\n'
+            cat "$audit_root/image-digests.txt" 2>/dev/null || printf 'unavailable\n'
+            printf '\n[timings and case validation]\n'
+            for run_number in 1 2; do
+              printf '\nrun_%s_timing:\n' "$run_number"
+              cat "$audit_root/run-$run_number.timing" 2>/dev/null || printf 'unavailable\n'
+              printf 'run_%s_runner_summary:\n' "$run_number"
+              grep -E 'Engine container wall time:|In-image audit wall time:|Total container wall time:|Engine Docker command:|Audit Docker command:|Task statuses:|Committed JSON/PNG pairs:|In-image serialized responses hard-validated:' \
+                "$audit_root/run-$run_number.log" 2>/dev/null || true
+              printf 'run_%s_independent_validation:\n' "$run_number"
+              cat "$audit_root/run-$run_number-independent-validation.log" 2>/dev/null || printf 'unavailable\n'
+            done
+            printf '\n[file counts]\n'
+            cat "$audit_root/file-counts.txt"
+            printf '\n[input and output hashes, relative to each run directory]\n'
+            for run_number in 1 2; do
+              printf '\nrun_%s_inputs_sha256:\n' "$run_number"
+              cat "$audit_root/run-$run_number-input.sha256"
+              printf 'run_%s_outputs_sha256:\n' "$run_number"
+              cat "$audit_root/run-$run_number-output.sha256"
+            done
+            printf '\n[case-by-case comparison]\ninput_hashes_match=%s\noutput_hashes_match=%s\ncomplete_18_case_pairs=%s\n' \
+              "$input_hashes_match" "$output_hashes_match" "$complete"
+          } > "$audit_root/manifest.txt"
+          sha256sum "$audit_root/manifest.txt" > "$audit_root/manifest.sha256"
+          if [ "$input_hashes_match" != true ] || [ "$output_hashes_match" != true ] || [ "$complete" != true ]; then
+            exit 1
+          fi
+      - name: Upload native synthetic audit artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: native-synthetic-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/native-synthetic-audit/
+          if-no-files-found: warn
+          retention-days: 90
+          compression-level: 0
+          include-hidden-files: true
