@@ -491,11 +491,19 @@ available interpreter passed the equivalent command
 The required CI `Verify and test` check remains the authoritative clean-run
 verification for this documentation-only PR.
 
+## Issue #70 production-font release gate
+
+**Current Stage 1 repository submission:** The seven packaged TTFs are Lora 3.008 and Poppins 4.004 stand-ins mapped to the sample's Solstice Serif/Sans faces. They are not final Adobe/Solstice production fonts. The pinned starter-kit source, file hashes, embedded face metadata, checked-sample glyph coverage, and bundled OFL evidence are recorded and rechecked in [`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md) and [`font_provenance_manifest.json`](font_provenance_manifest.json); this evidence applies only to these placeholders.
+
+**Disposition:** Defer production-font integration and authorization until Adobe supplies the exact files and applicable written redistribution terms. Keep Issue #70 open as a production-release gate, not a blocker to this repository-link-only submission. This does not waive `chameleon/brand_kit/README.md`'s separate instruction to replace stand-ins before distributing the starter to students. No contract, ADR, font, or runtime change is made.
+
 ## Issue #69 official scoring evidence
 
-The official evaluator revision, Level 1/2/3 target coverage, rubric, thresholds, hardware/runtime limits, failure semantics, result format, disclosure permission, and official result remain **UNVERIFIED_EXTERNAL_FACT**. The seven-case local evaluator and public fixtures are not organizer-held-out scoring.
+**As of 2026-10-30:** No organizer response or official scoring protocol/result was received. The official evaluator revision, full Level 1/2/3 target coverage, rubric, official score and thresholds, failure/result semantics, disclosure permission, and qualification remain **UNVERIFIED_EXTERNAL_FACT**.
 
-The dated organizer request is [Issue #69 comment 6368953819](https://github.com/bjornefisk/ProjectChameleon/issues/69#issuecomment-6368953819), created 2026-10-23 at 15:52:56Z. The latest blocker record is [comment 6375344513](https://github.com/bjornefisk/ProjectChameleon/issues/69#issuecomment-6375344513), created 2026-10-23 at 21:43:54Z. No authoritative protocol, result, or dated denial is recorded. Keep Issue #69 open; do not claim qualification from local results.
+Local tests, public fixtures, synthetic audits, and CI are internal engineering evidence only. They do not establish organizer scoring, the official rubric or thresholds, or qualification.
+
+The dated organizer request is [Issue #69 comment 6368953819](https://github.com/bjornefisk/ProjectChameleon/issues/69#issuecomment-6368953819), created 2026-10-23 at 15:52:56Z. The latest blocker record is [comment 6375344513](https://github.com/bjornefisk/ProjectChameleon/issues/69#issuecomment-6375344513), created 2026-10-23 at 21:43:54Z. Keep Issue #69 open and blocked for official qualification claims. This blocker is outside the scope of a repository-link-only submission; do not claim official score or qualification from local evidence.
 
 The reproducible request audit is [`.agents/runs/issue-69-official-scoring-request-20261023.md`](../.agents/runs/issue-69-official-scoring-request-20261023.md).
 
