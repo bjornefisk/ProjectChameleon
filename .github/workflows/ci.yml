@@ -219,117 +219,7 @@ jobs:
             printf 'after_run_1=%s\n' "$image_after_run_1"
             printf 'after_run_2=%s\n' "$image_after_run_2"
           } > "$audit_root/image-digests.txt"
-      - name: Compare native audit hashes and write manifest
-        if: always()
-        shell: bash
-        env:
-          NATIVE_AUDIT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-          NATIVE_AUDIT_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          PYTHONHASHSEED: "0"
-          TZ: UTC
-          LC_ALL: C.UTF-8
-        run: |
-          set -euo pipefail
-          audit_root="$RUNNER_TEMP/native-synthetic-audit"
-          mkdir -p "$audit_root"
-          complete=true
-          for run_number in 1 2; do
-            run_root="$audit_root/run-$run_number"
-            mkdir -p "$run_root"
-            for kind in input output; do
-              hash_file="$audit_root/run-$run_number-$kind.sha256"
-              if [ -d "$run_root/$kind" ]; then
-                (cd "$run_root/$kind" && find . -maxdepth 1 -type f -print0 | sort -z | xargs -0 -r sha256sum) > "$hash_file"
-              else
-                : > "$hash_file"
-                complete=false
-              fi
-            done
-            input_count="$(find "$run_root/input" -maxdepth 1 -type f -name '*.json' -print 2>/dev/null | wc -l | tr -d ' ')"
-            json_count="$(find "$run_root/output" -maxdepth 1 -type f -name '*_output.json' -print 2>/dev/null | wc -l | tr -d ' ')"
-            png_count="$(find "$run_root/output" -maxdepth 1 -type f -name '*_output.png' -print 2>/dev/null | wc -l | tr -d ' ')"
-            marker_count="$(find "$run_root/output" -maxdepth 1 -type f -name '.*_output.commit' -print 2>/dev/null | wc -l | tr -d ' ')"
-            if [ "$input_count" != 18 ] || [ "$json_count" != 18 ] || [ "$png_count" != 18 ] || [ "$marker_count" != 18 ]; then
-              complete=false
-            fi
-            printf 'run_%s_input_json=%s\nrun_%s_output_json=%s\nrun_%s_output_png=%s\nrun_%s_commit_markers=%s\n' \
-              "$run_number" "$input_count" "$run_number" "$json_count" \
-              "$run_number" "$png_count" "$run_number" "$marker_count" \
-              >> "$audit_root/file-counts.txt"
-          done
-          if diff -u "$audit_root/run-1-input.sha256" "$audit_root/run-2-input.sha256" > "$audit_root/input-hash-diff.txt"; then
-            input_hashes_match=true
-          else
-            input_hashes_match=false
-          fi
-          if diff -u "$audit_root/run-1-output.sha256" "$audit_root/run-2-output.sha256" > "$audit_root/output-hash-diff.txt"; then
-            output_hashes_match=true
-          else
-            output_hashes_match=false
-          fi
-          origin_main="$(git rev-parse origin/main 2>/dev/null || printf 'unavailable')"
-          {
-            printf 'origin_main_commit=%s\n' "$origin_main"
-            printf 'base_commit=%s\n' "$NATIVE_AUDIT_BASE_SHA"
-            printf 'audit_head_commit=%s\n' "$NATIVE_AUDIT_HEAD_SHA"
-            printf 'checkout_commit=%s\n' "$(git rev-parse HEAD 2>/dev/null || printf 'unavailable')"
-            printf 'checkout_tree_sha=%s\n' "$(git rev-parse 'HEAD^{tree}' 2>/dev/null || printf 'unavailable')"
-            printf 'origin_main_tree_sha=%s\n' "$(git rev-parse 'origin/main^{tree}' 2>/dev/null || printf 'unavailable')"
-            printf 'origin_main_chameleon_tree_sha=%s\n' "$(git rev-parse origin/main:chameleon 2>/dev/null || printf 'unavailable')"
-            printf 'audited_chameleon_tree_sha=%s\n' "$(git rev-parse HEAD:chameleon 2>/dev/null || printf 'unavailable')"
-            printf 'base_chameleon_tree_sha=%s\n' "$(git rev-parse "$NATIVE_AUDIT_BASE_SHA:chameleon" 2>/dev/null || printf 'unavailable')"
-            printf '\n[changes from origin/main to audited checkout]\n'
-            cat "$audit_root/source-tree-diff.txt" 2>/dev/null || git diff --name-status origin/main HEAD 2>/dev/null || true
-            printf '\n[run commands]\n'
-            printf 'image_build=make docker-build\n'
-            printf 'audit_command=PYTHONHASHSEED=0 TZ=UTC LC_ALL=C.UTF-8 .venv/bin/python scripts/run_synthetic_docker.py (run twice)\n'
-            printf 'independent_validation=run_synthetic_docker.py performs a separate offline container audit with validate_response() for all 18 responses per run\n'
-            printf '\n[runner environment]\nPYTHONHASHSEED=%s\nTZ=%s\nLC_ALL=%s\n' \
-              "$PYTHONHASHSEED" "$TZ" "$LC_ALL"
-            printf '\n[architecture]\nhost=%s\ndocker_daemon=%s\nimage=%s\n' \
-              "$(uname -m)" \
-              "$(docker info --format '{{.Architecture}}' 2>/dev/null || printf 'unavailable')" \
-              "$(docker image inspect --format '{{.Os}}/{{.Architecture}}' chameleon-stage1 2>/dev/null || printf 'unavailable')"
-            printf 'container_config_env=%s\nruntime_network=none\nruntime_platform=linux/amd64\n' \
-              "$(docker image inspect --format '{{json .Config.Env}}' chameleon-stage1 2>/dev/null || printf 'unavailable')"
-            printf '\n[image digest]\n'
-            cat "$audit_root/image-digests.txt" 2>/dev/null || printf 'unavailable\n'
-            printf '\n[timings and case validation]\n'
-            for run_number in 1 2; do
-              printf '\nrun_%s_timing:\n' "$run_number"
-              cat "$audit_root/run-$run_number.timing" 2>/dev/null || printf 'unavailable\n'
-              printf 'run_%s_runner_summary:\n' "$run_number"
-              grep -E 'Engine container wall time:|In-image audit wall time:|Total container wall time:|Engine Docker command:|Audit Docker command:|Task statuses:|Committed JSON/PNG pairs:|In-image serialized responses hard-validated:' \
-                "$audit_root/run-$run_number.log" 2>/dev/null || true
-              printf 'run_%s_independent_validation:\n' "$run_number"
-              cat "$audit_root/run-$run_number-independent-validation.log" 2>/dev/null || printf 'unavailable\n'
-            done
-            printf '\n[file counts]\n'
-            cat "$audit_root/file-counts.txt"
-            printf '\n[input and output hashes, relative to each run directory]\n'
-            for run_number in 1 2; do
-              printf '\nrun_%s_inputs_sha256:\n' "$run_number"
-              cat "$audit_root/run-$run_number-input.sha256"
-              printf 'run_%s_outputs_sha256:\n' "$run_number"
-              cat "$audit_root/run-$run_number-output.sha256"
-            done
-            printf '\n[case-by-case comparison]\ninput_hashes_match=%s\noutput_hashes_match=%s\ncomplete_18_case_pairs=%s\n' \
-              "$input_hashes_match" "$output_hashes_match" "$complete"
-          } > "$audit_root/manifest.txt"
-          sha256sum "$audit_root/manifest.txt" > "$audit_root/manifest.sha256"
-          if [ "$input_hashes_match" != true ] || [ "$output_hashes_match" != true ] || [ "$complete" != true ]; then
-            exit 1
-          fi
-      - name: Upload native synthetic audit artifact
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: native-synthetic-audit-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/native-synthetic-audit/
-          if-no-files-found: warn
-          retention-days: 90
-          compression-level: 0
-          include-hidden-files: true
+
       - name: Verify failed task publishes no artifact pair
         shell: bash
         run: |
@@ -529,7 +419,6 @@ jobs:
           set -euo pipefail
           audit_root="$RUNNER_TEMP/native-synthetic-audit"
           mkdir -p "$audit_root"
-          hash_match=true
           complete=true
           for run_number in 1 2; do
             run_root="$audit_root/run-$run_number"
@@ -559,13 +448,11 @@ jobs:
             input_hashes_match=true
           else
             input_hashes_match=false
-            hash_match=false
           fi
           if diff -u "$audit_root/run-1-output.sha256" "$audit_root/run-2-output.sha256" > "$audit_root/output-hash-diff.txt"; then
             output_hashes_match=true
           else
             output_hashes_match=false
-            hash_match=false
           fi
           origin_main="$(git rev-parse origin/main 2>/dev/null || printf 'unavailable')"
           {
@@ -583,7 +470,7 @@ jobs:
             printf '\n[run commands]\n'
             printf 'image_build=make docker-build\n'
             printf 'audit_command=PYTHONHASHSEED=0 TZ=UTC LC_ALL=C.UTF-8 .venv/bin/python scripts/run_synthetic_docker.py (run twice)\n'
-            printf 'independent_validation=docker run --rm --network none --platform linux/amd64 --entrypoint python chameleon-stage1 - <validator>\n'
+            printf 'independent_validation=run_synthetic_docker.py performs a separate offline container audit with validate_response() for all 18 responses per run\n'
             printf '\n[runner environment]\nPYTHONHASHSEED=%s\nTZ=%s\nLC_ALL=%s\n' \
               "$PYTHONHASHSEED" "$TZ" "$LC_ALL"
             printf '\n[architecture]\nhost=%s\ndocker_daemon=%s\nimage=%s\n' \
