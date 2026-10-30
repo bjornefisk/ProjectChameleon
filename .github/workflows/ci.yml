@@ -154,6 +154,7 @@ jobs:
         env:
           NATIVE_AUDIT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           NATIVE_AUDIT_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          NATIVE_AUDIT_GITHUB_TOKEN: ${{ github.token }}
           PYTHONHASHSEED: "0"
           TZ: UTC
           LC_ALL: C.UTF-8
@@ -162,8 +163,9 @@ jobs:
           test "$(uname -m)" = "x86_64"
           audit_root="$RUNNER_TEMP/native-synthetic-audit"
           mkdir -p "$audit_root"
-          git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main
-          git fetch --no-tags origin "$NATIVE_AUDIT_BASE_SHA"
+          git_auth="$(printf 'x-access-token:%s' "$NATIVE_AUDIT_GITHUB_TOKEN" | base64 -w 0)"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $git_auth" fetch --no-tags origin refs/heads/main:refs/remotes/origin/main
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $git_auth" fetch --no-tags origin "$NATIVE_AUDIT_BASE_SHA"
           origin_main="$(git rev-parse origin/main)"
           {
             printf 'origin_main_commit=%s\n' "$origin_main"
