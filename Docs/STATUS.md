@@ -130,6 +130,14 @@ triples. The in-image `validate_response()` audit reported `AUDIT_PAIRS=18` and
 container wall time was 544.672s. The daemon was `aarch64`; the audited image was
 `linux/amd64` under emulation. This is not native-x86_64 evidence.
 
+Required GitHub workflow `Verify and test` run 41098507148 passed on PR head
+`c21527b9e04fadf1e893c6ecb32293e8fb46835c` (merge candidate
+`82cb15f024788bbf8eb929846b49f459166e3660`). The runner reported `x86_64`.
+Native `linux/amd64` offline synthetic qualification passed 18/18 tasks,
+18 JSON/PNG/marker triplets, and in-image hard validation (`AUDIT_PAIRS=18`,
+`AUDIT_VALIDATED=18`). Its clean-cache rerun matched artifact hashes for the
+three committed sample inputs; no 18-case repeat-hash or solver-topology claim.
+
 
 The L2 600×600 serialized output retains `subhead.font_size=13` and its AABB
 [90, 307, 390, 427]. `cta_bg` is [90, 483, 510, 573] and `cta_label` is
