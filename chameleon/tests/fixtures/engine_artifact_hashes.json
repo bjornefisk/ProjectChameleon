@@ -18,20 +18,20 @@
   },
   "platforms": {
     "linux-x86_64": {
-      "observed_on": "GitHub Actions native x86_64 run 39711973748, job 119605163538, on PR #65 head 33f6fd9; Ubuntu 24.04, Python 3.11.17, Pillow 11.1.0, and skia-python 132.0b11. Renderer commit and font-tree SHA-256 are recorded in bound_inputs. This is a native Linux x86_64 artifact reference, not universal PNG parity or organizer qualification.",
+      "observed_on": "Original values from GitHub Actions native x86_64 run 39711973748, job 119605163538, on PR #65 head 33f6fd9; Ubuntu 24.04, Python 3.11.17, Pillow 11.1.0, and skia-python 132.0b11. After the 2026-10-29 foreground-envelope change, the Level 2 sample hashes were refreshed by running the linux/amd64 image on Docker Desktop's aarch64 daemon with PYTHONHASHSEED=0 and 4242; both runs were byte-identical. This is emulated amd64 evidence, not a native x86_64 revalidation or release qualification.",
       "artifacts": {
         "chameleon_sample_level1_warmup": {
           "json_sha256": "7b93fdfd44ad8e669c00aeae3a8e96931f85a761a60e67cc31d2bb02b10853b9",
           "png_sha256": "172d23ca87020478d24568a603ba6f9deaf272629b59d73608789aca9789a85c"
         },
         "chameleon_sample_level2_core": {
-          "json_sha256": "3e26ef9e95df3f9b9f3fc9fa8149382962081531936e5f01480f5161e3b5f8f6",
-          "png_sha256": "bf24e67125529d96b65df1f049d3f4b11cd0fcc9e05a2c7a765a60c3e5952f99"
+          "json_sha256": "b7d06847ed4f295ff111bd942779715709927462ec1e2fa39acd14c9c7ef90f6",
+          "png_sha256": "ab894005b88c44c9aced7c633e8f611a96e4c180c164bc316016c0eccf8ec6f1"
         }
       }
     },
     "linux-aarch64": {
-      "observed_on": "Local native linux/arm64 Docker container built from the pinned Dockerfile with only the platform flag changed; two runs byte-identical. Layout JSON equals linux-x86_64; PNG bytes differ (architecture-dependent raster output).",
+      "observed_on": "Local native linux/arm64 Docker container built from the pinned Dockerfile with only the platform flag changed; two pre-change runs byte-identical. Layout JSON equaled the prior linux-x86_64 reference; PNG bytes differed (architecture-dependent raster output). These pre-refinement values are not refreshed for the 2026-10-29 centering change; post-change linux-aarch64 hashes are unverified.",
       "artifacts": {
         "chameleon_sample_level1_warmup": {
           "json_sha256": "237a8a9eeeeae02ab954bf820fc0294b2501890097c390b3bb6c0c148d2744ba",
@@ -44,15 +44,15 @@
       }
     },
     "darwin-arm64": {
-      "observed_on": "Originally recorded on local macOS arm64 without a complete interpreter/dependency record; revalidated for issue #68 with Python 3.11.14, Pillow 11.1.0, skia-python 132.0b11, renderer a17e1fb9a732959dd6c21ae168d5ee09d74bd64f, and font tree SHA-256 c9b22d1fe1dcccea9035bd23fd5fb0ac3aec1cd3ad1b3b6e68eb06d76e8dc0fa. Repeated runs and hash seeds were byte-identical. Level 2 JSON differs from Linux because Skia glyph advances are fractional on macOS and hinted integers on Linux, affecting the largest fitting text font size.",
+      "observed_on": "Originally recorded on local macOS arm64 without a complete interpreter/dependency record; revalidated for issue #68 with Python 3.11.14, Pillow 11.1.0, skia-python 132.0b11, renderer a17e1fb9a732959dd6c21ae168d5ee09d74bd64f, and font tree SHA-256 c9b22d1fe1dcccea9035bd23fd5fb0ac3aec1cd3ad1b3b6e68eb06d76e8dc0fa. Repeated runs and hash seeds were byte-identical. Level 2 JSON differs from Linux because Skia glyph advances are fractional on macOS and hinted integers on Linux, affecting the largest fitting text font size. The 2026-10-29 foreground-envelope refinement changes the multi-element Level 2 output and refreshes only that task's hashes; Level 1 remains unchanged.",
       "artifacts": {
         "chameleon_sample_level1_warmup": {
           "json_sha256": "7b93fdfd44ad8e669c00aeae3a8e96931f85a761a60e67cc31d2bb02b10853b9",
           "png_sha256": "f8d171f1fc9866acef85f587039c86f372ce0a2d1d48f8bc3dd20fbe98bf8c00"
         },
         "chameleon_sample_level2_core": {
-          "json_sha256": "9618cc72bfde603d505fbfcff646f797b219cb2644484b93d815a8bd1ef8c2e4",
-          "png_sha256": "bc5af21d9c57b5ea508b617028a666aee0e12bb03b8b067d23ae12e7b2f2f449"
+          "json_sha256": "09a9523270f291a2bd71741ca3c138b5b79c6fc3b56c229227831692044210f0",
+          "png_sha256": "61cfd4caad97ffa361d1599b17fac293cc02afc5ee1a0a1c830d0fb1147cc325"
         }
       }
     }

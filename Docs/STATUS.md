@@ -1,10 +1,183 @@
 # Project Chameleon status
 
-**Date:** 2026-10-28
+**Date:** 2026-10-30
 
 **Phase:** Gate 1 is cleared. Tickets 01-08 are implemented within their accepted bounded scopes. Issue #61's PDF-grounded fix produces the public 1080×1350 → 728×90 sample as one hard-valid JSON/PNG pair in repeated local runs. PR #65 merged the fix as `6dbbc0a3eaba3090997ad9731a4026677dc6978c`, and Issue #61 closed automatically. Issue #81's dense Level 3 synthetic targets now produce hard-valid committed pairs in the local 18-case benchmark recorded with PR #84; this is not organizer scoring or release qualification. Required native x86_64 `Verify and test` run 39711973748 passed on PR head `33f6fd9`; the owner waived partner review and no partner approval is recorded. No official organizer score, cross-platform parity, or release qualification is claimed.
 **Decision status:** The merged implementation preserves bounded four-topology search, at most twelve source-derived candidates, renderer-gated hard validation, fixed-point ranking, deterministic output, and typed fail-closed behavior. Accepted ADR-010 through ADR-012 reconcile only quantized common group transforms, the absence of a numeric readability floor, and the renderer-measured transient glyph inset against the source challenge PDF. Accepted ADR-013 records the reproducible package-lock strategy. Local success and native CI do not establish organizer qualification; cross-platform parity and organizer-held-out scoring remain unverified.
 **Ticket 06 authority:** User-requested GitHub issue #13; owner @bjornefisk; partner reviewer @gabegaines24. Implementation branch `feat/ticket-06-column-pivot-level2` merged as PR #14. The Issue #61 branch was based on main commit `c5b1159` before PR #65 merged the fix into main.
+
+## Audit-remediation sprint
+
+**Branch:** `feature/audit-remediation-sprint`, based on clean `main` at
+`2acd6e0`. The fixes preserve the ratified contract and Accepted ADRs; no
+schema, API, dependency, or ADR changes were made. Selected synthetic PNGs and
+serialized responses were inspected after the run.
+
+| Case | Audit finding | After remediation |
+| --- | --- | --- |
+| L3 300×250 | Minimum font 4px; ribbon 4px; CTA 6px | Minimum font 6px; ribbon 8px; CTA 10px |
+| L2 1080×1920 | 460px bottom slack | Non-bleed foreground margins 460px / 460px; skew 0px |
+| L2 970×250 | 6px subhead; 135px vertical skew | 9px subhead; margins 32px / 32px; skew 0px |
+| L3 600×600 | Badge and unit gutters 0px | Minimum source-separated unit gap 6px; badge gaps 6px / 62px / 6px; minimum text 10px |
+
+The L3 square regression verifies all five rigid groups with the half-even
+quantized common-transform check. `make test
+VENV_DIR=/tmp/chameleon-hotspot-locked-venv-20261027` passed: the output
+reported successful suites of 309, 48, 3, 1, and 3 tests. `make
+docker-synthetic` reported 18/18 `SUCCESS`, 18 committed JSON/PNG/marker
+pairs, `AUDIT_PAIRS=18`, and `AUDIT_VALIDATED=18` from the in-image
+`validate_response()` audit.
+
+The local Docker daemon reported `aarch64`; the image ran as `linux/amd64`
+under emulation. This is not native-amd64 evidence and does not change the
+repository’s unverified cross-platform/release status.
+
+
+### L2 600×600 subhead/CTA overlap
+
+The source AABBs overlap: `subhead` [140, 920, 940, 990], `cta_bg` [330, 950, 750, 1040] (420×40), and `cta_label` [330, 975, 750, 1019] (420×15). The 1080×1080 source render shows no visible collision. Before this fix, `vertical_restack/dominant_copy` placed the output `subhead` [300, 42, 600, 342] over `cta_bg` [138, 42, 558, 132] (258×90) and `cta_label` [138, 67, 558, 111] (258×44).
+
+The extreme-topology packer now rejects positive-area output intersections between `SUPPORTING_TEXT` and `CTA`, even when the source pair overlaps; edge contact remains legal. The 600×600 response keeps `subhead.font_size=13`, places it at [90, 307, 390, 427], and places the rigid CTA group at [90, 483, 510, 573]. The authoritative response validator passed.
+
+Verification:
+
+- `/Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m unittest discover -s tests/layout -p test_level2.py -k compact_square_separates_source_overlapping_subhead_from_cta -v` from `chameleon/` — failed before the engine change on the positive subhead/CTA AABB intersection; passed after the change and after test cleanup.
+- `/Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m unittest discover -s tests/layout -p 'test_*.py' -v` from `chameleon/` — all 120 layout tests passed in 138.020s.
+- `/Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python -m engine.main` in an isolated temporary workspace — exit 0, one task `SUCCESS`, JSON/PNG/commit marker published. Direct `validate_response(source, target, response, fonts_dir=...)` passed.
+- `/Users/charliefurlow/Desktop/ProjectChameleon/.venv/bin/python scripts/inspect_layout.py /var/folders/q7/pr1pl8w14gq68h60cvvmd1540000gn/T/chameleon-l2-overlap-fixed-pephgq0g/output` — exit 0; no subhead/CTA collision; existing bleed and source-overlap warnings remain.
+- `make verify` — passed: repository governance and implementation wiring are consistent.
+- Docker build/run and ARM64 qualification were not run. No artifact hashes or dependency pins were changed.
+
+### Residual foreground-margin skew (2026-10-29)
+
+Baseline PNGs showed visible envelope imbalance in all six cases: L1 landscape
+was top-heavy with its small logo at bottom-left; L1 billboard and medium
+rectangle split copy to the right and logo to the left; L2 medium rectangle and
+square were top-loaded; L2 landscape was weighted right/lower, including its
+non-bleed lower-right decoration. The shared cause was the wide-target helper's
+horizontal-only centering, its early exit when any source-bleed element existed,
+and no final centering for medium or square targets.
+
+The selected response now receives one safe integer translation of its
+non-background, non-bleed foreground envelope on both axes for target aspect
+ratios at least 0.9. It runs after ranking, preserving the existing candidate
+ranking path; the existing wide-target horizontal refinement remains in place.
+Single-element foregrounds are left at their original position. The helper
+checks translated containment and source-separated overlap before moving
+anything; the selected serialized response is then hard-validated and rerendered.
+Source-bleed decorations stay fixed. Element sizes, text font sizes, image ratios,
+internal gutters, group-relative transforms, and glyph geometry are unchanged.
+
+Margins exclude the background and source-bleed elements. Utilization is the
+union of foreground rotated-AABB areas and includes source bleed. The minimum
+gutter is the smallest AABB gap between source-separated units; source-overlap
+pairs are excluded.
+
+| Case | Margins L/T/R/B before → after | H/V skew before → after | AABB utilization before → after | Minimum gutter before → after | Text sizes before → after |
+| --- | --- | --- | --- | --- | --- |
+| L1 1200×630 | 41/196/41/0 → 41/98/41/98 px | 0/196 → 0/0 px | 19.90% → 19.90% | 17 → 17 px | headline 68, CTA 29 → unchanged |
+| L1 970×250 | 156/62/0/14 → 78/38/78/38 px | 156/48 → 0/0 px | 13.01% → 13.01% | 11 → 11 px | headline 28, CTA 10 → unchanged |
+| L1 300×250 | 15/62/0/14 → 7/38/8/38 px | 15/48 → 1/0 px | 15.67% → 15.67% | 11 → 11 px | headline 23, CTA 10 → unchanged |
+| L2 1200×630 | 99/34/30/0 → 65/17/64/17 px | 69/34 → 1/0 px | 51.65% → 51.56% | 24 → 24 px | headline 56, subhead 24, badge 36, CTA 33 → unchanged |
+| L2 300×250 | 0/0/8/125 → 4/62/4/63 px | 8/125 → 0/1 px | 32.59% → 34.96% | 0 → 0 px | headline 13, subhead 9, badge 10, CTA 10 → unchanged |
+| L2 600×600 | 0/0/0/84 → 0/42/0/42 px | 0/84 → 0/0 px | 63.68% → 65.29% | 0 → 0 px | headline 31, subhead 13, badge 10, CTA 12 → unchanged |
+
+The six after-PNGs and `inspect_layout.py` diagnostics were inspected. L1 has
+zero reported overlaps or off-canvas elements. L2 retains only its expected
+source-bleed and source-existing overlap warnings; the serialized hard validator
+passes. The L2 landscape utilization change is −0.10 percentage points because
+the fixed bleed decoration overlaps the translated foreground differently.
+Internal L2 square whitespace remains; rearranging its groups would be a
+separate change and risks gutters.
+
+`make docker-synthetic` passed 18/18 tasks, committed 18 JSON/PNG/marker pairs,
+and reported `AUDIT_PAIRS=18` and `AUDIT_VALIDATED=18`. The final container wall
+time was 557.749s; the in-image audit took 5.498s. Docker Desktop reported an
+`aarch64` daemon running a `linux/amd64` image under emulation. The build emitted
+the existing constant-platform warning; Fontconfig and missing-asset messages
+were diagnostic. This is not native x86_64 evidence.
+
+`make test` on the workspace `.venv` timed out after 3600s. The locked command
+`make test VENV_DIR=/tmp/chameleon-hotspot-locked-venv-20261027` passed all five
+suites: 310, 48, 3, 1, and 3 tests (365 total). `make verify` passed.
+The foreground test also passed on all six targets. Two emulated `linux/amd64`
+image runs with `PYTHONHASHSEED=0` and `4242` produced identical JSON/PNG hashes
+for the Level 1 and Level 2 samples; Level 3 was not hash-compared. This does
+not verify repeat hashes for the 18 scorecard cases. The Linux x86_64 Level 2
+artifact pin was refreshed from those emulated outputs, and the Darwin arm64 pin
+from the locked local runner.
+`linux-aarch64` Level 2 pin remains from the pre-change revision and was not
+refreshed; its post-change hash is unverified. Native x86_64 revalidation also
+remains unverified. No solver topology or 18-case repeat-hash claim is made.
+
+### Final-candidate verification and 18-case audit (2026-10-30)
+
+`make test VENV_DIR=/tmp/chameleon-hotspot-locked-venv-20261027` passed all
+five suites: 311 main, 48 review, 3 runtime, 1 dependency-preparation, and 3
+font-provenance tests (366 total; 163.29s). `make verify` passed. The existing
+extreme-target regression passed for 320×50, 120×700, 3840×2160, and 100×100;
+the focused L2 compact-square subhead/CTA regression passed.
+
+`make docker-synthetic` passed 18/18 tasks and committed 18 JSON/PNG/marker
+triples. The in-image `validate_response()` audit reported `AUDIT_PAIRS=18` and
+`AUDIT_VALIDATED=18` (5.830s). Engine-container wall time was 543.695s; total
+container wall time was 549.524s. The daemon was `aarch64`; the audited image was
+`linux/amd64` under emulation. This is not native-x86_64 evidence.
+
+The L2 600×600 serialized output retains `subhead.font_size=13` and its AABB
+[90, 307, 390, 427]. `cta_bg` is [90, 483, 510, 573] and `cta_label` is
+[90, 508, 510, 552]. The positive-area AABB checks between the subhead and both
+CTA records returned false; the subhead-to-background gap is 56px. The final
+container PNG was inspected. Zero minimum unit-AABB gaps elsewhere are edge
+contacts; no layout was changed to improve those metrics.
+
+Metrics below use output text `font_size`; rotated-AABB margins exclude the
+background and source-bleed records. Utilization is the union area of foreground
+rotated AABBs divided by target area (source bleed included). Skew is
+`|L−R|/|T−B|`. Minimum gutter is Euclidean edge-to-edge distance between
+source-separated unit AABBs (explicit groups aggregated; source-overlapping unit
+pairs excluded). `0px` denotes an AABB edge contact. Foreground image ratios
+were checked by exact cross-products; the cover background is exempt.
+
+| Case | Text font sizes (px) | Margins L/T/R/B (px) | Skew H/V (px) | Utilization | Minimum gutter and limiting pair(s) | Foreground image ratios (exact source ratio → output dimensions) | Quantized rigid groups | Remaining diagnostics |
+| --- | --- | --- | --- | ---: | --- | --- | --- | --- |
+| L1 600×600 | headline 41; CTA 21 | 22/98/23/97 | 1/1 | 26.12% | 97px headline/CTA | 1/1; logo 16:5 → 176×55; background exempt | 0 (none) | None |
+| L1 1200×630 | headline 68; CTA 29 | 41/98/41/98 | 0/0 | 19.90% | 17px headline/CTA | 1/1; logo 16:5 → 144×45; background exempt | 0 (none) | None |
+| L1 1080×1920 | headline 75; CTA 38 | 40/384/40/384 | 0/0 | 14.81% | 388px logo/headline | 1/1; logo 16:5 → 320×100; background exempt | 0 (none) | None |
+| L1 300×250 | headline 23; CTA 10 | 7/38/8/38 | 1/0 | 15.67% | 11px headline/CTA | 1/1; logo 16:5 → 96×30; background exempt | 0 (none) | None |
+| L1 160×600 | headline 12; CTA 8 | 6/120/5/120 | 1/0 | 6.70% | 154px logo/headline | 1/1; logo 16:5 → 32×10; background exempt | 0 (none) | None |
+| L1 970×250 | headline 28; CTA 10 | 78/38/78/38 | 0/0 | 13.01% | 11px headline/CTA | 1/1; logo 16:5 → 96×30; background exempt | 0 (none) | None |
+| L2 600×600 | headline 31; subhead 13; badge_label 10; cta_label 12 | 90/27/90/27 | 0/0 | 43.49% | 0px badge/CTA; headline/subhead; logo/product; product/headline; subhead/badge | 2/2; logo 32:11 → 64×22; product 1:1 → 138×138; background exempt | 2/2: badge, CTA | Source AABB pairs: deco_circle_1/logo, deco_circle_1/product, deco_circle_2/product, deco_circle_2/headline. Source bleed: deco_circle_1 left/top. No subhead/CTA collision. |
+| L2 1200×630 | headline 56; subhead 24; badge_label 36; cta_label 33 | 65/17/64/17 | 1/0 | 51.56% | 24px headline/subhead | 2/2; logo 32:11 → 96×33; product 1:1 → 218×218; background exempt | 2/2: badge, CTA | Source AABB pairs: deco_circle_1/logo, deco_circle_2/cta_bg, deco_circle_2/cta_label. Source bleed: deco_circle_1 left/top. |
+| L2 1080×1920 | headline 56; subhead 24; badge_label 18; cta_label 22 | 40/460/80/460 | 40/0 | 37.48% | 0px headline/subhead | 2/2; logo 32:11 → 320×110; product 1:1 → 500×500; background exempt | 2/2: badge, CTA | Source AABB pairs: deco_circle_2/product, deco_circle_2/headline, deco_circle_2/subhead, deco_circle_2/cta_bg, deco_circle_2/cta_label, subhead/cta_bg, subhead/cta_label. Source bleed: deco_circle_1 left/top. |
+| L2 300×250 | headline 13; subhead 9; badge_label 10; cta_label 10 | 4/62/4/63 | 0/1 | 34.96% | 0px headline/CTA; headline/subhead; logo/product; product/headline; subhead/badge | 2/2; logo 32:11 → 32×11; product 1:1 → 57×57; background exempt | 2/2: badge, CTA | Source AABB pairs: deco_circle_2/product, deco_circle_2/headline. Source bleed: deco_circle_1 left/top. |
+| L2 160×600 | headline 10; subhead 10; badge_label 10; cta_label 10 | 0/15/0/15 | 0/0 | 43.95% | 21px badge/CTA; headline/subhead; logo/product; subhead/badge | 2/2; logo 32:11 → 32×11; product 1:1 → 74×74; background exempt | 2/2: badge, CTA | Source AABB pairs: deco_circle_1/logo, deco_circle_1/product. Source bleed: deco_circle_1 left/top. |
+| L2 970×250 | headline 15; subhead 9; badge_label 10; cta_label 10 | 25/32/25/32 | 0/0 | 24.48% | 9px badge/CTA; headline/subhead | 2/2; logo 32:11 → 96×33; product 1:1 → 117×117; background exempt | 2/2: badge, CTA | Source AABB pairs: deco_circle_1/logo, deco_circle_1/product. Source bleed: deco_circle_1 left/top. |
+| L3 600×600 | headline 10; subhead 10; badge1_label 10; badge2_label 10; badge3_label 10; cta_label 12; ribbon_label 11; legal_text 10 | 0/2/0/1 | 0/1 | 47.17% | 6px badge1/badge2; badge2/badge3; badge3/CTA; headline/subhead; product/headline; subhead/badge1 | 3/3; logo 16:5 → 80×25; product 1:1 → 111×111; holiday watermark 9:4 → 45×20; background exempt | 5/5: badge1, badge2, badge3, CTA, ribbon | Missing `solstice_holiday_badge_2025.png`; placeholder rendered, source reference preserved. |
+| L3 1200×630 | headline 19; subhead 10; badge1_label 10; badge2_label 10; badge3_label 10; cta_label 10; ribbon_label 10; legal_text 10 | 33/2/33/3 | 0/1 | 37.07% | 9px headline/subhead | 3/3; logo 16:5 → 144×45; product 1:1 → 186×186; holiday watermark 9:4 → 81×36; background exempt | 5/5: badge1, badge2, badge3, CTA, ribbon | Missing `solstice_holiday_badge_2025.png`; placeholder rendered, source reference preserved. |
+| L3 1080×1920 | headline 40; subhead 22; badge1_label 15; badge2_label 15; badge3_label 15; cta_label 22; ribbon_label 20; legal_text 12 | 60/284.40/37.66/295 | 22.34/10.60 | 32.22% | 20px badge1/badge2; badge2/badge3; headline/subhead; subhead/badge1; subhead/badge2; subhead/badge3 | 3/3; logo 16:5 → 320×100; product 1:1 → 400×400; holiday watermark 9:4 → 180×80; background exempt | 5/5: badge1, badge2, badge3, CTA, ribbon | Missing `solstice_holiday_badge_2025.png`; placeholder rendered, source reference preserved. |
+| L3 300×250 | headline 6; subhead 6; badge1_label 8; badge2_label 8; badge3_label 10; cta_label 10; ribbon_label 8; legal_text 6 | 8/6/8/6 | 0/0 | 45.09% | 8px badge3/CTA | 3/3; logo 16:5 → 80×25; product 1:1 → 34×34; holiday watermark 9:4 → 72×32; background exempt | 5/5: badge1, badge2, badge3, CTA, ribbon | Missing `solstice_holiday_badge_2025.png`; placeholder rendered, source reference preserved. |
+| L3 160×600 | headline 11; subhead 9; badge1_label 9; badge2_label 9; badge3_label 9; cta_label 10; ribbon_label 12; legal_text 10 | 5.89/34/5.89/0 | 0/34 | 60.57% | 6px product/holiday watermark | 3/3; logo 16:5 → 32×10; product 1:1 → 45×45; holiday watermark 9:4 → 45×20; background exempt | 5/5: badge1, badge2, badge3, CTA, ribbon | Missing `solstice_holiday_badge_2025.png`; placeholder rendered, source reference preserved. |
+| L3 970×250 | headline 15; subhead 9; badge1_label 10; badge2_label 10; badge3_label 10; cta_label 10; ribbon_label 10; legal_text 9 | 25/39.89/25/39 | 0/0.89 | 37.13% | 8.89px headline/ribbon | 3/3; logo 16:5 → 128×40; product 1:1 → 67×67; holiday watermark 9:4 → 90×40; background exempt | 5/5: badge1, badge2, badge3, CTA, ribbon | Missing `solstice_holiday_badge_2025.png`; placeholder rendered, source reference preserved. |
+
+There were no output AABB intersections between source-separated elements.
+The warning-only self-checks report `deco_circle_1` source bleed outside the
+canvas for the six Level 2 target formats; the inspector also reports the
+source-existing AABB pairs listed above. The Docker build emitted
+`FromPlatformFlagConstDisallowed` for the existing constant `linux/amd64`
+Dockerfile platform. The container emitted Fontconfig's
+`05-reset-dirs-sample.conf` unknown-element warning and the expected missing
+holiday-watermark placeholder warning. All 18 serialized responses still
+passed the in-image hard validator.
+
+Official Stage 1 runtime remains `linux/amd64`. The local Darwin/arm64
+`validate_response()` was also tried against the Docker-produced L1 1200×630
+response and rejected renderer-measured positioned glyph bounds. That
+cross-platform replay is not target-runtime qualification; it leaves
+cross-platform renderer parity unverified and was not used to change layout.
+This local run does not claim native x86_64 results, solver-topology
+qualification, or repeat-run hashes for all 18 cases.
+
 
 ## Compact-square optical centering
 
