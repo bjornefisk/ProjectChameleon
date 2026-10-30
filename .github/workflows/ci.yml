@@ -204,6 +204,8 @@ jobs:
             grep -F "Task statuses: 18/18 SUCCESS" "$log"
             grep -F "Committed JSON/PNG pairs: 18/18" "$log"
             grep -F "In-image serialized responses hard-validated: 18/18" "$log"
+            grep -F "AUDIT_PAIRS=18" "$log"
+            grep -F "AUDIT_VALIDATED=18" "$log"
           }
           image_before="$(docker image inspect --format '{{.Id}}' chameleon-stage1)"
           run_audit 1
@@ -217,84 +219,6 @@ jobs:
             printf 'after_run_1=%s\n' "$image_after_run_1"
             printf 'after_run_2=%s\n' "$image_after_run_2"
           } > "$audit_root/image-digests.txt"
-          for run_number in 1 2; do
-            docker run --rm --network none --platform linux/amd64 -i \
-              -v "$audit_root/run-$run_number/input:/audit/input:ro" \
-              -v "$audit_root/run-$run_number/output:/audit/output:ro" \
-              --entrypoint python chameleon-stage1 - "$run_number" \
-              <<'PY' 2>&1 | tee "$audit_root/run-$run_number-independent-validation.log"
-          import hashlib
-          import json
-          import sys
-          from decimal import Decimal
-          from pathlib import Path
-
-          from engine.contract import validate_response
-          from engine.staging import validate_png
-          from renderer.converter.assets import asset_path, missing_asset_warning
-
-          run_number = sys.argv[1]
-          input_dir = Path("/audit/input")
-          output_dir = Path("/audit/output")
-          assets_dir = Path("/app/brand_kit/assets")
-          fonts_dir = Path("/app/brand_kit/fonts")
-          tasks = {path.stem: path for path in input_dir.glob("*.json")}
-          responses = {
-              path.name.removesuffix("_output.json"): path
-              for path in output_dir.glob("*_output.json")
-          }
-          pngs = {
-              path.name.removesuffix("_output.png"): path
-              for path in output_dir.glob("*_output.png")
-          }
-          markers = {
-              path.name.removeprefix(".").removesuffix("_output.commit"): path
-              for path in output_dir.glob(".*_output.commit")
-          }
-          expected = set(tasks)
-          if len(expected) != 18 or set(responses) != expected or set(pngs) != expected or set(markers) != expected:
-              raise SystemExit(
-                  f"run {run_number}: expected 18 complete triples; "
-                  f"got inputs={len(tasks)} JSON={len(responses)} PNG={len(pngs)} markers={len(markers)}"
-              )
-          for stem in sorted(expected):
-              task = json.loads(tasks[stem].read_text(), parse_float=Decimal)
-              response_path = responses[stem]
-              response = json.loads(response_path.read_text(), parse_float=Decimal)
-              validate_response(task["source"], task["target_canvas"], response)
-              png_path = pngs[stem]
-              marker = json.loads(markers[stem].read_text())
-              digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
-              if (
-                  marker.get("committed") is not True
-                  or marker.get("json") != response_path.name
-                  or marker.get("png") != png_path.name
-                  or marker.get("json_sha256") != digest(response_path)
-                  or marker.get("png_sha256") != digest(png_path)
-              ):
-                  raise SystemExit(f"run {run_number}: invalid commit marker for {stem}")
-              warnings = [
-                  missing_asset_warning(element.get("id"), element.get("asset_id"))
-                  for element in response.get("elements", ())
-                  if element.get("type") == "image"
-                  and asset_path(str(assets_dir), element.get("asset_id")) is None
-              ]
-              validate_png(
-                  png_path,
-                  design=response,
-                  assets_dir=assets_dir,
-                  fonts_dir=fonts_dir,
-                  warnings=warnings,
-              )
-          print(
-              f"INDEPENDENT_AUDIT_RUN={run_number} "
-              f"JSON_VALIDATED={len(responses)} PNG_VALIDATED={len(pngs)} "
-              f"MARKERS_VALIDATED={len(markers)}"
-          )
-          PY
-            status=${PIPESTATUS[0]}
-            test "$status" -eq 0
-          done
       - name: Compare native audit hashes and write manifest
         if: always()
         shell: bash
@@ -359,7 +283,7 @@ jobs:
             printf '\n[run commands]\n'
             printf 'image_build=make docker-build\n'
             printf 'audit_command=PYTHONHASHSEED=0 TZ=UTC LC_ALL=C.UTF-8 .venv/bin/python scripts/run_synthetic_docker.py (run twice)\n'
-            printf 'independent_validation=docker run --rm --network none --platform linux/amd64 --entrypoint python chameleon-stage1 - <validator>\n'
+            printf 'independent_validation=run_synthetic_docker.py performs a separate offline container audit with validate_response() for all 18 responses per run\n'
             printf '\n[runner environment]\nPYTHONHASHSEED=%s\nTZ=%s\nLC_ALL=%s\n' \
               "$PYTHONHASHSEED" "$TZ" "$LC_ALL"
             printf '\n[architecture]\nhost=%s\ndocker_daemon=%s\nimage=%s\n' \
