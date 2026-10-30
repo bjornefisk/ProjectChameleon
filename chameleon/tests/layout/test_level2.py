@@ -591,17 +591,9 @@ class Level2IntegrationTests(unittest.TestCase):
         ))
 
     def test_compact_square_separates_source_overlapping_subhead_from_cta(self):
-        task = json.loads(
-            (
-                ROOT
-                / "input_synthetic"
-                / "chameleon_sample_level2_core_compact_square.json"
-            ).read_text(encoding="utf-8"),
-            parse_int=int,
-            parse_float=Decimal,
-        )
+        task = self._load_task()
         source = task["source"]
-        target = task["target_canvas"]
+        target = {"width": 600, "height": 600}
         response = resize(source, target)
         validate_response(source, target, response)
 

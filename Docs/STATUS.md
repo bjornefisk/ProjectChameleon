@@ -113,16 +113,23 @@ remains unverified. No solver topology or 18-case repeat-hash claim is made.
 ### Final-candidate verification and 18-case audit (2026-10-30)
 
 `make test VENV_DIR=/tmp/chameleon-hotspot-locked-venv-20261027` passed all
-five suites: 311 main, 48 review, 3 runtime, 1 dependency-preparation, and 3
-font-provenance tests (366 total; 163.29s). `make verify` passed. The existing
-extreme-target regression passed for 320×50, 120×700, 3840×2160, and 100×100;
-the focused L2 compact-square subhead/CTA regression passed.
+366 tests: main suite 311 (153.072s), review 48 (7.132s), runtime 3
+(0.334s), dependency-preparation 1 (0.001s), and font-provenance 3 (0.004s).
+`make verify` passed. The existing extreme-target test passed for 320×50,
+120×700, 3840×2160, and 100×100; the focused L2 compact-square subhead/CTA
+regression passed.
+
+`Verify and test` run 41095600987 on pre-fix head `088a5f1` exposed that the
+regression depended on a generated `input_synthetic` file absent in clean
+checkouts. The test now loads the tracked Level 2 source and sets the 600×600
+target explicitly. The corrected focused test and full local suite passed.
 
 `make docker-synthetic` passed 18/18 tasks and committed 18 JSON/PNG/marker
 triples. The in-image `validate_response()` audit reported `AUDIT_PAIRS=18` and
-`AUDIT_VALIDATED=18` (5.830s). Engine-container wall time was 543.695s; total
-container wall time was 549.524s. The daemon was `aarch64`; the audited image was
+`AUDIT_VALIDATED=18` (5.564s). Engine-container wall time was 539.108s; total
+container wall time was 544.672s. The daemon was `aarch64`; the audited image was
 `linux/amd64` under emulation. This is not native-x86_64 evidence.
+
 
 The L2 600×600 serialized output retains `subhead.font_size=13` and its AABB
 [90, 307, 390, 427]. `cta_bg` is [90, 483, 510, 573] and `cta_label` is
