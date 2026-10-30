@@ -12,7 +12,13 @@ from typing import Any, Mapping, NoReturn
 
 from ..contract import validate_response, validate_source, validate_target_canvas
 from ..errors import InfeasibleLayoutError, InfeasibleReasonCode
-from ..geometry.bounds import intersects_canvas, is_contained_in_canvas, rotated_aabb, source_bleed_sides
+from ..geometry.bounds import (
+    intersects_canvas,
+    is_contained_in_canvas,
+    positive_aabb_intersection,
+    rotated_aabb,
+    source_bleed_sides,
+)
 from ..geometry.math_util import quantize_to_int, to_fraction
 from ..geometry.ratios import reduced_ratio
 from .near_isomorphic import (
@@ -170,37 +176,93 @@ def _center_foreground_envelope(
     target_canvas: Mapping[str, Any],
     *,
     integer_translation: bool = False,
+    center_vertical: bool = True,
+    exclude_source_bleed: bool = True,
 ) -> bool:
-    """Center foreground collectively while preserving every rigid transform."""
+    """Center the non-bleed foreground only when multiple elements compose it."""
 
     if (
         background_index is not None
         and source_elements[background_index].get("group_id") is not None
     ):
         return False
-    if any(
-        source_bleed_sides(element, rotated_aabb(element), source_canvas) is not None
-        for element in source_elements
-    ):
+    bleed_indices = {
+        index
+        for index, element in enumerate(source_elements)
+        if (
+            source_bleed_sides(element, rotated_aabb(element), source_canvas)
+            is not None
+        )
+    }
+    if bleed_indices and not exclude_source_bleed:
         return False
-    indices = [index for index in range(len(source_elements)) if index != background_index]
-    if not indices:
+    indices = [
+        index
+        for index in range(len(source_elements))
+        if index != background_index and index not in bleed_indices
+    ]
+    if len(indices) < 2:
         return False
+
     boxes = [rotated_aabb(response_elements[index]) for index in indices]
-    left = min(box[0] for box in boxes)
-    right = max(box[2] for box in boxes)
-    delta = (to_fraction(target_canvas["width"]) - right - left) / 2
+    delta_x = (
+        to_fraction(target_canvas["width"])
+        - max(box[2] for box in boxes)
+        - min(box[0] for box in boxes)
+    ) / 2
+    delta_y = (
+        (
+            to_fraction(target_canvas["height"])
+            - max(box[3] for box in boxes)
+            - min(box[1] for box in boxes)
+        )
+        / 2
+        if center_vertical
+        else Fraction(0)
+    )
     if integer_translation:
-        delta = quantize_to_int(delta)
-    if not delta:
+        delta_x = quantize_to_int(delta_x)
+        delta_y = quantize_to_int(delta_y)
+    if not delta_x and not delta_y:
         return False
+
+    candidate_boxes = [rotated_aabb(element) for element in response_elements]
     for index in indices:
-        translated_x = to_fraction(response_elements[index]["x"]) + delta
+        box = candidate_boxes[index]
+        translated_box = box._replace(
+            min_x=box.min_x + delta_x,
+            min_y=box.min_y + delta_y,
+            max_x=box.max_x + delta_x,
+            max_y=box.max_y + delta_y,
+        )
+        if not is_contained_in_canvas(translated_box, target_canvas):
+            return False
+        candidate_boxes[index] = translated_box
+
+    source_boxes = [rotated_aabb(element) for element in source_elements]
+    for first in range(len(source_elements)):
+        if first == background_index:
+            continue
+        for second in range(first + 1, len(source_elements)):
+            if second == background_index or positive_aabb_intersection(
+                source_boxes[first], source_boxes[second]
+            ):
+                continue
+            if positive_aabb_intersection(
+                candidate_boxes[first], candidate_boxes[second]
+            ):
+                return False
+
+    for index in indices:
+        x = to_fraction(response_elements[index]["x"]) + delta_x
+        y = to_fraction(response_elements[index]["y"]) + delta_y
         response_elements[index]["x"] = (
-            quantize_to_int(translated_x) if integer_translation else translated_x
+            quantize_to_int(x) if integer_translation else x
+        )
+        response_elements[index]["y"] = (
+            quantize_to_int(y) if integer_translation else y
         )
     return True
-
 
 def _bleed_position(
     size: Fraction,
@@ -436,6 +498,8 @@ def _build_column_candidate(
             model.background_index,
             source["canvas"],
             target_canvas,
+            center_vertical=False,
+            exclude_source_bleed=False,
         )
 
     # Any record not covered by an inferred role is unsupported rather than

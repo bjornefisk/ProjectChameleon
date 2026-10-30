@@ -402,7 +402,12 @@ def _valid_plan_placement(
             for old_index, old_aabb in zip(indices, occupied_aabbs):
                 if old_aabb[2] <= old_aabb[0] or old_aabb[3] <= old_aabb[1]:
                     continue
-                if model.overlaps(new_index, old_index):
+                source_overlap = model.overlaps(new_index, old_index)
+                supporting_text_cta_pair = {
+                    model.assignments[new_index].role,
+                    model.assignments[old_index].role,
+                } == {RoleKind.SUPPORTING_TEXT, RoleKind.CTA}
+                if source_overlap and not supporting_text_cta_pair:
                     continue
                 if positive_aabb_intersection(new_aabb, old_aabb):
                     return False
@@ -1031,12 +1036,14 @@ def _build_wide_three_column_candidate(
     supporting_text: list[int],
     badges: list[tuple[int, list[int]]],
     cta: tuple[int, list[int]],
-    ribbon: tuple[int, list[int]],
+    ribbon: tuple[int, list[int]] | None,
+    decorations: list[int],
+    bleed_decorations: list[int],
     font_manager,
     fonts_dir: str | None,
     work_diagnostics: dict[str, Any],
 ) -> dict[str, Any] | None:
-    """Fit a dense, wide banner into source-role art, copy, and action columns."""
+    """Place wide-banner art, copy, and action in centered role columns."""
     target_width = int(target_canvas["width"])
     target_height = int(target_canvas["height"])
     padding_x = max(1, target_height // 10)
@@ -1058,10 +1065,10 @@ def _build_wide_three_column_candidate(
     if (
         model.background_index is None
         or len(art_images) != 2
-        or len(secondary_images) != 1
+        or len(secondary_images) > 1
         or len(headlines) != 1
-        or len(supporting_text) != 2
-        or len(badges) != 3
+        or len(supporting_text) not in (1, 2)
+        or not badges
         or inner_height <= 0
         or min(left_width, middle_width, right_width) <= 0
     ):
@@ -1075,15 +1082,37 @@ def _build_wide_three_column_candidate(
     response_elements[model.background_index].update(
         {"x": 0, "y": 0, "width": target_width, "height": target_height}
     )
+    decoration_scale = min(
+        Fraction(1),
+        Fraction(target_width, 1) / to_fraction(source["canvas"]["width"]),
+        Fraction(target_height, 1) / to_fraction(source["canvas"]["height"]),
+    )
+    for index in decorations:
+        element = source_elements[index]
+        response_elements[index].update(
+            {
+                "x": to_fraction(element["x"]) * decoration_scale,
+                "y": to_fraction(element["y"]) * decoration_scale,
+                "width": to_fraction(element["width"]) * decoration_scale,
+                "height": to_fraction(element["height"]) * decoration_scale,
+            }
+        )
 
     image_indices = [*art_images, *secondary_images]
-    logo_height = inner_height // 4
-    hero_height = inner_height * 2 // 5
-    secondary_height = inner_height - logo_height - hero_height - 2 * item_gap
-    image_slot_heights = (logo_height, hero_height, secondary_height)
-    if secondary_height <= 0:
-        work_diagnostics["status"] = "insufficient_art_space"
-        return None
+    if len(image_indices) == 3:
+        logo_height = inner_height // 4
+        hero_height = inner_height * 2 // 5
+        secondary_height = inner_height - logo_height - hero_height - 2 * item_gap
+        image_slot_heights = (logo_height, hero_height, secondary_height)
+        if secondary_height <= 0:
+            work_diagnostics["status"] = "insufficient_art_space"
+            return None
+    else:
+        first_height = inner_height // 4
+        image_slot_heights = (first_height, inner_height - first_height - item_gap)
+        if min(image_slot_heights) <= 0:
+            work_diagnostics["status"] = "insufficient_art_space"
+            return None
     image_y = padding_y
     for index, slot_height in zip(image_indices, image_slot_heights):
         if not _compact_image_placement(
@@ -1153,11 +1182,11 @@ def _build_wide_three_column_candidate(
             fit_element, middle_width, selected_size, font_manager
         )
 
-    ribbon_height = max(1, inner_height // 4)
+    ribbon_height = max(1, inner_height // 4) if ribbon is not None else 0
     copy_height = (
-        ribbon_height
-        + sum(text_heights.values())
-        + item_gap * len(text_indices)
+        sum(text_heights.values())
+        + item_gap * (len(text_indices) - 1)
+        + (ribbon_height + item_gap if ribbon is not None else 0)
     )
     minimum_margin = max(1, target_height // 8)
     if copy_height > target_height - 2 * minimum_margin:
@@ -1166,18 +1195,19 @@ def _build_wide_three_column_candidate(
 
     group_scales: dict[int, Fraction] = {}
     y = (target_height - copy_height) // 2
-    ribbon_scale = _compact_group_placement(
-        source_elements,
-        response_elements,
-        ribbon[1],
-        (middle_x, y, middle_width, ribbon_height),
-    )
-    if ribbon_scale is None:
-        work_diagnostics["status"] = "ribbon_does_not_fit"
-        return None
-    group_scales.update((index, ribbon_scale) for index in ribbon[1])
-    y += ribbon_height + item_gap
-    for index in text_indices:
+    if ribbon is not None:
+        ribbon_scale = _compact_group_placement(
+            source_elements,
+            response_elements,
+            ribbon[1],
+            (middle_x, y, middle_width, ribbon_height),
+        )
+        if ribbon_scale is None:
+            work_diagnostics["status"] = "ribbon_does_not_fit"
+            return None
+        group_scales.update((index, ribbon_scale) for index in ribbon[1])
+        y += ribbon_height + item_gap
+    for text_position, index in enumerate(text_indices):
         response_elements[index].update(
             {
                 "x": middle_x,
@@ -1187,7 +1217,9 @@ def _build_wide_three_column_candidate(
                 "font_size": text_sizes[index],
             }
         )
-        y += text_heights[index] + item_gap
+        y += text_heights[index]
+        if text_position < len(text_indices) - 1:
+            y += item_gap
 
     badge_height = max(1, inner_height // 6)
     cta_height = max(1, inner_height // 4)
@@ -1250,6 +1282,21 @@ def _build_wide_three_column_candidate(
             )
             return None
         response_elements[index]["font_size"] = selected_size
+    bleed_decoration_set = set(bleed_decorations)
+    non_bleed_bounds = [
+        rotated_aabb(element)
+        for index, element in enumerate(response_elements)
+        if index != model.background_index and index not in bleed_decoration_set
+    ]
+    min_y = min(bounds[1] for bounds in non_bleed_bounds)
+    max_y = max(bounds[3] for bounds in non_bleed_bounds)
+    vertical_shift = quantize_to_int(
+        Fraction(target_height, 2) - (min_y + max_y) / 2
+    )
+    if vertical_shift:
+        for index, element in enumerate(response_elements):
+            if index != model.background_index and index not in bleed_decoration_set:
+                element["y"] = to_fraction(element["y"]) + vertical_shift
 
     result = _serialize_extreme_candidate(
         {
@@ -1315,6 +1362,8 @@ def _build_compact_grid_candidate(
     secondary_images: list[int] = []
     headlines: list[int] = []
     supporting_text: list[int] = []
+    decorations: list[int] = []
+    bleed_decorations: list[int] = []
 
     for first, indices in units:
         if first == background:
@@ -1335,6 +1384,13 @@ def _build_compact_grid_candidate(
             else:
                 work_diagnostics["status"] = "unsupported_group"
                 return None
+            continue
+        if element["type"] == "shape" and role is RoleKind.DECORATION:
+            decorations.append(first)
+            if source_bleed_sides(
+                element, rotated_aabb(element), source["canvas"]
+            ):
+                bleed_decorations.append(first)
             continue
 
         if element["type"] == "text" and to_fraction(element.get("rotation", 0)) == 0:
@@ -1364,14 +1420,26 @@ def _build_compact_grid_candidate(
     text_indices = [
         index for index, element in enumerate(source_elements) if element["type"] == "text"
     ]
-    if (
-        len(badges) != 3
-        or cta is None
-        or ribbon is None
-        or len(art_images) != 2
-        or len(secondary_images) != 1
-        or len(headlines) != 1
-        or len(supporting_text) != 2
+    dense_profile = (
+        len(badges) == 3
+        and cta is not None
+        and ribbon is not None
+        and len(art_images) == 2
+        and len(secondary_images) == 1
+        and len(headlines) == 1
+        and len(supporting_text) == 2
+    )
+    billboard_profile = (
+        len(badges) == 1
+        and cta is not None
+        and ribbon is None
+        and len(art_images) == 2
+        and not secondary_images
+        and len(headlines) == 1
+        and len(supporting_text) == 1
+    )
+    if not dense_profile and not (
+        prefer_wide_ribbon and target_width >= 350 and billboard_profile
     ):
         work_diagnostics["status"] = "unsupported_dense_profile"
         return None
@@ -1388,6 +1456,8 @@ def _build_compact_grid_candidate(
             badges,
             cta,
             ribbon,
+            decorations,
+            bleed_decorations,
             font_manager,
             fonts_dir,
             work_diagnostics,
@@ -1403,7 +1473,13 @@ def _build_compact_grid_candidate(
         work_diagnostics["status"] = "insufficient_canvas"
         return None
 
-    media_height = min(inner_height // 4, inner_width // 2)
+    medium_rectangle_profile = (
+        target_width < 350 and target_height < 300 and target_width > target_height
+    )
+    media_height = min(
+        inner_height // (7 if medium_rectangle_profile else 4),
+        inner_width // 2,
+    )
     if target_height >= 2 * target_width:
         badge_height = max(1, min(inner_height // 24, inner_width // 7))
         group_rows = [
@@ -1412,6 +1488,12 @@ def _build_compact_grid_candidate(
             ([badges[2]], 1, badge_height),
             ([cta], 1, max(1, min(inner_height // 12, inner_width // 4))),
             ([ribbon], 1, max(1, min(inner_height // 8, inner_width // 2))),
+        ]
+    elif medium_rectangle_profile:
+        group_rows = [
+            (badges[:2], 2, max(1, inner_height // 12)),
+            ([badges[2], cta], 2, max(1, inner_height // 8)),
+            ([ribbon], 1, max(1, inner_height // 7)),
         ]
     else:
         group_rows = [
@@ -1456,6 +1538,21 @@ def _build_compact_grid_candidate(
     response_elements[background].update(
         {"x": 0, "y": 0, "width": target_width, "height": target_height}
     )
+    decoration_scale = min(
+        Fraction(1),
+        Fraction(target_width, 1) / to_fraction(source["canvas"]["width"]),
+        Fraction(target_height, 1) / to_fraction(source["canvas"]["height"]),
+    )
+    for index in decorations:
+        element = source_elements[index]
+        response_elements[index].update(
+            {
+                "x": to_fraction(element["x"]) * decoration_scale,
+                "y": to_fraction(element["y"]) * decoration_scale,
+                "width": to_fraction(element["width"]) * decoration_scale,
+                "height": to_fraction(element["height"]) * decoration_scale,
+            }
+        )
     for index, slot in zip(
         [*art_images, *secondary_images], row_slots(padding_y, media_height, 3)
     ):
@@ -1518,6 +1615,8 @@ def _build_compact_grid_candidate(
         "dominant_copy": Fraction(6, 5),
         "dominant_media": Fraction(4, 5),
     }.get(variant, Fraction(1))
+    if medium_rectangle_profile:
+        variant_scale = Fraction(1)
 
     selected_sizes: dict[int, int] = {}
     minimum_body_heights: dict[int, int] = {}
@@ -1529,10 +1628,16 @@ def _build_compact_grid_candidate(
         fit_element = dict(response_elements[index])
         fit_element["width"] = quantize_to_int(response_elements[index]["width"])
         fit_element["height"] = quantize_to_int(response_elements[index]["height"])
+        if medium_rectangle_profile and index in body_text:
+            fit_element["height"] = minimum_text_box_height(
+                fit_element, fit_element["width"], 6, font_manager
+            )
         source_size = to_fraction(source_elements[index]["font_size"])
-        preferred_size = _preferred_font_size(source_size, scale)
         role = model.assignments[index].role
-        if role is RoleKind.HEADLINE:
+        preferred_size = _preferred_font_size(source_size, scale)
+        if medium_rectangle_profile and index in body_text:
+            preferred_size = 6
+        elif role is RoleKind.HEADLINE:
             preferred_size = min(
                 int(source_size), max(preferred_size, 11)
             )
@@ -1548,6 +1653,16 @@ def _build_compact_grid_candidate(
         if selected_size is None:
             work_diagnostics.update(
                 {"status": "text_fit_exhausted", "failed_element_id": source_elements[index]["id"]}
+            )
+            return None
+        if medium_rectangle_profile and selected_size < (
+            7 if role is RoleKind.CTA else 6
+        ):
+            work_diagnostics.update(
+                {
+                    "status": "text_fit_below_profile_minimum",
+                    "failed_element_id": source_elements[index]["id"],
+                }
             )
             return None
         selected_sizes[index] = selected_size

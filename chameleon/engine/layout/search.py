@@ -8,7 +8,7 @@ the topology modules remain the source-aware geometry generators.
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from fractions import Fraction
 from math import ceil, floor
 from pathlib import Path
@@ -27,10 +27,7 @@ from ..geometry.ratios import reduced_ratio
 from .candidate import RenderedCandidate
 from .column_pivot import _center_foreground_envelope, solve_column_pivot
 from .horizontal_ribbon import solve_horizontal_ribbon
-from .near_isomorphic import (
-    _is_wide_landscape_target,
-    solve_near_isomorphic,
-)
+from .near_isomorphic import _is_wide_landscape_target, solve_near_isomorphic
 from .ranking import QualityScore, score_candidate, select_best
 from .roles import RoleKind, RoleModel, infer_roles
 from .vertical_restack import solve_vertical_restack
@@ -515,7 +512,7 @@ def _distribute_portrait_vertical_slack(
     target_canvas: Mapping[str, Any],
     roles: RoleModel,
 ) -> tuple[Mapping[str, Any], bool]:
-    """Center three inferred story blocks over a bounded 60% canvas span."""
+    """Center three inferred story blocks, excluding source-bleed units."""
 
     target_width = to_fraction(target_canvas["width"])
     target_height = to_fraction(target_canvas["height"])
@@ -531,6 +528,18 @@ def _distribute_portrait_vertical_slack(
         "cta": [],
     }
     group_categories: dict[Any, set[str | None]] = {}
+    bleeding_groups = {
+        element["group_id"]
+        for element, assignment in zip(elements, roles.assignments)
+        if element.get("group_id") is not None
+        and assignment.signals.get("source_bleed_sides") is not None
+    }
+    excluded_indices = {
+        index
+        for index, (element, assignment) in enumerate(zip(elements, roles.assignments))
+        if assignment.signals.get("source_bleed_sides") is not None
+        or element.get("group_id") in bleeding_groups
+    }
     for index, (element, assignment) in enumerate(zip(elements, roles.assignments)):
         category = (
             None
@@ -540,7 +549,8 @@ def _distribute_portrait_vertical_slack(
         if index != roles.background_index:
             if category is None:
                 return response, False
-            categories[category].append(index)
+            if index not in excluded_indices:
+                categories[category].append(index)
         group_id = element.get("group_id")
         if group_id is not None:
             group_categories.setdefault(group_id, set()).add(category)
@@ -599,6 +609,8 @@ def _distribute_portrait_vertical_slack(
         rotated_aabb(element)
         for index, element in enumerate(adjusted["elements"])
         if index != roles.background_index
+        and roles.assignments[index].signals.get("source_bleed_sides") is None
+        and element.get("group_id") not in bleeding_groups
         and to_fraction(element["width"]) > 0
         and to_fraction(element["height"]) > 0
     ]
@@ -984,6 +996,8 @@ def search(
                     source["canvas"],
                     target_canvas,
                     integer_translation=True,
+                    center_vertical=False,
+                    exclude_source_bleed=False,
                 )
             response_refined = (
                 slack_distributed or placeholder_adjusted or landscape_centered
@@ -1102,6 +1116,53 @@ def search(
             },
         )
     selected = select_best(admitted)
+    selected_before_refinement = selected
+    selected_response = deepcopy(dict(selected.response))
+    if (
+        to_fraction(target_canvas["width"]) * 10
+        >= to_fraction(target_canvas["height"]) * 9
+        and _center_foreground_envelope(
+            list(source["elements"]),
+            selected_response["elements"],
+            roles.background_index,
+            source["canvas"],
+            target_canvas,
+            integer_translation=True,
+        )
+    ):
+        validate_response(
+            source,
+            target_canvas,
+            selected_response,
+            font_manager=font_manager,
+            fonts_dir=fonts_dir,
+        )
+        selected_png, selected_warnings = _render_candidate(
+            selected_response,
+            assets_dir=assets_dir,
+            fonts_dir=fonts_dir,
+            font_manager=font_manager,
+        )
+        validate_response(
+            source,
+            target_canvas,
+            selected_response,
+            font_manager=font_manager,
+            fonts_dir=fonts_dir,
+        )
+        selected = replace(
+            selected,
+            response=selected_response,
+            rendered_png=bytes(selected_png),
+            quality=score_candidate(
+                source, selected_response, selected_png, roles=roles
+            ),
+            warnings=selected_warnings,
+        )
+        admitted = [
+            selected if candidate is selected_before_refinement else candidate
+            for candidate in admitted
+        ]
     selected_quality = {
         "readability": selected.quality.readability,
         "balance": selected.quality.balance,

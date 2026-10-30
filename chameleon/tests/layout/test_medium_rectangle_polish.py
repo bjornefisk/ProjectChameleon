@@ -58,6 +58,16 @@ class MediumRectanglePolishTests(unittest.TestCase):
         self.assertEqual(len(serialized["elements"]), len(source["elements"]))
 
         output = {element["id"]: element for element in serialized["elements"]}
+        text_elements = [
+            element
+            for element in serialized["elements"]
+            if element["type"] == "text"
+        ]
+        self.assertGreaterEqual(
+            min(element["font_size"] for element in text_elements), 6
+        )
+        self.assertGreaterEqual(output["ribbon_label"]["font_size"], 6)
+        self.assertGreaterEqual(output["cta_label"]["font_size"], 7)
         foreground = [
             element for element in serialized["elements"] if element["id"] != "bg"
         ]

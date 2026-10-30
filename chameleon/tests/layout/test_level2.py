@@ -388,6 +388,141 @@ class Level2IntegrationTests(unittest.TestCase):
 
 
 
+    def test_story_resize_centers_foreground_without_moving_source_bleed(self):
+        task = self._load_task()
+        source = task["source"]
+        target = {"width": 1080, "height": 1920}
+        response = resize(source, target)
+        validate_response(source, target, response)
+
+        model = infer_roles(source)
+        source_by_id = {element["id"]: element for element in source["elements"]}
+        response_by_id = {element["id"]: element for element in response["elements"]}
+        bleed = source_by_id["deco_circle_1"]
+        expected_bleed = source_bleed_sides(
+            bleed, rotated_aabb(bleed), source["canvas"]
+        )
+        self.assertEqual(expected_bleed, frozenset({"left", "top"}))
+        self.assertEqual(
+            source_bleed_sides(
+                response_by_id[bleed["id"]],
+                rotated_aabb(response_by_id[bleed["id"]]),
+                target,
+            ),
+            expected_bleed,
+        )
+
+        foreground = [
+            rotated_aabb(element)
+            for index, element in enumerate(response["elements"])
+            if index != model.background_index
+            and model.assignments[index].signals["source_bleed_sides"] is None
+            and element["width"] > 0
+            and element["height"] > 0
+        ]
+        top = min(box.min_y for box in foreground)
+        bottom = max(box.max_y for box in foreground)
+        self.assertLessEqual(abs(top - (target["height"] - bottom)), target["height"] / 10)
+        source_boxes = [rotated_aabb(element) for element in source["elements"]]
+        response_boxes = [rotated_aabb(element) for element in response["elements"]]
+        for left in range(len(source_boxes)):
+            for right in range(left + 1, len(source_boxes)):
+                if positive_aabb_intersection(source_boxes[left], source_boxes[right]):
+                    continue
+                self.assertFalse(
+                    positive_aabb_intersection(response_boxes[left], response_boxes[right]),
+                    (source["elements"][left]["id"], source["elements"][right]["id"]),
+                )
+
+    def test_story_bleed_excludes_entire_rigid_group_from_slack_distribution(self):
+        task = self._load_task()
+        source = copy.deepcopy(task["source"])
+        target = {"width": 1080, "height": 1920}
+        bleed = next(element for element in source["elements"] if element["id"] == "deco_circle_1")
+        sibling = next(element for element in source["elements"] if element["id"] == "deco_circle_2")
+        bleed["group_id"] = sibling["group_id"] = "bleed-decoration"
+        response = resize(source, target)
+        validate_response(source, target, response)
+
+        source_group = [bleed, sibling]
+        response_by_id = {element["id"]: element for element in response["elements"]}
+        response_group = [response_by_id[element["id"]] for element in source_group]
+        self.assertTrue(has_common_transform(source_group, response_group))
+        expected_bleed = source_bleed_sides(
+            bleed, rotated_aabb(bleed), source["canvas"]
+        )
+        self.assertEqual(
+            source_bleed_sides(
+                response_by_id[bleed["id"]],
+                rotated_aabb(response_by_id[bleed["id"]]),
+                target,
+            ),
+            expected_bleed,
+        )
+
+        model = infer_roles(source)
+        foreground = [
+            rotated_aabb(element)
+            for index, element in enumerate(response["elements"])
+            if index != model.background_index
+            and element.get("group_id") != "bleed-decoration"
+            and model.assignments[index].signals["source_bleed_sides"] is None
+            and element["width"] > 0
+            and element["height"] > 0
+        ]
+        top = min(box.min_y for box in foreground)
+        bottom = max(box.max_y for box in foreground)
+        self.assertLessEqual(abs(top - (target["height"] - bottom)), target["height"] / 10)
+        source_boxes = [rotated_aabb(element) for element in source["elements"]]
+        response_boxes = [rotated_aabb(element) for element in response["elements"]]
+        for left in range(len(source_boxes)):
+            for right in range(left + 1, len(source_boxes)):
+                if positive_aabb_intersection(source_boxes[left], source_boxes[right]):
+                    continue
+                self.assertFalse(
+                    positive_aabb_intersection(response_boxes[left], response_boxes[right]),
+                    (source["elements"][left]["id"], source["elements"][right]["id"]),
+                )
+
+
+    def test_billboard_resize_uses_slack_for_legible_centered_foreground(self):
+        task = self._load_task()
+        source = task["source"]
+        target = {"width": 970, "height": 250}
+        response = resize(source, target)
+        validate_response(source, target, response)
+
+        model = infer_roles(source)
+        foreground = [
+            rotated_aabb(element)
+            for index, element in enumerate(response["elements"])
+            if index != model.background_index
+            and model.assignments[index].signals["source_bleed_sides"] is None
+            and element["width"] > 0
+            and element["height"] > 0
+        ]
+        top = min(box.min_y for box in foreground)
+        bottom = max(box.max_y for box in foreground)
+        self.assertLessEqual(abs(top - (target["height"] - bottom)), target["height"] / 10)
+        response_by_id = {element["id"]: element for element in response["elements"]}
+        self.assertGreaterEqual(response_by_id["subhead"]["font_size"], 8)
+
+        source_by_id = {element["id"]: element for element in source["elements"]}
+        response_by_id = {element["id"]: element for element in response["elements"]}
+        for element_id, source_element in source_by_id.items():
+            expected_bleed = source_bleed_sides(
+                source_element, rotated_aabb(source_element), source["canvas"]
+            )
+            if expected_bleed is not None:
+                self.assertEqual(
+                    source_bleed_sides(
+                        response_by_id[element_id],
+                        rotated_aabb(response_by_id[element_id]),
+                        target,
+                    ),
+                    expected_bleed,
+                )
+
     def test_resize_preserves_identity_and_semantics_in_source_order(self):
         task = self._load_task()
         source = task["source"]
@@ -454,6 +589,36 @@ class Level2IntegrationTests(unittest.TestCase):
             [source_by_id["cta_bg"], source_by_id["cta_label"]],
             [by_id["cta_bg"], by_id["cta_label"]],
         ))
+
+    def test_compact_square_separates_source_overlapping_subhead_from_cta(self):
+        task = self._load_task()
+        source = task["source"]
+        target = {"width": 600, "height": 600}
+        response = resize(source, target)
+        validate_response(source, target, response)
+
+        response_by_id = {element["id"]: element for element in response["elements"]}
+        model = infer_roles(source)
+        subhead_index = next(
+            index
+            for index, element in enumerate(source["elements"])
+            if element["id"] == "subhead"
+        )
+        subhead_box = rotated_aabb(response_by_id["subhead"])
+        self.assertGreaterEqual(response_by_id["subhead"]["font_size"], 13)
+        for element_id in ("cta_bg", "cta_label"):
+            cta_index = next(
+                index
+                for index, element in enumerate(source["elements"])
+                if element["id"] == element_id
+            )
+            self.assertTrue(model.overlaps(subhead_index, cta_index))
+            self.assertFalse(
+                positive_aabb_intersection(
+                    subhead_box, rotated_aabb(response_by_id[element_id])
+                ),
+                msg=f"subhead must not cover {element_id}",
+            )
 
     def test_bleed_and_source_separated_pairs_follow_contract(self):
         task = self._load_task()

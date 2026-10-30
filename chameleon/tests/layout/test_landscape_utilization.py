@@ -3,17 +3,26 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 from pathlib import Path
 import unittest
 
 try:
     from engine.contract import validate_response
-    from engine.geometry.bounds import positive_aabb_intersection, rotated_aabb
+    from engine.geometry.bounds import (
+        positive_aabb_intersection,
+        rotated_aabb,
+        source_bleed_sides,
+    )
     from engine.layout.roles import infer_roles
     from engine.resize import resize
 except ModuleNotFoundError:
     from chameleon.engine.contract import validate_response
-    from chameleon.engine.geometry.bounds import positive_aabb_intersection, rotated_aabb
+    from chameleon.engine.geometry.bounds import (
+        positive_aabb_intersection,
+        rotated_aabb,
+        source_bleed_sides,
+    )
     from chameleon.engine.layout.roles import infer_roles
     from chameleon.engine.resize import resize
 
@@ -128,6 +137,48 @@ class LandscapeUtilizationTests(unittest.TestCase):
                             ),
                         )
 
+    def test_nonportrait_foreground_envelope_is_centered_on_both_axes(self):
+        cases = (
+            ("chameleon_sample_level1_warmup.json", 1200, 630),
+            ("chameleon_sample_level1_warmup.json", 970, 250),
+            ("chameleon_sample_level1_warmup.json", 300, 250),
+            ("chameleon_sample_level2_core.json", 1200, 630),
+            ("chameleon_sample_level2_core.json", 300, 250),
+            ("chameleon_sample_level2_core.json", 600, 600),
+        )
+        for fixture, width, height in cases:
+            with self.subTest(fixture=fixture, target=(width, height)):
+                source_document = json.loads(
+                    (ROOT / "input" / fixture).read_text(encoding="utf-8"),
+                    parse_float=Decimal,
+                )
+                source = source_document["source"]
+                target = {"width": width, "height": height}
+                response = resize(source, target)
+                validate_response(
+                    source, target, response, fonts_dir=str(FONTS)
+                )
+
+                roles = infer_roles(source)
+                foreground_boxes = [
+                    rotated_aabb(response["elements"][index])
+                    for index, source_element in enumerate(source["elements"])
+                    if index != roles.background_index
+                    and source_bleed_sides(
+                        source_element,
+                        rotated_aabb(source_element),
+                        source["canvas"],
+                    )
+                    is None
+                ]
+                margins = (
+                    min(box.min_x for box in foreground_boxes),
+                    min(box.min_y for box in foreground_boxes),
+                    width - max(box.max_x for box in foreground_boxes),
+                    height - max(box.max_y for box in foreground_boxes),
+                )
+                self.assertLessEqual(abs(margins[0] - margins[2]), 1)
+                self.assertLessEqual(abs(margins[1] - margins[3]), 1)
 
 if __name__ == "__main__":
     unittest.main()
