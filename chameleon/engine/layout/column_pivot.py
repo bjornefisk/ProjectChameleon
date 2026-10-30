@@ -508,8 +508,7 @@ def _build_column_candidate(
         missing = [source_elements[index]["id"] for index in range(len(source_elements)) if index not in transformed]
         _fail("column pivot has no source-derived placement for records", element_ids=missing)
 
-    # Renderer-in-loop text fitting reads exact geometry; serialization follows
-    # only after all placements and font-size probes finish.
+    # Fit text with rendered measurements before serializing the final geometry.
     manager = font_manager
     text_all = [index for index, element in enumerate(source_elements) if element.get("type") == "text"]
     if text_all:

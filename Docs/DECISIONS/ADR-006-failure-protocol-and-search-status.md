@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — pre-implementation contract decision. This ADR ratifies the Stage 1 failure and search-status rules for future implementation. It is documentation-only: acceptance does not claim that the runner, output protocol, or runtime behavior is implemented or qualified, and it does not authorize code changes by itself.
+Accepted — implemented in the bounded runner and staging paths. Native platform, organizer scoring, and release qualification remain separate evidence questions.
 
 ## Date
 
@@ -14,12 +14,12 @@ The ratified contract and Accepted ADR-003 establish the hard boundary: a Stage 
 
 The current public success shape must remain unchanged. In particular, a failure status must not be smuggled into a design document and a second JSON ``unsatisfiable`` response must not be invented before the organizer specifies how failures are scored. JSON Schema defines validation rather than process exit status ([JSON Schema validation](https://json-schema.org/draft/2020-12/json-schema-validation)), while the POSIX utility convention uses zero for success and nonzero for failure ([POSIX utility conventions](https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap01.html)). Those sources are general conventions, not organizer-specific scoring rules.
 
-Research also found an operational risk in the existing baseline: it can write artifacts before rendering has completed, leaves a zero exit status in failure paths, and has no stale-output or pair-publication protocol. This ADR records the intended behavior without changing that implementation during the documentation pass.
+The implementation now stages artifacts before publication, reports typed failures, cleans stale outputs, and preserves the all-or-nothing JSON/PNG boundary. This ADR remains the source for those rules.
 
 ### Authority classification
 
 - **Ratified current contract:** `Docs/PROJECT_CONTRACT.md` §§3 and 8, ADR-001, ADR-003, and ADR-004. These remain authoritative. They require a design-only success response, typed fail-closed infeasibility, no Stage 1 artifact for a failed task, and an offline `linux/amd64` runtime.
-- **Accepted internal contract decision:** the status names, deterministic cutoff rule, pair-publication protocol, and batch aggregation below are ratified defaults for future implementation. They must be reconciled with the ratified contract and remain unimplemented until the relevant work is completed and evidenced.
+- **Accepted internal contract decision:** the status names, deterministic cutoff rule, pair-publication protocol, and batch aggregation below are ratified defaults used by the current runner. Current evidence is recorded in the implementation tickets and `Docs/STATUS.md`.
 - **Externally unverified organizer fact:** whether hidden tasks are guaranteed feasible and how the scorer treats missing output or a nonzero task failure. No local decision can answer that question.
 
 ## Decision
@@ -54,7 +54,7 @@ This distinction preserves ADR-003's fail-closed rule while avoiding a false pro
 
 Candidate generation SHOULD prevent avoidable failures on extreme canvas ratios by considering all contract-permitted levers before declaring infeasibility:
 
-1. Reduce text font sizes while preserving unchanged copy, fixed typography properties, renderer bounds, and qualitative readability. The roughly 10–12px range is a soft preference, not a minimum; ADR-011 supersedes this subsection's former numeric floor.
+1. Reduce text font sizes while preserving unchanged copy, fixed typography properties, renderer bounds, and qualitative readability. Try larger positive sizes first, then smaller positive sizes when needed; there is no universal numeric minimum. ADR-011 supersedes this subsection's former numeric floor.
 2. Isotropically downscale foreground artwork while preserving exact image ratios.
 3. Consider horizontal-ribbon or multi-column topology shifts that spread content along the dominant canvas axis.
 4. Compress margins and element spacing where the source relationships and hard constraints allow.
@@ -107,18 +107,18 @@ Rejected. A successful process is not the same as a successful batch. Zero is re
 
 ## Consequences
 
-- The orchestrator needs an explicit typed status path before it can claim conforming failure behavior.
-- Search code must expose whether its candidate set was exhausted or cut off; it cannot infer that from the absence of a candidate alone.
-- Artifact publication becomes transactional at the task level and must include stale-output handling.
-- Batch logs can distinguish malformed input, proven infeasibility, incomplete search, and runtime/I/O failure without changing the design schema.
+- The orchestrator has an explicit typed status path and task-level pair publication.
+- Search code exposes whether its candidate set was exhausted or cut off; it cannot infer that from the absence of a candidate alone.
+- Artifact publication is transactional at the task level and includes stale-output handling.
+- Batch logs distinguish malformed input, proven infeasibility, incomplete search, and runtime/I/O failure without changing the design schema.
 - The organizer's failure scoring remains unresolved. A local run can be deterministic and fail closed without claiming that the external scorer will accept missing output.
-- No code, schema, fixture, Docker, dependency, or runtime change is claimed or authorized by this documentation-only ratification.
+- Implementation changes remain limited to this ADR's accepted behavior and recorded project scope.
 
 ## Affected files/schema fields
 
-When implemented, the affected work would touch the future task runner/orchestrator (including the current `chameleon/engine/main.py` path), task output staging/publishing, and the typed internal error definitions. No public schema field is added or changed. The existing design response, element identity rules, and ADR-003 failure contract remain the boundary.
+The affected implementation includes the task runner/orchestrator (`chameleon/engine/main.py`), task output staging/publishing, and typed internal error definitions. No public schema field is added or changed. The existing design response, element identity rules, and ADR-003 failure contract remain the boundary.
 
-This documentation-only ratification changes project documentation only; implementation and qualification remain pending.
+The runner, staging paths, typed errors, and task-level publication behavior implement this ADR. The public schema remains unchanged.
 
 ## Required validation/evidence
 
@@ -133,7 +133,7 @@ Before implementation can claim conformance, the evidence must include at least:
 - repeated runs produce the same status, reason code, artifact bytes, and aggregate exit status; and
 - a mixed batch continues independent tasks, commits only successful pairs, and exits nonzero if any task does not commit both artifacts.
 
-The status and publication evidence must be collected in the pinned offline Stage 1 runtime. No such tests or runtime changes were run or made for this documentation-only ratification; acceptance does not imply qualification.
+Focused and full test evidence is recorded in Ticket 03 and `Docs/STATUS.md`. This ADR defines the required evidence and does not replace those records.
 
 ### Organizer clarification required
 

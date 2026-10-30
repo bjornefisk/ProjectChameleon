@@ -85,9 +85,9 @@ One deliberate exception: the Level 3 sample's `holiday_watermark` element refer
 **Using it:**
 
 1. Install the pinned dependencies and build the verified renderer wheel with `make setup` from the repository root.
-2. Read `Docs/PROJECT_CONTRACT.md` before changing `chameleon/engine/resize.py`; `resize(source, target_canvas)` is the public solver function, while conformance work may also touch the task orchestrator and renderer adapter. The contract—not the baseline—defines behavior.
+2. Read `Docs/PROJECT_CONTRACT.md` before changing `chameleon/engine/resize.py`; `resize(source, target_canvas)` is the public solver function, while the task orchestrator and renderer adapter own batch output and rendering. The contract, not the starter code, defines behavior.
 3. Run `make run` from the repository root. It processes the three sample task files and writes successful JSON/PNG pairs plus hidden commit manifests to `chameleon/output/`; use `make inspect` rather than consuming raw JSON during execution.
-4. Use the contract fixtures and renderer conformance plan before claiming a behavior is supported. The current `resize.py` is intentionally nonconforming uniform stretch; failure behavior is defined by `Docs/PROJECT_CONTRACT.md` and must not be inferred from starter output.
+4. Use the contract fixtures and renderer conformance plan before claiming a behavior is supported. The uniform-stretch result was only the initial starter baseline; the current engine uses bounded search and hard validation.
 5. Qualify the actual Stage 1 image for Python 3.11 on `linux/amd64` from the repository root:
    ```
    make docker-build

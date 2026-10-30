@@ -4,7 +4,7 @@ This directory houses the complete engineering specification, module architectur
 
 It is structured using the industry-standard **`to-spec`**, **`to-tickets`**, and **`writing-for-agents`** methodologies so autonomous AI agents have explicit implementation boundaries and dependency-sequenced work.
 Use `../FINAL_ARCHITECTURE.md` as the consolidated implementation summary. This directory decomposes that architecture into the executable specification and dependency-sequenced tickets.
-Issue #61's public Level 3 implementation is merged in PR #65 and the issue is closed. The public 1080×1350 to 728×90 sample yields a hard-valid pair in repeated local integration tests; ADR-010 through ADR-012 reconcile the project-authored serialized-group equality, numeric font floor, and text-origin rules against the supplied PDF. Font probes and grouped-text scale refinement have fixed 74-step bounds with candidate-work diagnostics and typed cutoff propagation. Required native x86_64 CI passed on PR head `33f6fd9`; cross-platform parity, broad organizer-held-out scoring, and release qualification remain unverified.
+Issue #61's public Level 3 implementation is merged in PR #65 and the issue is closed. The public 1080×1350 to 728×90 sample yields a hard-valid pair in repeated local integration tests; ADR-010 through ADR-012 reconcile the project-authored serialized-group equality, no universal numeric font floor, and text-origin rules against the supplied PDF. Font probes and grouped-text scale refinement have fixed 74-step bounds with candidate-work diagnostics and typed cutoff propagation. Required native x86_64 CI passed on PR head `33f6fd9`; cross-platform parity, broad organizer-held-out scoring, and release qualification remain unverified.
 
 ---
 
@@ -67,7 +67,7 @@ Agents work the **frontier**: any ticket whose blockers are 100% complete.
 | **05** | `resize.py` isotropic scaling & near-isomorphic solver (passes Level 1) | **02, 03, 04** |
 | **06** | `roles.py` & `column_pivot.py` multi-signal inference (passes Level 2) | **05** |
 | **07** | `horizontal_ribbon.py` & spatial compression engine (passes Level 3) | **06** |
-| **08** | Bounded four-family search, fixed-point ranking, local artifact/held-out evidence, and offline Docker qualification plan | **07** for topology interfaces; bounded integration is present, official/native qualification remains pending |
+| **08** | Bounded four-family search, fixed-point ranking, local artifact/held-out evidence, and offline Docker qualification plan | **07** for topology interfaces; bounded integration is present, official scoring, cross-platform parity, organizer-held-out scoring, and release qualification remain unverified |
 
 ---
 

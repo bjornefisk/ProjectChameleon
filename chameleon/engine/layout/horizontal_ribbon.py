@@ -220,8 +220,7 @@ def _singleton_dimensions(
             )
     if element["type"] == "text":
         if axis == "horizontal":
-            # More independent units produce narrower, denser text columns;
-            # the actual font search below is renderer-in-the-loop.
+            # More units make text columns narrower. The font search below measures rendered text.
             width_divisor = max(12, unit_count + 8)
             width = max(12, target_width // width_divisor)
             height = max(8, target_height // 5)

@@ -35,8 +35,7 @@ def to_fraction(value: Any) -> Fraction:
     raise TypeError(f"not an exact contract number: {value!r}")
 
 
-# The validator's private helper used this conventional spelling.  Keeping one
-# public name makes geometry imports readable without creating a second path.
+# Keep this alias so geometry callers use one clear public name.
 as_fraction = to_fraction
 
 
