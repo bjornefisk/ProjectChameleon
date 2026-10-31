@@ -111,8 +111,7 @@ class SearchResult:
         return self.selected
 
 
-# Kept as a discoverable seam for tests and future topology additions.  Values
-# are imported solver functions and are never reordered at runtime.
+# Keep this fixed tuple for tests and future topology additions. Do not reorder it at runtime.
 _TOPOLOGY_SOLVERS: tuple[Callable[..., RenderedCandidate], ...] = (
     solve_near_isomorphic,
     solve_column_pivot,

@@ -150,7 +150,7 @@ Before implementation can claim conformance, the evidence must include at least:
 
 The external references used for this decision are [Unicode UAX #14](https://www.unicode.org/reports/tr14/), [Unicode UAX #29](https://www.unicode.org/reports/tr29/), and the pinned [cr-renderer commit](https://github.com/CyberAgentAILab/cr-renderer/commit/a17e1fb9a732959dd6c21ae168d5ee09d74bd64f) and source files linked above. The project contract and pinned dependency evidence remain authoritative over generic upstream behavior.
 
-The current tree provides local tests and renderer/artifact evidence for the bounded behavior described here; see `Docs/STATUS.md` and `Docs/IMPLEMENTATION/tickets/08-issue-23-evidence.md`. Native-amd64, final-font, and cross-platform hash qualification remain unverified.
+The current tree provides local tests and renderer/artifact evidence for the bounded behavior described here; see `Docs/STATUS.md` and `Docs/DEPENDENCY_EVIDENCE.md`. Native-amd64, final-font, and cross-platform hash qualification remain unverified.
 
 ### Organizer clarification required
 

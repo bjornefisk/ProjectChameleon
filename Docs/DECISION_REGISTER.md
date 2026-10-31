@@ -1,12 +1,12 @@
-# Project Chameleon pre-implementation decision register
+# Project Chameleon decision register
 
 ## Status
 
-Accepted pre-implementation documentation package. ADR-006 through ADR-009 were accepted contract decisions for Stage 1 and remain part of the historical record. ADR-010 through ADR-012 were later accepted on 2026-10-21; ADR-013 was accepted on 2026-10-25. Each later ADR authorizes only its explicitly scoped implementation changes and supersedes only the clauses it names.
+Accepted decision package and current implementation index. ADR-006 through ADR-009 were accepted contract decisions for Stage 1. ADR-010 through ADR-012 were accepted on 2026-10-21, and ADR-013 was accepted on 2026-10-25. Each later ADR authorizes only its explicitly scoped implementation changes and supersedes only the clauses it names.
 
 ## Date
 
-2026-10-06
+2026-10-28
 
 ## Scope and authority
 
@@ -14,15 +14,15 @@ This package records accepted operational decisions and remaining external quest
 
 - `Docs/PROJECT_CONTRACT.md` and Accepted ADR-001 through ADR-013 are the current ratified authority.
 - The ratified `chameleon/chameleon_design_schema_v0.9.json`, pinned renderer evidence, and Accepted ADRs are not silently overridden by starter code, fixtures, or lower-precedence guidance.
-- A conflict with the contract requires an explicit superseding ADR or contract update before implementation. Acceptance of this package records decisions but does not change runtime behavior.
-- No code, schema, fixture, Docker, requirements, engine, renderer, validator, solver, model, or runtime behavior changes are authorized by this register; implementation and qualification remain pending.
+- Implementation and qualification status are tracked in `Docs/STATUS.md`, the implementation tickets, and the evidence records. This register does not authorize changes outside the accepted scopes.
+- Tickets 01 through 08 are implemented within the accepted Stage 1 bounds. Native platform, organizer scoring, and release qualification remain separate evidence questions.
 
 The package distinguishes three kinds of statement:
 
 | Label | Meaning |
 | --- | --- |
 | **Ratified current contract** | Binding behavior already established by the project contract or an Accepted ADR. All later implementation must preserve it. |
-| **Accepted internal contract decision** | A deterministic, maintainable default ratified for later implementation. It is a contract decision, not evidence that the behavior is implemented or qualified. |
+| **Accepted internal contract decision** | A deterministic, maintainable default ratified for implementation. Implementation and qualification status is tracked separately. |
 | **Externally unverified organizer fact** | A fact controlled by the organizer or deployment environment and not established by this repository. It must remain open rather than being guessed. |
 
 ## Ratified baseline that these accepted decisions must preserve
@@ -37,31 +37,31 @@ The package distinguishes three kinds of statement:
 
 ## Decision matrix
 
-The status of every new ADR is **Accepted**. “Blocking” below means acceptance settles the contract before the corresponding implementation work can claim a settled behavior; it does not claim that work is implemented or qualified.
+The status of every new ADR is **Accepted**. “Blocking” below means acceptance settles the contract before the corresponding work can claim a settled behavior. Current implementation and qualification evidence is recorded in the status and ticket documents.
 
 | ADR | Decision area | Register classification | Implementation gate | Ratified decision recorded | External blocker |
 | --- | --- | --- | --- | --- | --- |
-| [ADR-006](DECISIONS/ADR-006-failure-protocol-and-search-status.md) | Failure protocol, incomplete versus infeasible search, artifact publication, batch exit | **Accepted; blocking decision** for a conforming runner/orchestrator | Implement only after the contract and evidence path are available | Stable typed internal statuses; no unsatisfiable success envelope; stage and commit JSON/PNG as one logical pair; zero only when every task commits | `Are hidden tasks guaranteed feasible? How does the scorer handle no-output/nonzero task failure?` |
-| [ADR-007](DECISIONS/ADR-007-numeric-and-geometry-semantics.md) | Exact numeric ingress, rounding, transforms, AABB, background, bleed, overlap | **Accepted; blocking decision** for validator/geometry/search work | Implement only with post-serialization conformance evidence | Exact rational ingress; one round-half-even serialization; post-serialization validation; common group transform; positive-area AABB collision; deterministic background and bleed rules | Official catalogue and score facts remain external, but no organizer answer is needed for the local arithmetic default |
-| [ADR-008](DECISIONS/ADR-008-typography-and-renderer-edge-semantics.md) | Unicode line generation, style-run boundaries, metrics, overflow, shape strokes | **Accepted; blocking decision** for renderer/typography conformance | Implement only with renderer and font evidence | UAX #29 clusters plus UAX #14 opportunities; latest-fitting greedy breaks; effective span metrics; reject overflow; preserve content; rasterize declared rectangle/ellipse strokes inside the box; no public line-map field | `Final fonts/assets/licensing and native amd64 qualification.` |
-| [ADR-009](DECISIONS/ADR-009-initial-search-strategy.md) | Initial candidate generation, ranking, cutoff, and future solver gate | **Accepted; recommended initial strategy; blocking for search implementation** | Implement only with held-out evaluation and deterministic evidence | Deterministic role inference; four topology families; at most three source-derived variants each; renderer-in-loop hard validation; fixed-point ranking; no model/CP-SAT now | Hidden feasibility/scoring, hardware/model limits, score thresholds, and catalogue breadth remain unverified |
+| [ADR-006](DECISIONS/ADR-006-failure-protocol-and-search-status.md) | Failure protocol, incomplete versus infeasible search, artifact publication, batch exit | **Accepted; implemented in the bounded runner** | Current native and official qualification still require separate evidence | Stable typed internal statuses; no unsatisfiable success envelope; stage and commit JSON/PNG as one logical pair; zero only when every task commits | `Are hidden tasks guaranteed feasible? How does the scorer handle no-output/nonzero task failure?` |
+| [ADR-007](DECISIONS/ADR-007-numeric-and-geometry-semantics.md) | Exact numeric ingress, rounding, transforms, AABB, background, bleed, overlap | **Accepted; implemented in validator, geometry, and search** | Cross-platform precision and official qualification remain separate evidence | Exact rational ingress; one round-half-even serialization; post-serialization validation; common group transform; positive-area AABB collision; deterministic background and bleed rules | Official catalogue and score facts remain external, but no organizer answer is needed for the local arithmetic default |
+| [ADR-008](DECISIONS/ADR-008-typography-and-renderer-edge-semantics.md) | Unicode line generation, style-run boundaries, metrics, overflow, shape strokes | **Accepted; implemented in renderer and typography paths** | Final fonts, assets, licensing, and native amd64 qualification remain separate evidence | UAX #29 clusters plus UAX #14 opportunities; latest-fitting greedy breaks; effective span metrics; reject overflow; preserve content; rasterize declared rectangle/ellipse strokes inside the box; no public line-map field | `Final fonts/assets/licensing and native amd64 qualification.` |
+| [ADR-009](DECISIONS/ADR-009-initial-search-strategy.md) | Initial candidate generation, ranking, cutoff, and future solver gate | **Accepted; implemented bounded strategy** | Official hidden-task feasibility, scoring, hardware limits, and catalogue breadth remain unverified | Deterministic role inference; four topology families; at most three source-derived variants each; renderer-in-loop hard validation; fixed-point ranking; no model/CP-SAT now | Hidden feasibility/scoring, hardware/model limits, score thresholds, and catalogue breadth remain unverified |
 
 ### Blocking decisions
 
-The failure, numeric/geometry, and typography decisions are accepted blocking decisions for their named hard-behavior workstreams. ADR-009 is accepted as the initial deterministic strategy and is binding when search implementation starts. Acceptance settles the contract choice; implementation, verification, and qualification remain pending.
+The failure, numeric/geometry, and typography decisions are accepted decisions for their named hard behavior. ADR-009 is the accepted initial deterministic strategy. Acceptance settles the contract choice; implementation evidence and qualification limits are tracked in `STATUS.md` and the ticket records.
 
 ### Ratified decisions
 
 The accepted, deterministic defaults are:
 
-1. **Failure & Feasibility:** Typed internal status distinctions, fail closed for genuinely invalid/unsolvable geometry, atomic task-level JSON/PNG commit boundary, and proactive spatial compression (font floors, isotropic art scaling, horizontal ribboning) to maximize feasibility on extreme canvases (ADR-006).
+1. **Failure & Feasibility:** Typed internal status distinctions, fail closed for genuinely invalid/unsolvable geometry, atomic task-level JSON/PNG commit boundary, and proactive spatial compression (positive font-size search, isotropic art scaling, horizontal ribboning) to maximize feasibility on extreme canvases (ADR-006).
 2. **Numeric & Geometry:** Exact rational comparisons, one final half-even quantization, contract AABBs, rigid group transforms, and positive-area overlap (ADR-007).
 3. **Typography:** Unicode-safe cluster boundaries, renderer-matched span metrics, explicit line/height rejection, and no text rewrite (ADR-008).
 4. **Search & Runtime:** Bounded four-topology structured search with 0 MB neural model weights, < 2.0s CPU latency target, < 500 MB solver RAM, strictly CPU-only execution under <= 8 cores and <= 8 GB RAM in Docker on Apple Silicon under Rosetta 2, followed by renderer-in-loop validation and fixed-point ranking (ADR-004, ADR-009).
 5. **Finale Integration:** Lightweight local HTTP service (FastAPI/Flask) or WebAssembly module connecting the Stage 1 engine to the Adobe Express add-on iframe (ADR-005).
-These are accepted internal contract decisions, not claims that implementation, verification, or qualification is complete.
+These are accepted internal contract decisions. Implementation evidence is listed in `STATUS.md` and the implementation tickets; qualification boundaries remain explicit.
 
-These decisions preserve the schema and existing hard constraints while settling internal behavior for later implementation.
+These decisions preserve the schema and existing hard constraints while guiding current implementation and future qualification.
 
 ## Organizer clarification questions and external blockers
 
@@ -107,14 +107,15 @@ Even after these decisions are ratified, the following implementation/evidence d
 
 ## Acceptance and implementation boundary
 
-ADR-006, ADR-007, ADR-008, and ADR-009 are accepted pre-implementation decisions:
+ADR-006, ADR-007, ADR-008, and ADR-009 remain accepted decisions:
 
-- these files are documentation-only contract records; they do not claim implementation or qualification;
+- they remain contract records, and their implemented behavior is subject to current code and evidence;
 - they preserve and extend `PROJECT_CONTRACT.md` and ADR-001 through ADR-005; together they form the original accepted ADR-001 through ADR-009 register package. Subsequent accepted ADR-010 through ADR-013 are listed below and retain their explicitly bounded scopes without adding wire fields or weakening hard constraints;
-- no code/schema/fixture/Docker/requirements/engine/renderer/validator/solver/model/runtime behavior changes on the strength of this register; and
+- implementation must remain within the accepted behavior and must not add code/schema/fixture/Docker/requirements/engine/renderer/validator/solver/model/runtime changes outside an approved scope; and
 - an implementation that encounters a conflict must stop and request a superseding accepted ADR or contract update rather than silently choosing a different behavior.
 
-## Files created by this package
+
+### Original files created by this package
 
 - `Docs/DECISION_REGISTER.md`
 - `Docs/DECISIONS/ADR-006-failure-protocol-and-search-status.md`
@@ -122,7 +123,7 @@ ADR-006, ADR-007, ADR-008, and ADR-009 are accepted pre-implementation decisions
 - `Docs/DECISIONS/ADR-008-typography-and-renderer-edge-semantics.md`
 - `Docs/DECISIONS/ADR-009-initial-search-strategy.md`
 
-No implementation files were changed for this documentation-only package. No tests, builds, linters, formatters, or network commands were run.
+The original package was documentation-only. Current implementation and verification records are maintained in `Docs/STATUS.md`, the implementation tickets, and the evidence files.
 
 ## Subsequent accepted implementation decisions
 

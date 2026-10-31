@@ -65,8 +65,9 @@ On Apple Silicon, `make docker-build` uses Buildx and loads the amd64 image into
 
 ## Further reading
 
-- [Engineering walkthrough for Adobe](Docs/STAGE1_ENGINEERING_WALKTHROUGH.md)
 - [Stage 1 contract](Docs/PROJECT_CONTRACT.md)
 - [Current status and evidence](Docs/STATUS.md)
+- [Submission packet](Docs/SUBMISSION_PACKET.md)
+- [Presentation outline](Docs/PRESENTATION.md)
 - [Final architecture](Docs/FINAL_ARCHITECTURE.md)
 - [Dependency evidence](Docs/DEPENDENCY_EVIDENCE.md)

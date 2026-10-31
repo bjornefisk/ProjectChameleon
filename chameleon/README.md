@@ -26,8 +26,8 @@ Both the JSON and the PNG are what get evaluated — see `RULES.md`.
 
 ```
 engine/
-  resize.py        <- implement your approach here
-  main.py           <- orchestrator (batch envelope -> resize() -> artifacts; conformance work may require updates)
+  resize.py        <- public resize(source, target_canvas) implementation
+  main.py           <- batch orchestrator (envelope -> resize() -> artifacts)
 renderer/           <- integrated converter wrapping pinned cr-renderer
 brand_kit/
   assets/           <- image files referenced by asset_id in the sample designs
@@ -128,3 +128,4 @@ require a separate accepted decision and immutable offline artifacts.
 - `../Docs/STATUS.md` — current implementation gaps and external blockers
 - `chameleon_design_schema_v0.9.json` — ratified structural wire schema
 - `RULES.md` / `FAQ.md` — organizer-facing clarifications aligned to the contract
+- `../Docs/SUBMISSION_PACKET.md` / `../Docs/PRESENTATION.md` — final review checklist and presentation outline

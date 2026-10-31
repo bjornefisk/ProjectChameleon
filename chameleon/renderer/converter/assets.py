@@ -56,7 +56,7 @@ def _placeholder(asset_id: Optional[str], width: float, height: float) -> Image.
     try:
         draw.multiline_text((w / 2, h / 2), label, fill=(120, 20, 20, 255), anchor="mm", align="center")
     except (TypeError, ValueError):
-        # Older Pillow without multiline `anchor` support - fall back silently.
+        # Older Pillow may lack multiline anchor support. Use simple text placement.
         draw.text((4, 4), label, fill=(120, 20, 20, 255))
     return image
 

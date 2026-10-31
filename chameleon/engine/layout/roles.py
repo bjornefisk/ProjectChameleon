@@ -365,8 +365,8 @@ def infer_roles(source: Mapping[str, Any]) -> RoleModel:
     return RoleModel(tuple(assignments), relationships, background_index)
 
 
-# Explicit aliases make the intended seam discoverable to callers while keeping
-# one implementation and one deterministic result.
+# Keep aliases at this boundary so callers find one implementation
+# and one deterministic result.
 infer_role_model = infer_roles
 infer_layout_roles = infer_roles
 

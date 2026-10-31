@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — the issue owner authorized this PDF-grounded decision and an independent reviewer returned APPROVE on 2026-10-21. Repository maintainer review of the implementation PR remains required before merge.
+Accepted — implemented in PR #65, merged at `6dbbc0a3eaba3090997ad9731a4026677dc6978c`. Partner review was waived by the repository owner; no partner approval is recorded. Native and official qualification boundaries remain separate evidence questions.
 
 ## Date / owner / reviewers
 

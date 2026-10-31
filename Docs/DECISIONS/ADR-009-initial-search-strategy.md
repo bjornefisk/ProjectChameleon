@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — pre-implementation contract decision. This ADR ratifies the initial deterministic Stage 1 search strategy for future implementation. It is documentation-only: acceptance does not claim that search, renderer validation, dependencies, model artifacts, or runtime behavior is implemented or qualified, and it does not authorize code changes by itself.
+Accepted — implemented as the bounded four-topology Stage 1 search. Official hidden-task feasibility, organizer scoring, cross-platform parity, and release qualification remain unverified.
 
 ## Date
 
@@ -14,12 +14,12 @@ The ratified Stage 1 contract defines what a hard-valid output must preserve but
 
 Stage 1 must preserve source identity, fixed properties, image ratios, groups, intentional overlap, text, and renderer semantics before optimizing visual preferences. A solver that scores a proxy before rendering can select a structurally invalid or unreadable result. Conversely, a large model or unconstrained optimizer would add offline packaging, determinism, and resource questions before the repository has evidence that it improves hidden-case coverage.
 
-The existing architecture identifies four useful regimes—near-isomorphic, column pivot, horizontal ribbon, and vertical re-stack—and recommends renderer-in-loop validation. This ADR turns those research recommendations into a bounded initial search default without making them current implementation behavior.
+The current implementation uses four bounded topology families and renderer-backed validation. This ADR records the search boundary and does not authorize models, CP-SAT, or unbounded search.
 
 ### Authority classification
 
 - **Ratified current contract:** `Docs/PROJECT_CONTRACT.md` §§5–9, ADR-002, ADR-003, and ADR-004. These fix mutable fields, hard validation, renderer authority, fail-closed behavior, offline `linux/amd64` execution, and the absence of a current model/OR-Tools dependency.
-- **Accepted internal contract decision:** deterministic multi-signal role inference, four topology families, at most three source-derived variants per family, renderer-in-loop hard validation, fixed-point ranking, and the future solver gate below are ratified defaults for future implementation. They remain unimplemented until the relevant work is completed and evidenced.
+- **Accepted internal contract decision:** deterministic multi-signal role inference, four topology families, at most three source-derived variants per family, renderer-in-loop hard validation, fixed-point ranking, and the solver gate below are ratified defaults used by the current implementation. Evidence is recorded in `Docs/STATUS.md` and the implementation tickets.
 - **Externally unverified organizer fact:** hidden-task feasibility, scorer handling of failed tasks, official score thresholds and target catalogue, exact M5 Pro resources/model limits, final fonts/assets/licensing, native `amd64` qualification, and Adobe Express deployment details remain outside the repository's authority.
 
 ## Decision
@@ -171,13 +171,13 @@ Rejected. It risks overfitting to public fixtures and cannot establish hidden-ca
 - Rendering every candidate increases work, but it makes the PNG path the same authority used for hard text and image behavior.
 - CP-SAT/model improvements remain possible, but they require held-out evidence, a new accepted dependency decision, and explicit deterministic status/resource handling.
 - Hardware limits, score thresholds, catalogue breadth, and final assets remain external blockers for claims about official qualification.
-- No code, schema, fixture, Docker, dependency, model, or runtime change is claimed or authorized by this documentation-only ratification.
+- The four-family search, renderer gate, fixed-point ranking, and cutoff rules are implemented within the accepted Stage 1 boundary.
 
 ## Affected files/schema fields
 
-When implemented, the affected work would touch the future role-inference/router, candidate generator, renderer-in-loop validator, ranker, and evaluation harness. It would read the existing `x`, `y`, `width`, `height`, `rotation`, `opacity`, `z_index`, `group_id`, `fit`, text, asset, and shape fields but would add no wire fields and change no immutable source data.
+The implementation touches the role-inference/router, candidate generator, renderer-in-loop validator, ranker, and evaluation harness. It reads the existing `x`, `y`, `width`, `height`, `rotation`, `opacity`, `z_index`, `group_id`, `fit`, text, asset, and shape fields but adds no wire fields and changes no immutable source data.
 
-The current requirements, container, renderer pin, and offline boundary remain governed by ADR-004 and the project contract. Any later CP-SAT or model adoption requires a separate accepted dependency/runtime decision. This documentation-only ratification changes project documentation only; implementation and qualification remain pending.
+The current requirements, container, renderer pin, and offline boundary remain governed by ADR-004 and the project contract. Any later CP-SAT or model adoption requires a separate accepted dependency/runtime decision. Current implementation evidence is recorded in `Docs/STATUS.md` and the implementation tickets.
 
 ## Required validation/evidence
 
@@ -195,7 +195,7 @@ Before implementation can claim conformance, the evidence must include at least:
 
 The external search references used for this decision are the [CP-SAT solver guide](https://developers.google.com/optimization/cp/cp_solver) and [CP-SAT tasks/status guidance](https://developers.google.com/optimization/cp/cp_tasks). The existing project architecture and dependency evidence remain subordinate to the ratified contract and Accepted ADRs.
 
-No such tests, builds, benchmarks, dependency changes, model runs, or runtime changes were run or made for this documentation-only ratification; acceptance does not imply qualification.
+Search, renderer, and ranking evidence is recorded in `Docs/STATUS.md` and the implementation tickets. This ADR defines the required evidence for later expansion and does not replace those records.
 
 ### Organizer clarification required
 

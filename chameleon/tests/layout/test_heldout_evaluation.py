@@ -45,12 +45,12 @@ REQUIRED_COVERAGE = {
     "source-bleed:left",
     "asset:missing-preservation",
 }
-# Each authored case was designed to exercise one family's route
-# (Docs/IMPLEMENTATION/tickets/08-heldout-evaluation.md, "Corpus provenance and
-# coverage matrix"). ADR-009 section 3 only describes the regime each family
-# serves; the per-case pairing is corpus design intent, so a failure below means
-# the corpus no longer exercises that route and the corpus or solver change must
-# be reviewed, not that the ADR mandates the pairing.
+# Each authored case was designed to exercise one family's route.
+# STATUS.md records current corpus provenance and coverage boundaries. ADR-009
+# section 3 only describes the regime each family serves; the per-case pairing is
+# corpus design intent, so a failure below means the corpus no longer exercises
+# that route and the corpus or solver change must be reviewed, not that the ADR
+# mandates the pairing.
 INTENDED_FAMILY = {
     "isomorphic-gallery": "near_isomorphic",
     "column-pivot-catalog": "column_pivot",

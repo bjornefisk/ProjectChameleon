@@ -18,8 +18,7 @@ When reading or implementing this project, follow this strict precedence. A lowe
    [`CHAMELEONCHALLENGE.md`](CHAMELEONCHALLENGE.md) and [`../chameleon/RULES.md`](../chameleon/RULES.md).
 5. **Contract Fixtures:**  
    [`../chameleon/tests/fixtures/contract/`](../chameleon/tests/fixtures/contract/).
-6. **Architectural & Algorithmic Guidance:**  
-   `PROBLEM.md`, `MATHEMATICAL_CONSTRAINTS.md`, `NEURO_SYMBOLIC_ARCHITECTURE.md`, `COMPUTATIONAL_LAYOUT_SOLVERS.md`, `TYPOGRAPHIC_REFLOW_AND_GROUPING.md`, `OBJECTIVE_EVALUATION_METRICS.md`, `DIFFICULTY_TIERS_AND_FAILURE_MODES.md`, `HERMETIC_RUNTIME_ARCHITECTURE.md`, `ADOBE_EXPRESS_INTERACTIVE_ADDON.md`.
+6. **Current architecture and evidence:** [`FINAL_ARCHITECTURE.md`](FINAL_ARCHITECTURE.md), [`STATUS.md`](STATUS.md), and [`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md).
 7. **Starter Scaffolding & Warnings:**  
    `../chameleon/README.md`, `../chameleon/FAQ.md`, and baseline code in `../chameleon/engine/resize.py` (explicitly an intentionally nonconforming baseline).
 
@@ -35,10 +34,11 @@ Implementation should start with `FINAL_ARCHITECTURE.md`, then consult the relev
 | [`PROJECT_CONTRACT.md`](PROJECT_CONTRACT.md) | **Normative Contract** | The binding behavioral specification for the Stage 1 engine: input/output, mutability, geometry invariants, rotated AABB, foreground image ratios, grouping, fail-closed rules, and runtime target. |
 | [`DECISION_REGISTER.md`](DECISION_REGISTER.md) | **Governance** | Master index of all architectural decision records, tracking statuses, ratified defaults, and external blockers. |
 | [`STATUS.md`](STATUS.md) | **Project Status** | Current execution status, completed gates, known implementation gaps, explicitly unverified external facts, and planned verification commands. |
+| [`SUBMISSION_PACKET.md`](SUBMISSION_PACKET.md) | **Submission Checklist** | Plain-language final review, evidence boundary, exact command sequence, and the missing-PDF note. |
+| [`PRESENTATION.md`](PRESENTATION.md) | **Presentation Outline** | Short review deck outline with demo order, speaker notes, and evidence boundaries. |
 | [`IMPLEMENTATION_ROADMAP.md`](IMPLEMENTATION_ROADMAP.md) | **Execution Roadmap** | Phased delivery plan from Gate 0 through Gate 7, structuring how agents build and qualify the engine in vertical slices. |
 | [`FINAL_ARCHITECTURE.md`](FINAL_ARCHITECTURE.md) | **Consolidated Architecture** | Final implementation-facing summary of the Stage 1 engine, renderer, validator, runtime, search, failure, and finale boundaries. It is subordinate to the contract and Accepted ADRs. |
 | [`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md) | **Evidence Record** | Verifiable citations and facts for all external dependencies, renderer commits, base image digests, and runtime libraries. |
-| [`AGENT_HARNESS_PLAN.md`](AGENT_HARNESS_PLAN.md) | **Agent Harness** | Blueprint for the automated testing harness, regression corpus, and Makefile commands that guide agent development. |
 | [`IMPLEMENTATION/`](IMPLEMENTATION/) | **Implementation Blueprint** | Complete `to-spec` engineering specification, data flow models, and 8 dependency-sequenced tracer-bullet tickets for subagent execution. |
 | [`../.agents/`](../.agents/) | **Shared Agent Operating System** | Provider-neutral roles, workflows, policies, research/evidence standards, GitHub/PR guidance, checklists, templates, and handoff rules. |
 
@@ -62,15 +62,6 @@ All accepted ADRs reside in [`DECISIONS/`](DECISIONS/):
 
 | Document | Focus area | Key takeaways |
 |---|---|---|
-| [`PROBLEM.md`](PROBLEM.md) | Problem Formulation | Why uniform scaling fails, semantic gap in input data, and mandatory output behaviors. |
-| [`MATHEMATICAL_CONSTRAINTS.md`](MATHEMATICAL_CONSTRAINTS.md) | Mathematical Model | Formal equations for rotated AABB containment, image aspect ratio invariance, source-separated non-overlap, and soft readability/contrast targets. |
-| [`NEURO_SYMBOLIC_ARCHITECTURE.md`](NEURO_SYMBOLIC_ARCHITECTURE.md) | Internal Pipeline Guidance | Internal four-phase pipeline: role/relationship inference, layout archetype generation, constraint placement/typography, and serialize/render/validate. It is not the product Stage 1/finale split. |
-| [`COMPUTATIONAL_LAYOUT_SOLVERS.md`](COMPUTATIONAL_LAYOUT_SOLVERS.md) | Solver Paradigms | Keeps bounded structured search primary; treats Kiwi/Cassowary and CP-SAT as deferred alternatives requiring evidence and an accepted decision. |
-| [`TYPOGRAPHIC_REFLOW_AND_GROUPING.md`](TYPOGRAPHIC_REFLOW_AND_GROUPING.md) | Typography & Groups | Font metric measurement, binary-search font sizing within slots, typographic hierarchy preservation, and rigid unit derivation. |
-| [`OBJECTIVE_EVALUATION_METRICS.md`](OBJECTIVE_EVALUATION_METRICS.md) | Optimization Proxies | Distinguishes hard validation gates from soft ranking terms (alignment, balance, readability, occlusion, overlap penalty). |
-| [`DIFFICULTY_TIERS_AND_FAILURE_MODES.md`](DIFFICULTY_TIERS_AND_FAILURE_MODES.md) | Benchmark Profiles | Level 1 (Warm-up), Level 2 (Core banner with bleed), and Level 3 (Advanced 728x90 leaderboard), detailing adversarial stress modes. |
-| [`HERMETIC_RUNTIME_ARCHITECTURE.md`](HERMETIC_RUNTIME_ARCHITECTURE.md) | Container Environment | Offline container requirements, build-time packaging, network isolation, and CPU-only resource bounds. |
-| [`ADOBE_EXPRESS_INTERACTIVE_ADDON.md`](ADOBE_EXPRESS_INTERACTIVE_ADDON.md) | Stage 2 Finale | Architecture for the live Adobe Express add-on at Adobe HQ, candidate carousels, pinning, and local HTTP engine integration. |
 | [`CHAMELEONCHALLENGE.md`](CHAMELEONCHALLENGE.md) | Historical Challenge Brief | Original competition brief supplied by Adobe, contest structure, glossary, and starter instructions. |
 
 ---
@@ -83,5 +74,5 @@ All accepted ADRs reside in [`DECISIONS/`](DECISIONS/):
 4. **Rotated containment:** Elements must stay inside the target canvas using rotated axis-aligned bounds (with the sole exception of contract-defined translucent source-bleed shapes).
 5. **Grouping & collisions:** Elements sharing a `group_id` move as a rigid unit via a single uniform scale and translation. Elements that were separate in the source must not collide (zero positive-area overlap).
 6. **Deterministic typography:** Line breaking uses Unicode grapheme cluster safety; style-runs use $[start, end)$ code-point indexing; font size is quantized to integers; overflowing text causes candidate rejection, never silent truncation.
-7. **Proactive spatial compression:** On tight canvases like 728×90, the engine tries the contract-permitted levers—font-size reduction toward the readable preference near 10–12px unless the source is smaller, isotropic artwork scaling, topology pivots, and margin compression—before reporting a typed failure. These are feasibility measures, not a guarantee that every target is solvable.
+7. **Proactive spatial compression:** On tight canvases like 728×90, the engine tries the contract-permitted levers—larger font sizes first, then smaller positive sizes when measured checks and qualitative readability allow, isotropic artwork scaling, topology pivots, and margin compression—before reporting a typed failure. These are feasibility measures, not a guarantee that every target is solvable.
 8. **Hermetic CPU execution:** The container targets `linux/amd64` offline with `--network none`, budgets $\le$ 8 CPU threads and $\le$ 8 GB RAM, has a 0 MB neural weight footprint, and has a < 2.0s per-design performance target pending qualification; these are not a substitute for the failure protocol or organizer clarification.
