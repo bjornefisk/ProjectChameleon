@@ -71,7 +71,7 @@ Rejected. It would let content evade containment. The exception is limited to th
 - `chameleon/chameleon_design_schema_v0.9.json` (`elements.minItems`, geometry fields)
 - `x`, `y`, `width`, `height`, `rotation`, `opacity`, `group_id`, `fit`, `font_size`
 - `chameleon/engine/main.py` self-check and future failure handling
-- `Docs/MATHEMATICAL_CONSTRAINTS.md`, `Docs/DIFFICULTY_TIERS_AND_FAILURE_MODES.md`
+- `Docs/FINAL_ARCHITECTURE.md` and `Docs/STATUS.md`
 
 ## Required validation tests
 

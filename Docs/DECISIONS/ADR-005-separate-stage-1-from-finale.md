@@ -43,7 +43,7 @@ Rejected. Manual decisions would violate autonomous Stage 1 behavior and make re
 
 ## Affected files/schema fields
 
-- `Docs/ADOBE_EXPRESS_INTERACTIVE_ADDON.md`
+- `Docs/FINAL_ARCHITECTURE.md` finale boundary
 - `chameleon/FAQ.md` and `chameleon/README.md`
 - `content`, `font_family`, `font_weight`, `font_style`, `color`, `style_runs`, `asset_id`, and element identity fields
 

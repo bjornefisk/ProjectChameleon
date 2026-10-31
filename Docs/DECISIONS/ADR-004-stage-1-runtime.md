@@ -55,7 +55,7 @@ Rejected. OR-Tools is not present, and solver choice is an implementation decisi
 - `chameleon/requirements.in` and `chameleon/requirements.lock`
 - `chameleon/renderer-build.in`, `chameleon/renderer-build.lock`, and `chameleon/renderer-artifact.json`
 - `chameleon/apt/` package/source/hash records
-- `Docs/HERMETIC_RUNTIME_ARCHITECTURE.md`
+- `Docs/FINAL_ARCHITECTURE.md` runtime boundary
 - `chameleon/brand_kit/` fonts/assets and any future model artifacts
 
 ## Required validation tests

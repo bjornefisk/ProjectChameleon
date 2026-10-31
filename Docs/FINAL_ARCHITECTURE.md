@@ -350,5 +350,3 @@ These facts are tracked in `Docs/STATUS.md` and `Docs/DEPENDENCY_EVIDENCE.md`. T
 - [Accepted ADRs](DECISIONS/)
 - [Ratified design schema](../chameleon/chameleon_design_schema_v0.9.json)
 - [Dependency evidence](DEPENDENCY_EVIDENCE.md)
-- [Implementation roadmap](IMPLEMENTATION_ROADMAP.md)
-- [Implementation specification](IMPLEMENTATION/SPEC.md)

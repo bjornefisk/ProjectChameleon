@@ -10,7 +10,7 @@ A horizontal ribbon layout generator and spatial compression engine for Level 3 
 The bounded horizontal-ribbon and vertical-restack families remain within the four-topology / twelve-candidate search. Issue #61 adds a source-PDF-grounded, renderer-measured copy-band candidate; the public Level 3 sample publishes a hard-valid JSON/PNG pair in repeated local integration tests. Font probes and each grouped-text scale-refinement invocation are capped at 74 steps; cutoff work is reported and remains typed `INCOMPLETE_SEARCH`, never infeasibility. Superseding decisions ADR-010 through ADR-012 preserve one common quantized group transform, remove the unsupported numeric readability floor, and keep actual glyphs inside unchanged declared bounds. Required native x86_64 CI run 39711973748 passed on PR head `33f6fd9`; PR #65 is merged and the issue closed. The owner waived partner review; no partner approval is recorded; official scoring remains unverified.
 
 **Current evidence:**
-See [`Docs/STATUS.md`](../../STATUS.md) and [`Docs/IMPLEMENTATION/tickets/08-qualification-evidence.md`](08-qualification-evidence.md) for current local results and explicit native-amd64 and organizer qualification boundaries.
+See [`Docs/STATUS.md`](../../STATUS.md) and [`Docs/DEPENDENCY_EVIDENCE.md`](../../DEPENDENCY_EVIDENCE.md) for current local results and explicit native-amd64 and organizer qualification boundaries.
 
 **Dispatch gate:**
 Ticket 06 is complete. The public sample now passes through Issue #61 and Accepted ADR-010 through ADR-012; PR #65 merged the bounded fix, and Issue #61 is closed. Keep this slice bounded, do not broaden it into solver dependencies, altered wire fields, or organizer-qualification claims.

@@ -18,8 +18,7 @@ When reading or implementing this project, follow this strict precedence. A lowe
    [`CHAMELEONCHALLENGE.md`](CHAMELEONCHALLENGE.md) and [`../chameleon/RULES.md`](../chameleon/RULES.md).
 5. **Contract Fixtures:**  
    [`../chameleon/tests/fixtures/contract/`](../chameleon/tests/fixtures/contract/).
-6. **Architectural & Algorithmic Guidance:**  
-   `PROBLEM.md`, `MATHEMATICAL_CONSTRAINTS.md`, `NEURO_SYMBOLIC_ARCHITECTURE.md`, `COMPUTATIONAL_LAYOUT_SOLVERS.md`, `TYPOGRAPHIC_REFLOW_AND_GROUPING.md`, `OBJECTIVE_EVALUATION_METRICS.md`, `DIFFICULTY_TIERS_AND_FAILURE_MODES.md`, `HERMETIC_RUNTIME_ARCHITECTURE.md`, `ADOBE_EXPRESS_INTERACTIVE_ADDON.md`.
+6. **Current architecture and evidence:** [`FINAL_ARCHITECTURE.md`](FINAL_ARCHITECTURE.md), [`STATUS.md`](STATUS.md), and [`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md).
 7. **Starter Scaffolding & Warnings:**  
    `../chameleon/README.md`, `../chameleon/FAQ.md`, and baseline code in `../chameleon/engine/resize.py` (explicitly an intentionally nonconforming baseline).
 
@@ -40,7 +39,6 @@ Implementation should start with `FINAL_ARCHITECTURE.md`, then consult the relev
 | [`IMPLEMENTATION_ROADMAP.md`](IMPLEMENTATION_ROADMAP.md) | **Execution Roadmap** | Phased delivery plan from Gate 0 through Gate 7, structuring how agents build and qualify the engine in vertical slices. |
 | [`FINAL_ARCHITECTURE.md`](FINAL_ARCHITECTURE.md) | **Consolidated Architecture** | Final implementation-facing summary of the Stage 1 engine, renderer, validator, runtime, search, failure, and finale boundaries. It is subordinate to the contract and Accepted ADRs. |
 | [`DEPENDENCY_EVIDENCE.md`](DEPENDENCY_EVIDENCE.md) | **Evidence Record** | Verifiable citations and facts for all external dependencies, renderer commits, base image digests, and runtime libraries. |
-| [`AGENT_HARNESS_PLAN.md`](AGENT_HARNESS_PLAN.md) | **Agent Harness** | Blueprint for the automated testing harness, regression corpus, and Makefile commands that guide agent development. |
 | [`IMPLEMENTATION/`](IMPLEMENTATION/) | **Implementation Blueprint** | Complete `to-spec` engineering specification, data flow models, and 8 dependency-sequenced tracer-bullet tickets for subagent execution. |
 | [`../.agents/`](../.agents/) | **Shared Agent Operating System** | Provider-neutral roles, workflows, policies, research/evidence standards, GitHub/PR guidance, checklists, templates, and handoff rules. |
 
@@ -64,15 +62,6 @@ All accepted ADRs reside in [`DECISIONS/`](DECISIONS/):
 
 | Document | Focus area | Key takeaways |
 |---|---|---|
-| [`PROBLEM.md`](PROBLEM.md) | Problem Formulation | Why uniform scaling fails, semantic gap in input data, and mandatory output behaviors. |
-| [`MATHEMATICAL_CONSTRAINTS.md`](MATHEMATICAL_CONSTRAINTS.md) | Mathematical Model | Formal equations for rotated AABB containment, image aspect ratio invariance, source-separated non-overlap, and soft readability/contrast targets. |
-| [`NEURO_SYMBOLIC_ARCHITECTURE.md`](NEURO_SYMBOLIC_ARCHITECTURE.md) | Internal Pipeline Guidance | Internal four-phase pipeline: role/relationship inference, layout archetype generation, constraint placement/typography, and serialize/render/validate. It is not the product Stage 1/finale split. |
-| [`COMPUTATIONAL_LAYOUT_SOLVERS.md`](COMPUTATIONAL_LAYOUT_SOLVERS.md) | Solver Paradigms | Keeps bounded structured search primary; treats Kiwi/Cassowary and CP-SAT as deferred alternatives requiring evidence and an accepted decision. |
-| [`TYPOGRAPHIC_REFLOW_AND_GROUPING.md`](TYPOGRAPHIC_REFLOW_AND_GROUPING.md) | Typography & Groups | Font metric measurement, binary-search font sizing within slots, typographic hierarchy preservation, and rigid unit derivation. |
-| [`OBJECTIVE_EVALUATION_METRICS.md`](OBJECTIVE_EVALUATION_METRICS.md) | Optimization Proxies | Distinguishes hard validation gates from soft ranking terms (alignment, balance, readability, occlusion, overlap penalty). |
-| [`DIFFICULTY_TIERS_AND_FAILURE_MODES.md`](DIFFICULTY_TIERS_AND_FAILURE_MODES.md) | Benchmark Profiles | Level 1 (Warm-up), Level 2 (Core banner with bleed), and Level 3 (Advanced 728x90 leaderboard), detailing adversarial stress modes. |
-| [`HERMETIC_RUNTIME_ARCHITECTURE.md`](HERMETIC_RUNTIME_ARCHITECTURE.md) | Container Environment | Offline container requirements, build-time packaging, network isolation, and CPU-only resource bounds. |
-| [`ADOBE_EXPRESS_INTERACTIVE_ADDON.md`](ADOBE_EXPRESS_INTERACTIVE_ADDON.md) | Stage 2 Finale | Architecture for the live Adobe Express add-on at Adobe HQ, candidate carousels, pinning, and local HTTP engine integration. |
 | [`CHAMELEONCHALLENGE.md`](CHAMELEONCHALLENGE.md) | Historical Challenge Brief | Original competition brief supplied by Adobe, contest structure, glossary, and starter instructions. |
 
 ---

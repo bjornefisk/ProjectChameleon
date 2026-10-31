@@ -88,7 +88,7 @@ Until that file arrives, this packet and `Docs/PRESENTATION.md` are the usable w
 - Architecture boundary: `Docs/FINAL_ARCHITECTURE.md`
 - Dependency and package evidence: `Docs/DEPENDENCY_EVIDENCE.md`
 - Presentation outline: `Docs/PRESENTATION.md`
-- Public Level 3 evidence: `Docs/IMPLEMENTATION/tickets/08-qualification-evidence.md`
+- Public Level 3 evidence: `Docs/STATUS.md` and `Docs/DEPENDENCY_EVIDENCE.md`
 
 ## Final claim boundary
 

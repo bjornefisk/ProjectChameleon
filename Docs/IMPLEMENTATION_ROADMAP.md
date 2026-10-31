@@ -129,16 +129,7 @@ The following review notes are retained for rationale and are subordinate to the
 
 ## Historical review findings (resolved or superseded)
 
-| Document | Original review finding |
-| --- | --- |
-| [Neuro-symbolic architecture](NEURO_SYMBOLIC_ARCHITECTURE.md) | Replace fixed role thresholds, containment-first grouping, three-regime routing, universal non-overlap, and mandatory Kiwi with source-aware rules. |
-| [Typographic reflow and grouping](TYPOGRAPHIC_REFLOW_AND_GROUPING.md) | Document explicit renderer line maps, measured metrics, source hierarchy preservation, and `group_id` precedence. |
-| [Mathematical constraints](MATHEMATICAL_CONSTRAINTS.md) | Add identity, fixed-property, rotated-bound, rounding, missing-asset, and source-overlap checks. |
-| [Objective metrics](OBJECTIVE_EVALUATION_METRICS.md) | Treat Val, Ove, Ali, Bal, Occ, and Rea as internal proxies, not the judging rubric, and make overlap and contrast source-aware. |
-| [Difficulty tiers](DIFFICULTY_TIERS_AND_FAILURE_MODES.md) | Remove fixed pixel slots and include vertical re-stack and adversarial edge cases. |
-| [Computational layout solvers](COMPUTATIONAL_LAYOUT_SOLVERS.md) | Keep bounded structured search primary; keep CP-SAT and Kiwi deferred unless measured evidence and an accepted dependency decision justify them; score alignment and spacing. |
-| [Hermetic runtime](HERMETIC_RUNTIME_ARCHITECTURE.md) | State the `linux/amd64` build target and separate offline requirements from unverified performance targets. |
-| [Interactive finale](ADOBE_EXPRESS_INTERACTIVE_ADDON.md) | Keep shedding and copy revision explicitly outside Stage 1, with no zero-size or hidden-element workaround. |
+Historical rationale remains in repository history. Current implementation boundaries and evidence live in `FINAL_ARCHITECTURE.md`, `PROJECT_CONTRACT.md`, `STATUS.md`, and accepted ADRs.
 
 The following phase matrix names implementation workstreams after Gate 1; these phases are not product stages and do not override current gate blockers.
 

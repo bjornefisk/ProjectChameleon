@@ -21,4 +21,4 @@ The checkboxes below preserve the earlier Ticket 08 evidence record. Current Iss
 - [x] Run the container with `--network none` mounting input and output volumes: record whether each level produces a valid JSON/PNG pair, any typed failure status, and measured per-design runtime against the <$2.0$ second performance target.
 - [x] Measure peak memory against the <$500\text{ MB}$ solver target and image size against the <$8\text{ GB}$ container ceiling; record evidence rather than treating targets as completed qualification.
 
-Evidence: [08-qualification-evidence.md](08-qualification-evidence.md)
+Evidence: [STATUS.md](../../STATUS.md) and [DEPENDENCY_EVIDENCE.md](../../DEPENDENCY_EVIDENCE.md)
